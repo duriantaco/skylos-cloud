@@ -54,9 +54,9 @@ function generateBadge(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
-  const { projectId } = params
+  const { projectId } = await params 
   const { searchParams } = new URL(request.url)
   const style = (searchParams.get("style") as BadgeStyle) || "flat"
   const branch = searchParams.get("branch")
