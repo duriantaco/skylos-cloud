@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const GITHUB_APP_NAME = "Skylos Gate"
+const GITHUB_APP_NAME = "skylos-gate"
 
 export default function GitHubIntegration() {
   const [installing, setInstalling] = useState(false);
