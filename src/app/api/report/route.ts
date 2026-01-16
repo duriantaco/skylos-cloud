@@ -7,6 +7,7 @@ import { sendSlackNotification } from "@/lib/slack";
 import { sendDiscordNotification } from "@/lib/discord";
 import { getSiteUrl } from "@/lib/site";
 import { trackEvent } from "@/lib/analytics";
+import { SupabaseClient } from '@supabase/supabase-js';
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -24,6 +25,21 @@ const LIMITS = {
   MAX_MESSAGE_LENGTH: 1000,
   MAX_FILE_PATH_LENGTH: 500,
 };
+
+async function batchInsertFindings(
+  supabase: SupabaseClient,
+  rows: any[]
+): Promise<void> {
+  if (rows.length === 0) 
+    return;
+  
+  const BATCH_SIZE = 500;
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE);
+    const { error } = await supabase.from('findings').insert(batch);
+    if (error) throw new Error(`Batch insert failed: ${error.message}`);
+  }
+}
 
 type Plan = "free" | "pro" | "enterprise";
 
@@ -198,15 +214,13 @@ export async function POST(req: Request) {
     }
     const token = authHeader.split(' ')[1]
 
-    // Include all notification fields in project query
     const { data: project, error: projError } = await supabase
       .from('projects')
       .select(`
         id, name, org_id, strict_mode, repo_url, policy_config,
-        slack_webhook_url, slack_notifications_enabled, slack_notify_on,
-        discord_webhook_url, discord_notifications_enabled, discord_notify_on,
-        organizations(plan)
-      `)
+        github_installation_id, slack_webhook_url, slack_notifications_enabled, 
+        slack_notify_on, discord_webhook_url, discord_notifications_enabled, 
+        discord_notify_on, organizations(plan)`)
       .eq('api_key', token)
       .single()
 
@@ -267,32 +281,41 @@ export async function POST(req: Request) {
       }, { status: 403 })
     }
 
-    let isWhitelisted = false;
-    if (caps.overridesEnabled) {
-      const { data: overriddenScan } = await supabase
+    const [overriddenScanResult, baselineScanResult, suppressionsResult] = await Promise.all([
+      caps.overridesEnabled
+        ? supabase
+            .from('scans')
+            .select('id, override_reason')
+            .eq('project_id', project.id)
+            .eq('commit_hash', commit_hash)
+            .eq('is_overridden', true)
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+
+      supabase
         .from('scans')
-        .select('id, override_reason')
+        .select('id')
         .eq('project_id', project.id)
-        .eq('commit_hash', commit_hash)
-        .eq('is_overridden', true)
+        .eq('branch', 'main')
+        .or('quality_gate_passed.eq.true,is_overridden.eq.true')
+        .order('created_at', { ascending: false })
         .limit(1)
-        .maybeSingle()
+        .maybeSingle(),
 
-      isWhitelisted = !!overriddenScan
-    }
+      caps.suppressionsEnabled
+        ? supabase
+            .from('suppressions')
+            .select('rule_id, file_path, line_number, expires_at')
+            .eq('project_id', project.id)
+            .is('revoked_at', null)
+        : Promise.resolve({ data: [] }),
+    ])
 
-    const { data: baselineScan } = await supabase
-      .from('scans')
-      .select('id')
-      .eq('project_id', project.id)
-      .eq('branch', 'main')
-      .or('quality_gate_passed.eq.true,is_overridden.eq.true')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const isWhitelisted = !!overriddenScanResult.data
+    const baselineScan = baselineScanResult.data
 
     const baselineCredits = new Map<string, number>()
-
     if (baselineScan?.id) {
       const { data: oldFindings } = await supabase
         .from('findings')
@@ -308,26 +331,17 @@ export async function POST(req: Request) {
     }
 
     const activeSuppressions = new Set<string>()
-    if (caps.suppressionsEnabled) {
-      const now = new Date()
-      const nowIso = now.toISOString()
+    const now = new Date()
+    const nowIso = now.toISOString()
 
-      const { data: suppressionRows } = await supabase
-        .from('suppressions')
-        .select('rule_id, file_path, line_number, expires_at, revoked_at')
-        .eq('project_id', project.id)
-        .is('revoked_at', null)
-
-      ;(suppressionRows || []).forEach((s: any) => {
-        if (s.expires_at && String(s.expires_at) <= nowIso) 
-          return
-        
-        const ruleId = String(s.rule_id || "UNKNOWN")
-        const filePath = normPath(String(s.file_path || ""))
-        const lineNum = Number(s.line_number || 0)
-        activeSuppressions.add(supKey(ruleId, filePath, lineNum))
-      })
-    }
+    ;(suppressionsResult.data || []).forEach((s: any) => {
+      if (s.expires_at && String(s.expires_at) <= nowIso) 
+        return
+      const ruleId = String(s.rule_id || "UNKNOWN")
+      const filePath = normPath(String(s.file_path || ""))
+      const lineNum = Number(s.line_number || 0)
+      activeSuppressions.add(supKey(ruleId, filePath, lineNum))
+    })
 
     const finalFindings = processedFindings.map((f: any) => {
       const ruleId = f.rule_id
@@ -499,15 +513,67 @@ export async function POST(req: Request) {
     }))
 
     if (dbRows.length > 0) {
-      const { error: insertError } = await supabase.from('findings').insert(dbRows)
-      if (insertError) 
-        throw new Error(insertError.message)
+      await batchInsertFindings(supabase, dbRows);
     }
 
     await cleanupOldScans(project.id, caps.maxScansStored);
 
-    // GitHub Check Runs
-    if (caps.checkRunsEnabled) {
+    if (caps.checkRunsEnabled && (project as any).github_installation_id) {
+      try {
+        const { getInstallationOctokit } = await import("@/lib/github-app");
+        const octokit = await getInstallationOctokit((project as any).github_installation_id);
+        
+        const [owner, repo] = (project.repo_url || "")
+          .replace("https://github.com/", "")
+          .replace(".git", "")
+          .split("/");
+        
+        if (owner && repo && commit_hash && commit_hash !== "local") {
+          // Find existing check run for this SHA
+          const { data: checkRuns } = await octokit.checks.listForRef({
+            owner,
+            repo,
+            ref: commit_hash,
+            check_name: "Skylos Quality Gate",
+          });
+          
+          const checkRun = checkRuns.check_runs[0];
+          
+          if (checkRun) {
+            await octokit.checks.update({
+              owner,
+              repo,
+              check_run_id: checkRun.id,
+              status: "completed",
+              conclusion: passedGate ? "success" : "failure",
+              output: {
+                title: passedGate ? "Quality Gate Passed" : "Quality Gate Failed",
+                summary: `Found ${unsuppressedNewCount} new issue(s).`,
+                text: `[View full report](${process.env.APP_BASE_URL}/dashboard/scans/${scan.id})`,
+              },
+            });
+          } else {
+            await octokit.checks.create({
+              owner,
+              repo,
+              name: "Skylos Quality Gate",
+              head_sha: commit_hash,
+              status: "completed",
+              conclusion: passedGate ? "success" : "failure",
+              output: {
+                title: passedGate ? "Quality Gate Passed" : "Quality Gate Failed",
+                summary: `Found ${unsuppressedNewCount} new issue(s).`,
+                text: `[View full report](${process.env.APP_BASE_URL}/dashboard/scans/${scan.id})`,
+              },
+            });
+          }
+        }
+      } catch (e) {
+        console.error("GitHub App CheckRun failed:", e);
+      }
+    }
+    // Fallback to old method if no GitHub App installed
+    else if (caps.checkRunsEnabled) {
       try {
         await postSkylosCheckRun({
           repoUrl: project.repo_url || null,
@@ -529,15 +595,10 @@ export async function POST(req: Request) {
         console.error("GitHub CheckRun failed:", e);
       }
     }
-
-    // ========================================
-    // NOTIFICATIONS (Slack + Discord)
-    // ========================================
     
-    // Build notification payload once (shared between Slack/Discord)
     const notificationPayload: NotificationPayload = {
       passed: passedGate,
-      isRecovery: false, // Will be set below if needed
+      isRecovery: false,
       newIssues: unsuppressedNewCount,
       criticalCount: unsuppressedNewBySeverity['CRITICAL'] || 0,
       highCount: unsuppressedNewBySeverity['HIGH'] || 0,
