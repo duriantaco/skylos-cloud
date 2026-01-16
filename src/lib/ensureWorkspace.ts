@@ -37,7 +37,7 @@ export async function getUserProjects(supabase: SupabaseClient, orgId: string) {
 export async function getProject(supabase: SupabaseClient, projectId: string, orgId: string) {
   const { data: project } = await supabase
     .from("projects")
-    .select("id, name, repo_url, api_key, policy_config, created_at, strict_mode")
+    .select("id, name, repo_url, api_key, policy_config, created_at, strict_mode, github_installation_id")
     .eq("id", projectId)
     .eq("org_id", orgId)
     .single();

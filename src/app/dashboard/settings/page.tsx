@@ -10,7 +10,7 @@ import SlackIntegration from "@/components/settings/SlackIntegration";
 import DiscordIntegration from "@/components/settings/DiscordIntegration";
 import { createClient } from "@/utils/supabase/server";
 import DevPlanToggle from "@/components/settings/DevPlanToggle";
-
+import GitHubAppInstall from "@/components/settings/GitHubAppInstall"
 
 async function updatePlan(formData: FormData) {
   'use server'
@@ -268,6 +268,12 @@ export default async function SettingsPage({
         <p className="text-slate-500 mb-6">Manage API keys, quality gates, and analysis configuration.</p>
 
         <ProjectSwitcher projects={projects} selectedProjectId={project.id} />
+
+        <GitHubAppInstall 
+          currentPlan={userPlan}
+          githubInstallationId={project.github_installation_id}
+          repoUrl={project.repo_url}
+        />
 
         <div className={`rounded-xl p-6 mb-8 border-2 ${
           ['pro'].includes(userPlan)
