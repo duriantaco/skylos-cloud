@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { ArrowLeft, Key, Shield, FolderOpen, MessageSquare, Hash, Zap } from "lucide-react";
+import { ArrowLeft, Key, Shield, FolderOpen, MessageSquare, Hash } from "lucide-react";
 import { ensureWorkspace, getUserProjects, getProject } from "@/lib/ensureWorkspace";
 import ApiKeySection from "@/components/settings/ApiKeySection";
 import PolicyEditor from "@/components/settings/PolicyEditor";
@@ -11,6 +11,7 @@ import DiscordIntegration from "@/components/settings/DiscordIntegration";
 import { createClient } from "@/utils/supabase/server";
 import DevPlanToggle from "@/components/settings/DevPlanToggle";
 import GitHubAppInstall from "@/components/settings/GitHubAppInstall"
+import RepoUrlEditor from "@/components/settings/RepoUrlEditor";
 
 async function updatePlan(formData: FormData) {
   'use server'
@@ -268,6 +269,8 @@ export default async function SettingsPage({
         <p className="text-slate-500 mb-6">Manage API keys, quality gates, and analysis configuration.</p>
 
         <ProjectSwitcher projects={projects} selectedProjectId={project.id} />
+
+        <RepoUrlEditor projectId={project.id} currentUrl={project.repo_url} />
 
         <GitHubAppInstall 
           currentPlan={userPlan}
