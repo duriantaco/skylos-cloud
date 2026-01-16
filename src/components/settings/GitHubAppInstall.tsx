@@ -9,9 +9,10 @@ type Props = {
   currentPlan: string
   githubInstallationId: number | null
   repoUrl: string | null
+  projectId: string
 }
 
-export default function GitHubAppInstall({ currentPlan, githubInstallationId, repoUrl }: Props) {
+export default function GitHubAppInstall({ currentPlan, githubInstallationId, repoUrl, projectId }: Props) {
   const [installing, setInstalling] = useState(false)
   
   const isPro = currentPlan === "pro" || currentPlan === "enterprise"
@@ -19,7 +20,8 @@ export default function GitHubAppInstall({ currentPlan, githubInstallationId, re
   
   const handleInstall = () => {
     setInstalling(true)
-    window.location.href = `https://github.com/apps/${GITHUB_APP_NAME}/installations/new`
+    const state = encodeURIComponent(projectId)
+    window.location.href = `https://github.com/apps/${GITHUB_APP_NAME}/installations/new?state=${state}`
   }
   
   if (!isPro) {

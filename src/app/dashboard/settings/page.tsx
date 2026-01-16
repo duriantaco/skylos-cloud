@@ -276,6 +276,7 @@ export default async function SettingsPage({
           currentPlan={userPlan}
           githubInstallationId={project.github_installation_id}
           repoUrl={project.repo_url}
+          projectId={project.id}
         />
 
         <div className={`rounded-xl p-6 mb-8 border-2 ${
