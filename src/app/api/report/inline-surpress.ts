@@ -15,7 +15,8 @@ export interface SuppressionResult {
 }
 
 export function parseInlineSuppressions(snippet: string): InlineSuppression[] {
-  if (!snippet) return [];
+  if (!snippet) 
+    return [];
   
   const lines = snippet.split("\n");
   const suppressions: InlineSuppression[] = [];

@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from "next/server"
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
 }
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
@@ -60,6 +60,17 @@ export async function GET(
   const { searchParams } = new URL(request.url)
   const style = (searchParams.get("style") as BadgeStyle) || "flat"
   const branch = searchParams.get("branch")
+
+  const uuidRe =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  if (!uuidRe.test(projectId)) {
+    const svg = generateBadge("skylos", "not found", COLORS.unknown, style);
+    return new NextResponse(svg, {
+      status: 404,
+      headers: { "Content-Type": "image/svg+xml" },
+    });
+  }
 
   try {
     const { data: project } = await supabase

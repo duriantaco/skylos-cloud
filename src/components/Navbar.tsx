@@ -23,11 +23,22 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <div className="hidden items-center gap-8 text-sm text-slate-600 md:flex">
-          <a href="#features" className="hover:text-slate-900 transition">Features</a>
-          <a href="#how" className="hover:text-slate-900 transition">How it works</a>
-          <a href="#pricing" className="hover:text-slate-900 transition">Pricing</a>
-          <Link href="https://docs.skylos.dev/" className="hover:text-slate-900 transition">Docs</Link>
+        <div className="hidden items-center gap-2 text-sm text-slate-600 md:flex">
+          <a href="#features" className="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition">
+            Features
+          </a>
+          <a href="#how" className="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition">
+            How it works
+          </a>
+          <a href="#pricing" className="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition">
+            Pricing
+          </a>
+          <Link href="/blog" className="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition">
+            Blog
+          </Link>
+          <Link href="https://docs.skylos.dev/" className="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition">
+            Docs
+          </Link>
         </div>
 
         <div className="flex items-center gap-3">

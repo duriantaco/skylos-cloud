@@ -16,13 +16,31 @@ export async function POST(
 
   const { data: scanData, error: scanError } = await supabase
     .from("scans")
-    .select(`*, projects ( repo_url )`)
+    .select(`*, projects ( repo_url, org_id )`)
     .eq("id", id)
     .single();
 
-  if (scanError || !scanData) {
-    return NextResponse.json({ error: "Scan not found" }, { status: 404 });
+  const orgId = (scanData.projects as any)?.org_id;
+    if (!orgId) {
+      return NextResponse.json({ error: "Scan not found" }, { status: 404 });
+    }
+
+  const { data: member, error: memErr } = await supabase
+    .from("organization_members")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("org_id", orgId)
+    .single();
+
+  if (memErr || !member) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  const role = String(member.role || "").toLowerCase();
+  if (role !== "owner" && role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
 
   const { error: updateError } = await supabase
     .from("scans")

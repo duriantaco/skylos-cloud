@@ -1,0 +1,124 @@
+---
+title: "Why SAST tools drown teams in false positives (and what actually works)"
+excerpt: "Static Application Security Testing (SAST) is supposed to catch vulnerabilities before they ship. In practice? Most teams end up ignoring it."
+publishedAt: "2026-01-21"
+tags: ["security", "sast", "appsec"]
+---
+
+
+But whether that's actually exploitable depends on stuff SAST can't see:
+- Authentication middleware
+- Input validation layers
+- Framework-level protections
+- Type checking
+- Feature flags that disable entire code paths
+
+SAST just sees "there's a path from A to B" and panics. It doesn't know that path is blocked six different ways.
+
+
+## Static analysis has to choose: miss bugs or cry wolf
+
+Every SAST engine faces a tradeoff between precision and recall.
+
+You can tune for fewer false positives (high precision), but then you miss real bugs. Or you can catch everything (high recall), but drown in noise.
+
+This is why some tools let you pick different modes — "daily dev workflow" vs "security audit sweep". It's the same tradeoff, just exposed as a feature.
+
+
+## Infeasible paths: code that exists but never runs
+
+A huge source of false positives is when SAST finds a dangerous path that literally cannot execute.
+
+```py
+if not user.is_admin:
+    return
+
+# only admins reach this point
+db.execute(f"DELETE FROM users WHERE id={user_input}")
+```
+
+A naive rule sees SQL injection. It doesn't understand that non-admins bail out before they ever get there.
+
+
+## Tools don't know your application's context
+
+Even when a finding is technically correct, it might not matter in *your* codebase:
+- Your auth layer might guarantee that input is safe
+- Your framework might sanitize certain inputs automatically
+- Your business logic might enforce constraints that aren't obvious from static analysis alone
+
+Without app-specific customization, tools over-report by default.
+
+
+## Pattern matching is fast, cheap, and extremely noisy
+
+A lot of older SAST tools still rely heavily on simple pattern matching:
+- Regex searches
+- AST pattern rules
+- "Dangerous API" blacklists (`eval`, `exec`, `os.system`)
+- String-matching heuristics
+
+This catches obvious mistakes, but it also fires on safe code constantly.
+
+
+## Logic bugs are the real threat (and nearly impossible to detect statically)
+
+The most dangerous vulnerabilities today aren't SQL injection — they're logic bugs:
+- Broken access control (IDOR)
+- Missing authorization checks
+- Privilege escalation in multi-step workflows
+- Race conditions
+
+These require understanding *intent*, not just code patterns. Even fancy AI-based SAST tools struggle here, often flagging issues based on assumptions rather than proof.
+
+
+## Scale makes everything worse
+
+Even a 5% false positive rate becomes unbearable at scale.
+
+Let's say you have:
+- 200 repos
+- 10,000 alerts per week
+- 5% false positive rate
+
+That's **500 bogus alerts every week**. At that point, it's just spam.
+
+
+## What actually works
+
+### Use modern dataflow analysis
+Skip pure pattern matching. Look for tools that do:
+- Real taint tracking and dataflow analysis
+- Framework-aware modeling (knows how Django/Rails/etc work)
+- Sanitizer detection
+- Reachability analysis (can this code even run?)
+
+### Run different modes for different contexts
+High-precision mode for developers. Deep scans for security reviews.
+
+### Add a human triage layer
+Here's the key insight: **don't show developers everything**.
+
+Run comprehensive scans in CI, but filter results before surfacing them. Let your security team or a triage process decide what's actually worth showing to devs.
+
+### Make suppressions first-class
+False positives will never hit zero. Accept that.
+
+Good tools let you suppress findings with context:
+- "Accepted risk"
+- "Not applicable in our architecture"
+- "False positive"
+
+And they make those suppressions reviewable and auditable.
+
+
+## The real problem
+
+False positives aren't just annoying. They actively make your codebase less secure.
+
+Once developers stop trusting the security tool:
+- They ignore all alerts (including real ones)
+- They route around it
+- Actual vulnerabilities slip through
+
+The goal isn't to "scan harder" or "find more issues". It's to **be right more often** so people actually pay attention when you flag something.

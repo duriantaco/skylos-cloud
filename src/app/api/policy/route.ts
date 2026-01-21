@@ -10,9 +10,12 @@ function toNonNegInt(v: any, fallback: number) {
 }
 
 function toBool(v: any, fallback: boolean) {
-  if (v === true || v === false) return v;
-  if (v === "true") return true;
-  if (v === "false") return false;
+  if (v === true || v === false) 
+    return v;
+  if (v === "true") 
+    return true;
+  if (v === "false") 
+    return false;
   return fallback;
 }
 
@@ -31,21 +34,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
     }
 
-    // Custom rules
     const incomingRules = Array.isArray(body.custom_rules) ? body.custom_rules : [];
     const custom_rules = incomingRules
       .map((x: any) => String(x ?? "").trim())
       .filter(Boolean)
       .slice(0, 50);
 
-    // Exclude paths
     const incomingPaths = Array.isArray(body.exclude_paths) ? body.exclude_paths : [];
     const exclude_paths = incomingPaths
       .map((x: any) => String(x ?? "").trim())
       .filter(Boolean)
       .slice(0, 100);
 
-    // Quality thresholds
     const complexity_enabled = toBool(body.complexity_enabled, true);
     const complexity_threshold = toNonNegInt(body.complexity_threshold, 10);
     const nesting_enabled = toBool(body.nesting_enabled, true);
@@ -55,13 +55,11 @@ export async function POST(req: Request) {
     const arg_count_enabled = toBool(body.arg_count_enabled, true);
     const arg_count_threshold = toNonNegInt(body.arg_count_threshold, 5);
 
-    // Category toggles
     const security_enabled = toBool(body.security_enabled, true);
     const secrets_enabled = toBool(body.secrets_enabled, true);
     const quality_enabled = toBool(body.quality_enabled, true);
     const dead_code_enabled = toBool(body.dead_code_enabled, true);
 
-    // Gate config
     const g = body.gate || {};
     const gate = {
       enabled: toBool(g.enabled, true),
@@ -81,12 +79,10 @@ export async function POST(req: Request) {
     for (const c of defaultCats) gate.by_category[c] = toNonNegInt(catObj[c], 0);
     for (const s of defaultSev) gate.by_severity[s] = toNonNegInt(sevObj[s], 0);
 
-    // Build policy_config object
     const policy_config = {
       custom_rules,
       gate,
       exclude_paths,
-      // Thresholds
       complexity_enabled,
       complexity_threshold,
       nesting_enabled,
@@ -95,14 +91,12 @@ export async function POST(req: Request) {
       function_length_threshold,
       arg_count_enabled,
       arg_count_threshold,
-      // Categories
       security_enabled,
       secrets_enabled,
       quality_enabled,
       dead_code_enabled,
     };
 
-    // Update project
     const { error } = await supabase
       .from("projects")
       .update({ policy_config })
