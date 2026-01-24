@@ -17,10 +17,14 @@ function timeAgo(dateString: string) {
   const now = new Date();
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
   
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  if (seconds < 60) 
+    return "just now";
+  if (seconds < 3600) 
+    return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) 
+    return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) 
+    return `${Math.floor(seconds / 86400)}d ago`;
   return date.toLocaleDateString();
 }
 
@@ -206,7 +210,23 @@ export default async function DashboardRoot() {
               {projects?.length || 0} project{(projects?.length || 0) !== 1 ? 's' : ''} • {scansThisWeek.length} scan{scansThisWeek.length !== 1 ? 's' : ''} this week
             </p>
           </div>
+
           <div className="flex items-center gap-3">
+
+            <Link 
+                href="/dashboard/rules" 
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+              >
+                Rules
+            </Link>
+
+            <Link 
+                href="/dashboard/compliance" 
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+              >
+                Compliance
+            </Link>
+
             <Link 
               href="/dashboard/settings" 
               className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"

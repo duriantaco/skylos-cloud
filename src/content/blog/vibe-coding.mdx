@@ -1,0 +1,519 @@
+---
+title: "AI-generated code is shipping vulnerabilities"
+excerpt: "LLMs write code fast. The problem? It is not safe. Here is why AI-generated code fails security checks, the most common vulnerability patterns, and how to detect them with SAST and agentic verification."
+publishedAt: "2026-01-23"
+updatedAt: "2026-01-23"
+tags: ["security", "sast", "appsec", "ai", "devsecops"]
+keywords:
+  - AI generated code security
+  - vibe coding vulnerabilities
+  - LLM insecure code
+  - SAST for AI code
+  - detect hallucinated code
+  - Copilot vulnerable code study
+  - secure AI coding workflow
+  - agentic AI security
+canonicalUrl: "/blog/ai-generated-code-vulnerabilities-vibe-coding"
+---
+
+# AI-generated code is shipping vulnerabilities
+
+AI coding assistants are everywhere now. They make teams faster, more efficient, and they allow teams to ship features quicker. However, they also introduce a new kind of risk: AI-generated code often looks correct, but is it really?
+
+This pattern is so common that large evaluations have found a huge fraction of AI-generated code failing even basic vulnerability categories like injection and insecure defaults. Veracode's 2025 report evaluated 100+ LLMs and found many produced insecure outputs.
+
+Source: [Veracode 2025 GenAI Code Security Report](https://www.veracode.com/blog/genai-code-security-report/)
+
+---
+
+## Summary
+
+This post covers the following key points:
+
+- Common vulnerability patterns include injection, broken access control, weak auth, and unsafe defaults
+- AI introduces unique failure modes such as hallucinated dependencies, phantom helper functions, and feeling of "good" security
+- The solution is building a secure AI coding pipeline with high-signal SAST, agentic verification, and PR-time guardrails
+
+**To be very clear, this is not an "AI is bad" post. It is a "treat AI output like untrusted input" post.**
+
+
+---
+
+## Why AI-generated code fails security checks
+
+Humans write insecure code too. But AI adds a specific flavor of insecurity.
+
+### The model is trained to be helpful, not safe
+
+LLMs learn from massive code corpora. They absorb patterns, including insecure ones, and reproduce them confidently.
+
+Research shows AI assistants can generate code containing security weaknesses at non-trivial rates. 
+One peer-reviewed analysis of Copilot-generated code identified many snippets with security weaknesses across languages.
+
+These same "vibe-coded" security flaws, are then used to fine-tune/train new models.
+
+Source: [ACM study (Fu et al.)](https://dl.acm.org/doi/10.1145/3716848)
+
+### Fake-good security (security theater)
+
+A dangerous pattern is when AI produces code that looks secure:
+
+```python
+# This looks safe but the functions may not even exist or it does nothing
+user_input = sanitize_input(request.data)
+if validate_user(user_id):
+    check_permissions(user_id, resource)
+    return get_resource(resource)
+```
+
+These functions are often missing, incomplete, never called, or not connected to enforcement. The code passes visual inspection and still ships a vulnerability.
+
+### Hallucinated dependencies
+
+A newer failure mode is library hallucination: importing packages that do not exist, calling functions that are not real, or using APIs that have deprecated eons ago.
+
+```python
+# This import may not exist
+from security_utils_new import auto_sanitize_sql
+
+# The model hallucinated this package
+import flask_secured  # This does not exist in pypi
+```
+
+This is not just reliability pain. It becomes a security risk when teams patch around it quickly and accidentally disable important safety checks.
+
+Source: [Library Hallucinations in LLMs (Twist et al.)](https://arxiv.org/pdf/2509.22202)
+
+---
+
+## The most common vibe-coded vulnerabilities
+
+These are the patterns you will see repeatedly when teams ship AI-generated code under time pressure.
+
+### Injection vulnerabilities
+
+Classic issue: raw user input flows into dangerous sinks. Even modern teams still get hit by injection because AI will often pick the code that works, not the safest.
+
+**SQL Injection Example:**
+
+```python
+# Vulnerable: string concat
+def get_user(user_id):
+    query = f"SELECT * FROM users WHERE id = '{user_id}'"
+    return db.execute(query)
+
+# Secure: parameterized query
+def get_user(user_id):
+    query = "SELECT * FROM users WHERE id = %s"
+    return db.execute(query, (user_id,))
+```
+
+**Command Injection Example:**
+
+```python
+# Vulnerable
+def convert_file(filename):
+    os.system(f"convert {filename} output.pdf")
+
+# Secure
+def convert_file(filename):
+    subprocess.run(["convert", filename, "output.pdf"], check=True)
+```
+
+**Template Injection Example:**
+
+```python
+# Vulnerable: user input in template
+@app.route("/hi")
+def hi():
+    template = request.args.get("template", "Hi {{ name }}")
+    return render_template_string(template, name="User")
+
+# Secure: **never** use user input as template
+@app.route("/hi")
+def hi():
+    name = request.args.get("name", "User")
+    return render_template("hi.html", name=name)
+```
+
+### Broken access control
+
+This is one of the biggest real-world risk categories. A lot of working code forgets to enforce who is allowed to do what, especially in multi-step workflows.
+
+AI will happily generate endpoints like these and omit permission checks because the prompt did not demand them:
+
+```javascript
+// Vulnerable: no auth check
+app.get("/invoice/:id", async (req, res) => {
+  const invoice = await Invoice.findById(req.params.id)
+  res.json(invoice)
+})
+
+// Secure: verify ownership
+app.get("/invoice/:id", async (req, res) => {
+  const invoice = await Invoice.findById(req.params.id)
+  
+  if (!invoice) {
+    return res.status(404).json({ error: "Not found" })
+  }
+  
+  if (invoice.userId !== req.user.id) {
+    return res.status(403).json({ error: "Forbidden" })
+  }
+  
+  res.json(invoice)
+})
+```
+
+**Multi-step workflow example:**
+
+```python
+# Vulnerable: checks permission only once and not on state change
+class OrderWorkflow:
+    def __init__(self, order_id, user):
+        self.order = Order.get(order_id)
+        if self.order.user_id != user.id:
+            raise PermissionError()
+    
+    def cancel(self):
+        # Missing: re-check if user can cancel at this state
+        self.order.status = "cancelled"
+        self.order.save()
+
+# Secure: check permissions at each state transition
+class OrderWorkflow:
+    def __init__(self, order_id, user):
+        self.order = Order.get(order_id)
+        self.user = user
+        self._verify_access()
+    
+    def _verify_access(self):
+        if self.order.user_id != self.user.id:
+            raise PermissionError("Not your order")
+    
+    def cancel(self):
+        self._verify_access()
+        if self.order.status not in ["pending", "confirmed"]:
+            raise InvalidStateError("Cannot cancel at this stage")
+        self.order.status = "cancelled"
+        self.order.save()
+```
+
+OWASP consistently highlights broken access control as a major web risk category in modern apps.
+
+### Unsafe defaults
+
+AI commonly defaults to configurations that are convenient but insecure:
+
+```python
+# Vulnerable defaults in Flask
+app = Flask(__name__)
+app.config["DEBUG"] = True  # Exposes debugger in production
+app.config["SECRET_KEY"] = "dev"  # Predictable secret
+
+# Secure configuration
+import os
+
+app = Flask(__name__)
+app.config["DEBUG"] = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
+
+if not app.config["SECRET_KEY"]:
+    raise RuntimeError("SECRET_KEY environment variable required")
+```
+
+**CORS misconfiguration:**
+
+```javascript
+// Vulnerable: allows any origin
+app.use(cors({
+  origin: "*",
+  credentials: true  // This combination is dangerous
+}))
+
+// Secure: explicit allowlist
+const allowedOrigins = [
+  "https://app.example.com",
+  "https://admin.example.com"
+]
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error("Not allowed by CORS"))
+    }
+  },
+  credentials: true
+}))
+```
+
+**Weak token generation:**
+
+```python
+# Vulnerable: predictable tokens
+import random
+import string
+
+def generate_token():
+    return "".join(random.choices(string.ascii_letters, k=32))
+
+# Secure: cryptographically random tokens
+import secrets
+
+def generate_token():
+    return secrets.token_urlsafe(32)
+```
+
+### Tool misuse in agentic workflows
+
+As agents gain tool access (filesystem, git, IDE actions), security failures do not just live in the code. They live in the automation layer.
+
+```python
+# Vulnerable: agent with unrestricted file access
+class CodeAgent:
+    def write_file(self, path, content):
+        with open(path, "w") as f:
+            f.write(content)
+
+# Secure: sandboxed file operations
+class CodeAgent:
+    ALLOWED_PATHS = ["/workspace/src", "/workspace/tests"]
+    
+    def write_file(self, path, content):
+        abs_path = os.path.abspath(path)
+        
+        if not any(abs_path.startswith(p) for p in self.ALLOWED_PATHS):
+            raise SecurityError(f"Path not allowed: {path}")
+        
+        if ".." in path:
+            raise SecurityError("Path traversal detected")
+        
+        with open(abs_path, "w") as f:
+            f.write(content)
+```
+
+Source: [OWASP GenAI Agentic Guidance](https://genai.owasp.org/2025/12/09/owasp-genai-security-project-releases-top-10-risks-and-mitigations-for-agentic-ai-security/)
+
+---
+
+## What actually works: secure AI coding as a pipeline
+
+If your organization is using AI to write code, here is the correct mindset: AI output is untrusted until verified.
+
+That means your workflow should behave like a security pipeline, not a suggestion box.
+
+### Step 1: Enforce high-signal SAST
+
+AI code needs modern SAST, not grep-based security scanning.
+
+Look for tools that provide:
+
+- Dataflow and taint tracking
+- Sanitizer detection
+- Framework-aware modeling
+- Reachability checks (is this code even callable?)
+
+The goal is not to scan more. The goal is to be right more often.
+
+### Step 2: Add AI-specific static checks
+
+Traditional SAST misses many AI failure modes. Add targeted heuristics that catch vibe-coded patterns with high precision.
+
+**Phantom security calls detector:**
+
+```python
+# Static analysis rule: flag undefined security functions
+import ast
+
+SECURITY_PATTERNS = [
+    "sanitize_", "validate_", "check_permission", 
+    "auth_", "verify_", "secure_"
+]
+
+def find_phantom_security_calls(source_code):
+    tree = ast.parse(source_code)
+    defined_functions = set()
+    called_functions = []
+    
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            defined_functions.add(node.name)
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                called_functions.append(node.func.id)
+    
+    findings = []
+    for func in called_functions:
+        if any(func.startswith(p) for p in SECURITY_PATTERNS):
+            if func not in defined_functions:
+                findings.append(f"Undefined security function: {func}")
+    
+    return findings
+```
+
+**Security TODO detector:**
+
+```python
+# Flag security TODOs that shouldn't ship
+import re
+
+def find_security_todos(code):
+    pattern = r"#.*(TODO|FIXME).*(auth|secur|permission)"
+    return [f"Line {i}: {line.strip()}" 
+            for i, line in enumerate(code.split("\n"), 1)
+            if re.search(pattern, line, re.IGNORECASE)]
+```
+
+**Hallucinated dependency detector:**
+
+```python
+# Compare imports against lockfile
+import ast
+import json
+import sys
+
+def find_hallucinated_imports(source_code, lockfile_path):
+    tree = ast.parse(source_code)
+    
+    with open(lockfile_path) as f:
+        if lockfile_path.endswith(".json"):
+            lockfile = json.load(f)
+            installed = set(lockfile.get("packages", {}).keys())
+        else:
+            # requirements.txt format
+            installed = set()
+            for line in f:
+                if line.strip() and not line.startswith("#"):
+                    pkg = line.split("==")[0].split(">=")[0].strip()
+                    installed.add(pkg)
+    
+    findings = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                pkg = alias.name.split(".")[0]
+                if pkg not in installed and pkg not in sys.stdlib_module_names:
+                    findings.append(f"Potentially hallucinated import: {pkg}")
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                pkg = node.module.split(".")[0]
+                if pkg not in installed and pkg not in sys.stdlib_module_names:
+                    findings.append(f"Potentially hallucinated import: {pkg}")
+    
+    return findings
+```
+
+### Step 3: Agentic verification (This should be built well if not it's gonna be the same problem again)
+
+Static analysis is necessary but not sufficient. AI-generated code should be verified with tests that prove security properties.
+
+**Auth test example:**
+
+```python
+import pytest
+
+class TestInvoiceAuthorization:
+    def test_user_can_access_own_invoice(self, client, user, user_invoice):
+        response = client.get(
+            f"/invoice/{user_invoice.id}",
+            headers={"Authorization": f"Bearer {user.token}"}
+        )
+        assert response.status_code == 200
+    
+    def test_user_cannot_access_other_invoice(self, client, user, other_invoice):
+        response = client.get(
+            f"/invoice/{other_invoice.id}",
+            headers={"Authorization": f"Bearer {user.token}"}
+        )
+        assert response.status_code == 403
+    
+    def test_unauth_cannot_access_invoice(self, client, user_invoice):
+        response = client.get(f"/invoice/{user_invoice.id}")
+        assert response.status_code == 401
+    
+    def test_invalid_invoice_id_returns_404(self, client, user):
+        response = client.get(
+            "/invoice/nonexistent-id",
+            headers={"Authorization": f"Bearer {user.token}"}
+        )
+        assert response.status_code == 404
+```
+
+### Step 4: PR gating that developers will not disable
+
+If you want adoption, gate on:
+
+- New findings only
+- High confidence
+- High severity
+- Actionable fixes
+
+Do not block merges on legacy noise. That is how scanners get turned off.
+
+```yaml
+name: Security Gate
+on: [pull_request]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run SAST on changed files
+        run: |
+          git diff --name-only origin/main...HEAD | \
+            xargs semgrep --config=auto --severity=ERROR
+```
+
+### Step 5: Suppressions with reasons
+
+False positives never hit zero. Suppressions must be reviewable, scoped, explained, and auditable.
+
+```yaml
+# .security-suppressions.yaml
+suppressions:
+  - rule: "SQLI-001"
+    file: "billing/service.py"
+    line: 142
+    reason: "Parameterized query with int() constraint; no attacker-controlled SQL"
+    owner: "appsec"
+    createdAt: "2026-01-23"
+    expiresAt: "2026-07-23"
+  
+  - rule: "HARDCODED-SECRET"
+    file: "tests/fixtures.py"
+    line: 15
+    reason: "Test-only mock API key, not used in production"
+    owner: "backend-team"
+    createdAt: "2026-01-20"
+```
+
+---
+
+## The real takeaway
+
+<div className="flex items-start gap-3 my-6">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="w-6 h-6 text-red-500 flex-shrink-0 mt-1"
+  >
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <line x1="12" y1="8" x2="12" y2="12" />
+    <line x1="12" y1="16" x2="12.01" y2="16" />
+  </svg>
+  <p>
+    AI code is not worse than human code. It is faster to produce, which means it can outpace your ability to review and secure it.
+  </p>
+</div>
+
+That creates a new reality: the bottleneck is no longer writing code. The bottleneck is verifying code safely. Teams that succeed in 2026 will build three things: high-signal security scanning, AI-aware static checks, and verification workflows that scale.
+
+Because vibe coding is not going away.

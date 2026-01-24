@@ -3,10 +3,37 @@ title: "Why SAST tools drown teams in false positives (and what actually works)"
 excerpt: "Static Application Security Testing (SAST) is supposed to catch vulnerabilities before they ship. In practice? Most teams end up ignoring it."
 publishedAt: "2026-01-21"
 tags: ["security", "sast", "appsec"]
+keywords:
+  - SAST false positives
+  - reduce SAST noise
+  - static analysis precision recall
+  - taint tracking
+  - dataflow analysis
+  - reachability analysis
+  - AppSec triage
+canonicalUrl: "/blog/sast-false-positives-what-works"
 ---
 
 
-But whether that's actually exploitable depends on stuff SAST can't see:
+# Why SAST tools drown teams in false positives (and what actually works)
+
+Static Application Security Testing (SAST) is supposed to catch vulnerabilities before they ship.  
+In practice, many teams end up ignoring it.
+
+## TL;DR
+
+- Most SAST tools produce too many **false positives** because static analysis lacks runtime context.
+- The precision vs recall tradeoff is real. The more you scan, the more noise you get.
+- What works is **dataflow + taint tracking + framework modeling + reachability + triage + suppressions**.
+- The goal is not "find everything." Whoever tells you otherwise is lying to you. The key is to **be right often enough that developers trust it**.
+
+---
+
+Here's the problem:
+
+SAST sees code in isolation. Real-world exploitability depends on runtime context the scanner can't reliably model.
+
+Exploitablity depends on stuff SAST cannot see:
 - Authentication middleware
 - Input validation layers
 - Framework-level protections
@@ -30,15 +57,21 @@ This is why some tools let you pick different modes — "daily dev workflow" vs 
 A huge source of false positives is when SAST finds a dangerous path that literally cannot execute.
 
 ```py
-if not user.is_admin:
+if user.role != "admin":
     return
 
-# only admins reach this point
-db.execute(f"DELETE FROM users WHERE id={user_input}")
+## strict type constraint
+user_id = int(user_input)
+db.execute("DELETE FROM users WHERE id=%s", (user_id,))
 ```
 
-A naive rule sees SQL injection. It doesn't understand that non-admins bail out before they ever get there.
+A naive scanner might still flag SQL injection if it only pattern-matches on `db.execute(...)`
+and doesn’t detect parameter binding + type constraints.
 
+> **Do note:** SAST can’t fully model runtime context, so false positives are inevitable.
+
+
+The admin check matters for exposure, but it’s not the main reason it’s safe.
 
 ## Tools don't know your application's context
 
@@ -74,7 +107,7 @@ These require understanding *intent*, not just code patterns. Even fancy AI-base
 
 ## Scale makes everything worse
 
-Even a 5% false positive rate becomes unbearable at scale.
+Even a small false positive rate becomes unbearable at scale.
 
 Let's say you have:
 - 200 repos

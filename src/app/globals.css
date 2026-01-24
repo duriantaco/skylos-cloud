@@ -1,33 +1,9 @@
-/* @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-} */
-
 @import "tailwindcss";
 
 @theme {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
   --color-bg-app: #0f111a;
   --color-bg-panel: #161822;
   --color-border-subtle: #2d3142;
@@ -45,8 +21,13 @@ body {
 body {
   background-color: var(--color-bg-app);
   color: #94a3b8;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
   font-feature-settings: "ss01", "ss02", "cv01", "cv02";
   -webkit-font-smoothing: antialiased;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 ::-webkit-scrollbar {
@@ -71,41 +52,4 @@ body {
 .animate-float-delayed {
   animation: float 3s ease-in-out infinite;
   animation-delay: 1.5s;
-}
-
-@keyframes dog-run {
-  0% {
-    left: -10%;
-    transform: scaleX(1);
-  }
-  49% {
-    left: 110%;
-    transform: scaleX(1);
-  }
-  50% {
-    left: 110%;
-    transform: scaleX(-1);
-  }
-  99% {
-    left: -10%;
-    transform: scaleX(-1);
-  }
-  100% {
-    left: -10%;
-    transform: scaleX(1);
-  }
-}
-
-@keyframes dog-bounce {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  25% { transform: translateY(-3px) rotate(-2deg); }
-  75% { transform: translateY(-3px) rotate(2deg); }
-}
-
-.animate-dog-run {
-  animation: dog-run 8s linear infinite;
-}
-
-.animate-dog-bounce {
-  animation: dog-bounce 0.25s ease-in-out infinite;
 }

@@ -3,6 +3,9 @@ import { Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { getSiteUrl } from '@/lib/site'
 import 'highlight.js/styles/github-dark.css';
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import "./globals.css";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
@@ -67,14 +70,14 @@ export const metadata: Metadata = {
   icons: { icon: '/favicon.ico' },
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" className="scroll-smooth">
-      <body
-        className={`${inter.variable} ${mono.variable} font-sans bg-white text-slate-900 antialiased selection:bg-cyan-200 selection:text-slate-900`}
-      >
-        {children}
-      </body>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className="font-sans antialiased">{children}</body>
     </html>
-  )
+  );
 }
