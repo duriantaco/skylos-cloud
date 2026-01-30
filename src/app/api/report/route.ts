@@ -7,16 +7,34 @@ import { sendSlackNotification } from "@/lib/slack";
 import { sendDiscordNotification } from "@/lib/discord";
 import { getSiteUrl } from "@/lib/site";
 import { trackEvent } from "@/lib/analytics";
-import { SupabaseClient } from '@supabase/supabase-js';
+import { groupFindings, Finding  } from '@/lib/grouping';
+import crypto from "crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('Missing Supabase environment variables');
+function getSupabaseAdmin(): SupabaseClient | null {
+  const url =
+    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL; // fallback for dev
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) return null;
+  return createClient(url, key);
 }
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+function makeGroupFingerprint(projectId: string, ruleId: string, filePath: string, line: number) {
+  const input = `${projectId}|${ruleId}|${filePath}|${line}`;
+  return crypto.createHash("sha256").update(input).digest("hex").slice(0, 24);
+}
+
+type InsertedFinding = {
+  id: string;
+  rule_id: string;
+  category: string;
+  severity: string;
+  file_path: string;
+  line_number: number | null;
+  snippet: string | null;
+};
+
 
 const LIMITS = {
   MAX_BODY_SIZE_MB: 5,
@@ -40,6 +58,98 @@ async function batchInsertFindings(
     if (error) throw new Error(`Batch insert failed: ${error.message}`);
   }
 }
+
+
+export async function createOrUpdateIssueGroups(
+  supabase: SupabaseClient,
+  args: {
+    orgId: string;
+    projectId: string;
+    scanId: string;
+    scanCreatedAtIso: string;
+    findings: InsertedFinding[];
+  }
+): Promise<Record<string, string>> {
+  const { orgId, projectId, scanId, scanCreatedAtIso, findings } = args;
+  const mapping: Record<string, string> = {};
+
+  const grouped = groupFindings(findings as any);
+
+  console.log("[grouping] groups:", (grouped as any)?.size ?? "unknown");
+
+  for (const [_, items] of grouped as any as Iterable<[string, InsertedFinding[]]>) {
+    const canonical = items?.[0];
+    if (!canonical) continue;
+
+    const ruleId = String(canonical.rule_id || "UNKNOWN");
+    const filePath = String(canonical.file_path || "");
+    const line = Number(canonical.line_number || 0);
+
+    if (!filePath) continue;
+
+    const fingerprint = makeGroupFingerprint(projectId, ruleId, filePath, line);
+
+    const affectedFiles = Array.from(
+      new Set(items.map((x) => String(x.file_path || "")).filter(Boolean))
+    );
+
+    const { data: groupRow, error: gErr } = await supabase
+      .from("issue_groups")
+      .upsert(
+        {
+          org_id: orgId,
+          project_id: projectId,
+          fingerprint,
+
+          rule_id: ruleId,
+          category: String(canonical.category || "SECURITY"),
+          severity: String(canonical.severity || "MEDIUM"),
+
+          canonical_file: filePath,
+          canonical_line: line,
+          canonical_snippet: canonical.snippet || null,
+
+          occurrence_count: items.length,
+          affected_files: affectedFiles,
+
+          last_seen_at: scanCreatedAtIso,
+          last_seen_scan_id: scanId,
+
+          status: "open",
+        },
+        { onConflict: "org_id,project_id,fingerprint" }
+      )
+      .select("id, first_seen_scan_id, first_seen_at")
+      .single();
+
+    if (gErr || !groupRow?.id) {
+      throw new Error(gErr?.message || "Failed to upsert issue_group");
+    }
+
+    const groupId = String(groupRow.id);
+
+    if (!groupRow.first_seen_scan_id) {
+      const { error: firstErr } = await supabase
+        .from("issue_groups")
+        .update({
+          first_seen_at: scanCreatedAtIso,
+          first_seen_scan_id: scanId,
+        })
+        .eq("id", groupId);
+
+      if (firstErr) throw new Error(`Failed to set first_seen fields: ${firstErr.message}`);
+    }
+
+    for (const it of items) {
+      if (it?.id) mapping[String(it.id)] = groupId;
+    }
+  }
+
+  console.log("[grouping] mapping:", Object.keys(mapping).length);
+
+  return mapping;
+}
+
 
 type Plan = "free" | "pro" | "enterprise";
 
@@ -162,27 +272,35 @@ function diffContextForDb(scope: any) {
   }
 }
 
-async function cleanupOldScans(projectId: string, maxScans: number) {
-  const { count } = await supabase
-    .from('scans')
-    .select('id', { count: 'exact', head: true })
-    .eq('project_id', projectId);
+async function cleanupOldScans(
+  supabase: SupabaseClient,
+  projectId: string,
+  maxScans: number
+) {
+  const { count, error: countErr } = await supabase
+    .from("scans")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", projectId);
 
-  if (!count || count <= maxScans) 
-    return;
+  if (countErr) throw new Error(`Failed to count scans: ${countErr.message}`);
+  if (!count || count <= maxScans) return;
 
-  const { data: oldScans } = await supabase
-    .from('scans')
-    .select('id')
-    .eq('project_id', projectId)
-    .order('created_at', { ascending: true })
+  const { data: oldScans, error: oldErr } = await supabase
+    .from("scans")
+    .select("id")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: true })
     .limit(count - maxScans);
 
+  if (oldErr) throw new Error(`Failed to list old scans: ${oldErr.message}`);
+
   if (oldScans && oldScans.length > 0) {
-    const idsToDelete = oldScans.map(s => s.id);
-    await supabase.from('scans').delete().in('id', idsToDelete);
+    const idsToDelete = oldScans.map((s: any) => s.id);
+    const { error: delErr } = await supabase.from("scans").delete().in("id", idsToDelete);
+    if (delErr) throw new Error(`Failed to delete old scans: ${delErr.message}`);
   }
 }
+
 
 type NotificationPayload = {
   passed: boolean;
@@ -197,6 +315,22 @@ type NotificationPayload = {
 
 
 export async function POST(req: Request) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return NextResponse.json(
+      {
+        error: "Server misconfigured: missing Supabase env vars",
+        missing: {
+          SUPABASE_URL: !process.env.SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL,
+          SUPABASE_SERVICE_ROLE_KEY: !process.env.SUPABASE_SERVICE_ROLE_KEY,
+        },
+      },
+      { status: 500 }
+    );
+  }
+  
+  const sb = supabase;
+
   try {
     const contentLength = req.headers.get('content-length');
     if (contentLength && parseInt(contentLength) > LIMITS.MAX_BODY_SIZE_MB * 1024 * 1024) {
@@ -281,7 +415,7 @@ export async function POST(req: Request) {
       }, { status: 403 })
     }
 
-    const [overriddenScanResult, baselineScanResult, suppressionsResult] = await Promise.all([
+    const [overriddenScanResult, suppressionsResult] = await Promise.all([
       caps.overridesEnabled
         ? supabase
             .from('scans')
@@ -293,16 +427,6 @@ export async function POST(req: Request) {
             .maybeSingle()
         : Promise.resolve({ data: null }),
 
-      supabase
-        .from('scans')
-        .select('id')
-        .eq('project_id', project.id)
-        .eq('branch', 'main')
-        .or('quality_gate_passed.eq.true,is_overridden.eq.true')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-
       caps.suppressionsEnabled
         ? supabase
             .from('suppressions')
@@ -312,8 +436,39 @@ export async function POST(req: Request) {
         : Promise.resolve({ data: [] }),
     ])
 
+   
+    let baselineScan: { id: string } | null = null;
+    
+    const { data: sameBranchScan } = await supabase
+      .from('scans')
+      .select('id')
+      .eq('project_id', project.id)
+      .eq('branch', branch)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (sameBranchScan?.id) {
+      baselineScan = sameBranchScan;
+    } 
+    else if (branch !== 'main') {
+      const { data: mainScan } = await supabase
+        .from('scans')
+        .select('id')
+        .eq('project_id', project.id)
+        .eq('branch', 'main')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (mainScan?.id) {
+        baselineScan = mainScan;
+      }
+    }
+    
+    const hasBaseline = !!baselineScan?.id;
     const isWhitelisted = !!overriddenScanResult.data
-    const baselineScan = baselineScanResult.data
+
 
     const baselineCredits = new Map<string, number>()
     if (baselineScan?.id) {
@@ -351,7 +506,7 @@ export async function POST(req: Request) {
       const k = key(ruleId, filePath)
 
       let isNew = false
-      let new_reason: "pr-changed-line" | "pr-file-fallback" | "legacy" | "non-pr" = "legacy"
+      let new_reason: "pr-changed-line" | "pr-file-fallback" | "legacy" | "non-pr" | "first-scan-baseline" | "not-in-baseline" = "legacy"
 
       if (diffScope && caps.prDiffEnabled) {
         isNew = isNewByDiff({ scope: diffScope, filePath, lineNumber: line })
@@ -363,11 +518,21 @@ export async function POST(req: Request) {
         } else {
           new_reason = "legacy"
         }
-      } else {
-        new_reason = "non-pr"
+      } 
+      else if (!hasBaseline) {
+        isNew = false
+        new_reason = "first-scan-baseline"
+      }
+      else {
         const credits = baselineCredits.get(k) || 0
         isNew = credits <= 0
-        if (credits > 0) baselineCredits.set(k, credits - 1)
+        
+        if (credits > 0) {
+          baselineCredits.set(k, credits - 1)
+          new_reason = "legacy"
+        } else {
+          new_reason = "not-in-baseline"
+        }
       }
 
       const isSuppressed = caps.suppressionsEnabled 
@@ -516,7 +681,49 @@ export async function POST(req: Request) {
       await batchInsertFindings(supabase, dbRows);
     }
 
-    await cleanupOldScans(project.id, caps.maxScansStored);
+    const { data: insertedFindings, error: insSelErr } = await supabase
+      .from("findings")
+      .select("id, rule_id, category, severity, file_path, line_number, snippet, message")
+      .eq("scan_id", scan.id);
+
+    if (insSelErr) throw new Error(`Failed to read inserted findings: ${insSelErr.message}`);
+
+    console.log("[grouping] insertedFindings:", insertedFindings?.length || 0);
+
+
+    if (insertedFindings && insertedFindings.length > 0) {
+      const mapping = await createOrUpdateIssueGroups(supabase, {
+        orgId: project.org_id,
+        projectId: project.id,
+        scanId: scan.id,
+        scanCreatedAtIso: scan.created_at,
+        findings: insertedFindings as InsertedFinding[],
+      });
+
+    const groupToIds = new Map<string, string[]>();
+    for (const [findingId, groupId] of Object.entries(mapping)) {
+      if (!groupToIds.has(groupId)) groupToIds.set(groupId, []);
+      groupToIds.get(groupId)!.push(findingId);
+    }
+
+    for (const [groupId, ids] of groupToIds.entries()) {
+      const CHUNK = 500;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const slice = ids.slice(i, i + CHUNK);
+
+        const { error } = await supabase
+          .from("findings")
+          .update({ group_id: groupId })
+          .in("id", slice);
+
+        if (error) {
+          throw new Error(`Failed to link findings to issue_groups: ${error.message}`);
+        }
+      }
+    }
+    }
+
+    await cleanupOldScans(supabase, project.id, caps.maxScansStored);
 
     if (caps.checkRunsEnabled && (project as any).github_installation_id) {
       try {
@@ -529,7 +736,6 @@ export async function POST(req: Request) {
           .split("/");
         
         if (owner && repo && commit_hash && commit_hash !== "local") {
-          // Find existing check run for this SHA
           const { data: checkRuns } = await octokit.checks.listForRef({
             owner,
             repo,
@@ -624,7 +830,7 @@ export async function POST(req: Request) {
       }
       
       if (notifyOn === 'recovery') {
-        const { data: prevScan } = await supabase
+        const { data: prevScan } = await sb
           .from('scans')
           .select('quality_gate_passed')
           .eq('project_id', projectId)
@@ -707,6 +913,24 @@ export async function POST(req: Request) {
           ? 'Quality Gate Passed.'
           : `Quality Gate Failed! ${unsuppressedNewCount} new violations introduced.`,
       },
+      explain: {
+            baseline: {
+              scan_id: baselineScan?.id || null,
+              branch: "main",
+              selection_rule:
+                "latest scan on main where quality_gate_passed==true OR is_overridden==true",
+            },
+            detection_mode: caps.prDiffEnabled ? "pr-diff" : "baseline-fallback",
+            suppressions_enabled: caps.suppressionsEnabled,
+            strict_mode: !!project.strict_mode,
+            force_disabled_when_strict: !!project.strict_mode,
+            new_reason_values: {
+              pr_changed_line: "pr-changed-line",
+              pr_file_fallback: "pr-file-fallback",
+              legacy: "legacy",
+              non_pr: "non-pr",
+            },
+          },
       plan,
       capabilities: {
         pr_diff: caps.prDiffEnabled,

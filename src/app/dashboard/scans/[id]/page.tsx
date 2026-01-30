@@ -8,6 +8,8 @@ import {
   ArrowLeft, CheckCircle, XCircle, FileText, ChevronRight, ChevronDown,
   Search, ExternalLink, AlertTriangle, Lock, Unlock, Ban, AlertOctagon, Shield, Terminal, X, ChevronUp
 } from "lucide-react";
+import FlowVisualizerButton from "@/components/FlowVisualizerButton";
+import FixPrButton from "@/components/FixPrButton";
 
 type Scan = {
   id: string;
@@ -795,7 +797,7 @@ export default function ScanDetailsPage() {
                 </div>
               )}
 
-              {/* Header */}
+              {/* Header with FlowVisualizerButton */}
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
@@ -805,12 +807,24 @@ export default function ScanDetailsPage() {
                   <h1 className="text-xl font-bold text-slate-900">{selectedFinding.message}</h1>
                 </div>
 
-                {!selectedFinding.is_suppressed && (
-                  <button onClick={handleSuppress} disabled={isSuppressing} className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
-                    <Ban className="w-3 h-3" />
-                    Suppress
-                  </button>
-                )}
+                {/* Action buttons - Flow + Suppress */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <FixPrButton findingId={selectedFinding.id} />
+                  <FlowVisualizerButton
+                    findingId={selectedFinding.id}
+                    ruleId={selectedFinding.rule_id}
+                    category={selectedFinding.category}
+                    repoUrl={scan.projects?.repo_url}
+                    commitHash={scan.commit_hash}
+                  />
+                  
+                  {!selectedFinding.is_suppressed && (
+                    <button onClick={handleSuppress} disabled={isSuppressing} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
+                      <Ban className="w-3 h-3" />
+                      Suppress
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Location */}

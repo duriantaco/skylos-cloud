@@ -37,21 +37,27 @@ async function handleInstallation(payload: any) {
   const repos = payload.repositories || [];
   const account = payload.installation.account;
   
+  console.log(`Processing installation ${installationId} with ${repos.length} repos`);
+  
   const octokit = await getInstallationOctokit(installationId);
   
   for (const repo of repos) {
-    const [owner, repoName] = repo.full_name.split("/");
-    const repoUrl = `https://github.com/${repo.full_name}`;
+    const fullName = repo.full_name;
+    const [owner, repoName] = fullName.split("/");
     
-    const { error: updateError } = await supabase
+    const { data: matchedProjects, error: updateError } = await supabase
       .from('projects')
       .update({ github_installation_id: installationId })
-      .eq('repo_url', repoUrl);
+      .ilike('repo_url', `%github.com/${fullName}%`)
+      .select('id, name, repo_url');
     
     if (updateError) {
-      console.error(`Failed to save installation for ${repoUrl}:`, updateError);
+      console.error(`Failed to update installation for ${fullName}:`, updateError);
+    } else if (matchedProjects && matchedProjects.length > 0) {
+      console.log(`Linked installation ${installationId} to ${matchedProjects.length} project(s):`);
+      matchedProjects.forEach(p => console.log(`   - ${p.name} (${p.repo_url})`));
     } else {
-      console.log(`✓ Saved installation ID ${installationId} for ${repoUrl}`);
+      console.log(`No projects found matching ${fullName} - user may need to create project first`);
     }
     
     try {
@@ -86,10 +92,53 @@ async function handleInstallation(payload: any) {
         restrictions: existingProtection?.restrictions ?? null,
       });
       
-      console.log(`✓ Enabled branch protection for ${repo.full_name}:${defaultBranch}`);
-    } catch (e) {
-      console.error(`Failed to configure branch protection for ${repo.full_name}:`, e);
+      console.log(`Enabled branch protection for ${fullName}:${defaultBranch}`);
+    } catch (e: any) {
+      console.warn(`Could not configure branch protection for ${fullName}:`, e.message);
     }
+  }
+}
+
+async function handleInstallationRepositoriesAdded(payload: any) {
+  const installationId = payload.installation.id;
+  const addedRepos = payload.repositories_added || [];
+  
+  console.log(`Adding ${addedRepos.length} repos to installation ${installationId}`);
+  
+  for (const repo of addedRepos) {
+    const fullName = repo.full_name;
+    
+    const { data: matchedProjects, error } = await supabase
+      .from('projects')
+      .update({ github_installation_id: installationId })
+      .ilike('repo_url', `%github.com/${fullName}%`)
+      .select('id, name');
+    
+    if (error) {
+      console.error(`Failed to link ${fullName}:`, error);
+    } else if (matchedProjects && matchedProjects.length > 0) {
+      console.log(`Linked ${fullName} to ${matchedProjects.length} project(s)`);
+    } else {
+      console.log(`No projects found for ${fullName}`);
+    }
+  }
+}
+
+async function handleInstallationDeleted(payload: any) {
+  const installationId = payload.installation.id;
+  
+  console.log(`Installation ${installationId} deleted, clearing from projects`);
+  
+  const { data, error } = await supabase
+    .from('projects')
+    .update({ github_installation_id: null })
+    .eq('github_installation_id', installationId)
+    .select('id, name');
+  
+  if (error) {
+    console.error('Failed to clear installation:', error);
+  } else if (data && data.length > 0) {
+    console.log(`Cleared installation from ${data.length} project(s)`);
   }
 }
 
@@ -112,11 +161,12 @@ async function handlePullRequest(payload: any) {
       summary: "Skylos scan will run when triggered by CI or manual upload.",
     },
   });
+  
+  console.log(`Created pending check for PR in ${owner}/${repo}`);
 }
 
 async function handleCheckRun(payload: any) {
-  if (payload.action !== "rerequested") 
-    return;
+  if (payload.action !== "rerequested") return;
   console.log("Check run re-requested:", payload.check_run.id);
 }
 
@@ -125,18 +175,28 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get("x-hub-signature-256") || "";
   
   if (!verifySignature(body, signature)) {
+    console.error("Invalid webhook signature");
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
   
   const event = request.headers.get("x-github-event");
   const payload = JSON.parse(body);
   
+  console.log(`\nGitHub webhook: ${event} (action: ${payload.action})`);
+  
   try {
     switch (event) {
       case "installation":
-      case "installation_repositories":
-        if (payload.action === "created" || payload.action === "added") {
+        if (payload.action === "created") {
           await handleInstallation(payload);
+        } else if (payload.action === "deleted") {
+          await handleInstallationDeleted(payload);
+        }
+        break;
+        
+      case "installation_repositories":
+        if (payload.action === "added") {
+          await handleInstallationRepositoriesAdded(payload);
         }
         break;
         
@@ -149,6 +209,9 @@ export async function POST(request: NextRequest) {
       case "check_run":
         await handleCheckRun(payload);
         break;
+        
+      default:
+        console.log(`Ignoring event: ${event}`);
     }
     
     return NextResponse.json({ ok: true });

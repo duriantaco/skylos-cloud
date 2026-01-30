@@ -1,485 +1,614 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import { 
-  ArrowRight, Shield, Clock, GitBranch, 
-  TrendingUp, TrendingDown, Minus, Activity, CheckCircle, 
-  XCircle, ExternalLink, BookOpen, Terminal, Zap, FolderOpen, AlertOctagon
+import {
+  ShieldCheck,
+  ShieldAlert,
+  ArrowUpRight,
+  GitPullRequest,
+  CheckCircle2,
+  Box,
+  Clock,
+  Layers,
+  History,
+  AlertTriangle,
+  TrendingUp,
+  Eye,
+  FileSearch,
+  Zap,
 } from "lucide-react";
-import CreateProjectButton from "@/components/CreateProjectButton";
-import CreateWorkspaceModal from "@/components/CreateWorkspaceModal";
-import dogImg from "../../../public/assets/favicon-96x96.png";
-import { trackEvent } from "@/lib/analytics";
 
+// --- Types ---
+type ScanRow = {
+  id: string;
+  created_at: string;
+  commit_hash: string | null;
+  quality_gate_passed: boolean | null;
+  stats: any;
+  projects?: { name: string | null; repo_url: string | null } | null;
+};
+
+type IssueGroupRow = {
+  id: string;
+  rule_id: string;
+  severity: string;
+  category: string;
+  canonical_file: string | null;
+  canonical_line: number | null;
+  occurrence_count: number | null;
+  verification_status: string | null;
+  project_id: string | null;
+  first_seen_at: string | null;
+  last_seen_at: string | null;
+  last_seen_scan_id: string | null;
+  scan_count?: number | null;
+  projects?: { name: string | null; repo_url: string | null } | null;
+};
+
+// --- Helpers ---
 function timeAgo(dateString: string) {
   const date = new Date(dateString);
   const now = new Date();
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-  
-  if (seconds < 60) 
-    return "just now";
-  if (seconds < 3600) 
-    return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) 
-    return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) 
-    return `${Math.floor(seconds / 86400)}d ago`;
-  return date.toLocaleDateString();
+  const diff = (now.getTime() - date.getTime()) / 1000;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function StatCard({ 
-  label, 
-  value, 
-  subValue, 
-  icon: Icon, 
-  trend, 
-  color = "slate" 
-}: { 
-  label: string; 
-  value: string | number; 
-  subValue?: string; 
-  icon: any; 
-  trend?: "up" | "down" | "neutral";
-  color?: "slate" | "red" | "emerald" | "amber";
-}) {
-  const colorStyles = {
-    slate: "bg-slate-50 text-slate-600",
-    red: "bg-red-50 text-red-600",
-    emerald: "bg-emerald-50 text-emerald-600",
-    amber: "bg-amber-50 text-amber-600",
-  };
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function sevRank(sev: string) {
+  const s = String(sev || "").toUpperCase();
+  if (s === "CRITICAL") return 4;
+  if (s === "HIGH") return 3;
+  if (s === "MEDIUM") return 2;
+  return 1;
+}
+
+function SeverityPill({ severity }: { severity: string }) {
+  const s = String(severity || "").toUpperCase();
+  const cls =
+    s === "CRITICAL"
+      ? "bg-rose-100 text-rose-700 ring-rose-600/20"
+      : s === "HIGH"
+      ? "bg-orange-100 text-orange-700 ring-orange-600/20"
+      : s === "MEDIUM"
+      ? "bg-amber-100 text-amber-700 ring-amber-600/20"
+      : "bg-slate-100 text-slate-600 ring-slate-500/20";
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between mb-3">
-        <div className={`p-2.5 rounded-lg ${colorStyles[color]}`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        {trend && (
-          <div className={`flex items-center gap-1 text-xs font-medium ${
-            trend === "up" ? "text-red-600" : trend === "down" ? "text-emerald-600" : "text-slate-400"
-          }`}>
-            {trend === "up" && <TrendingUp className="w-3.5 h-3.5" />}
-            {trend === "down" && <TrendingDown className="w-3.5 h-3.5" />}
-            {trend === "neutral" && <Minus className="w-3.5 h-3.5" />}
-          </div>
-        )}
-      </div>
-      <div className="text-2xl font-bold text-slate-900">{value}</div>
-      <div className="text-sm text-slate-500 mt-0.5">{label}</div>
-      {subValue && <div className="text-xs text-slate-400 mt-1">{subValue}</div>}
-    </div>
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ring-1 ring-inset ${cls} uppercase tracking-wide`}>
+      {s}
+    </span>
   );
 }
 
-export default async function DashboardRoot() {
+function GateBadge({ passed }: { passed: boolean | null }) {
+  if (passed === null) return <span className="text-slate-400 text-xs">—</span>;
+  return passed ? (
+    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 uppercase tracking-wide">
+      <CheckCircle2 className="w-3 h-3" /> Passed
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700 ring-1 ring-inset ring-rose-600/20 uppercase tracking-wide">
+      <AlertTriangle className="w-3 h-3" /> Failed
+    </span>
+  );
+}
+
+export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return redirect("/login");
 
-  const { data: member } = await supabase
-    .from("organization_members")
+  const { data: anyProject } = await supabase
+    .from("projects")
     .select("org_id")
-    .eq("user_id", user.id)
+    .limit(1)
     .maybeSingle();
-  
-  const orgId = member?.org_id;
+
+  const orgId = anyProject?.org_id as string | undefined;
 
   if (!orgId) {
     return (
-      <main className="min-h-screen bg-slate-50">
-        <CreateWorkspaceModal userEmail={user.email || ''} userId={user.id} />
-        
-        <div className="opacity-30 pointer-events-none">
-          <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-40">
-            <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-              <div className="flex items-center gap-2.5 font-bold text-lg tracking-tight text-slate-900">
-                <Image src={dogImg} alt="Skylos" width={32} height={32} className="h-8 w-8 object-contain" />
-                Skylos
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                  Beta
-                </span>
-              </div>
-            </div>
-          </nav>
-          <div className="max-w-7xl mx-auto px-6 py-8">
-            <div className="h-16 bg-slate-200 rounded-xl animate-pulse mb-8 max-w-md" />
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              {[1,2,3,4].map(i => <div key={i} className="h-28 bg-slate-200 rounded-xl animate-pulse" />)}
-            </div>
-            <div className="grid lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 h-64 bg-slate-200 rounded-xl animate-pulse" />
-              <div className="h-64 bg-slate-200 rounded-xl animate-pulse" />
-            </div>
+      <main className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl p-10 shadow-sm">
+            <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+            <p className="text-slate-500 mt-2">Connect your first repository to start scanning.</p>
+            <Link
+              href="/dashboard/projects"
+              className="inline-flex mt-6 items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition"
+            >
+              <Box className="w-4 h-4" />
+              Connect Repository
+            </Link>
           </div>
         </div>
       </main>
     );
   }
 
-  const { data: projects } = await supabase
-    .from("projects")
-    .select(`*, scans (id, created_at, branch, quality_gate_passed, stats, commit_hash)`)
-    .eq("org_id", orgId)
-    .order("created_at", { ascending: false });
+  // Fetch all data
+  const [
+    { count: projectCount },
+    { data: recentScansRaw },
+    { data: openGroupsRaw, count: openGroupsCount },
+    { data: criticalHighGroupsRaw, count: criticalHighCount },
+  ] = await Promise.all([
+    supabase.from("projects").select("*", { count: "exact", head: true }),
 
-  const { data: recentScans } = await supabase
-    .from("scans")
-    .select(`*, projects!inner(id, name, org_id)`)
-    .eq("projects.org_id", orgId)
-    .order("created_at", { ascending: false })
-    .limit(10);
+    supabase
+      .from("scans")
+      .select("id, created_at, commit_hash, quality_gate_passed, stats, projects(name, repo_url)")
+      .order("created_at", { ascending: false })
+      .limit(10),
 
-  const allScans = projects?.flatMap(p => p.scans || []) || [];
-  const now = new Date();
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const scansThisWeek = allScans.filter(s => new Date(s.created_at) > weekAgo);
-  
-  const totalCriticals = allScans.reduce((sum, s) => sum + (s.stats?.danger_count || 0), 0);
-  const latestScans = projects?.map(p => {
-    const sorted = (p.scans || []).sort((a: any, b: any) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-    return sorted[0];
-  }).filter(Boolean) || [];
+    supabase
+      .from("issue_groups")
+      .select(
+        `id, rule_id, severity, category, canonical_file, canonical_line,
+         occurrence_count, verification_status, project_id, 
+         first_seen_at, last_seen_at, last_seen_scan_id,
+         projects!inner(name, repo_url)`,
+        { count: "exact" }
+      )
+      .eq("org_id", orgId)
+      .eq("status", "open")
+      .order("last_seen_at", { ascending: false })
+      .limit(10),
 
-  const passingProjects = latestScans.filter(s => s?.quality_gate_passed).length;
-  const failingProjects = latestScans.filter(s => s && !s.quality_gate_passed).length;
+    supabase
+      .from("issue_groups")
+      .select(
+        `id, rule_id, severity, category, canonical_file, canonical_line,
+         occurrence_count, verification_status, project_id,
+         first_seen_at, last_seen_at, last_seen_scan_id,
+         projects!inner(name, repo_url)`,
+        { count: "exact" }
+      )
+      .eq("org_id", orgId)
+      .eq("status", "open")
+      .in("severity", ["CRITICAL", "HIGH"])
+      .order("last_seen_at", { ascending: false })
+      .limit(6),
+  ]);
 
-  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-  const scansLastWeek = allScans.filter(s => {
-    const d = new Date(s.created_at);
-    return d > twoWeeksAgo && d <= weekAgo;
+  const recentScans = (recentScansRaw as unknown as ScanRow[] | null) || [];
+  const openGroups = (openGroupsRaw as unknown as IssueGroupRow[] | null) || [];
+  const criticalHighGroups = (criticalHighGroupsRaw as unknown as IssueGroupRow[] | null) || [];
+
+  const latestScan = recentScans[0] || null;
+  const openCount = Number(openGroupsCount || 0);
+  const urgentCount = Number(criticalHighCount || 0);
+
+  const lastScanAt = latestScan?.created_at ? new Date(latestScan.created_at) : null;
+  const daysSinceLastScan = lastScanAt
+    ? Math.floor((Date.now() - lastScanAt.getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  const isStale = daysSinceLastScan === null || daysSinceLastScan >= 3;
+
+  // Sort open issues by severity
+  const openSorted = openGroups.slice().sort((a, b) => {
+    const d = sevRank(b.severity) - sevRank(a.severity);
+    if (d !== 0) return d;
+    return new Date(b.last_seen_at || 0).getTime() - new Date(a.last_seen_at || 0).getTime();
   });
-  const lastWeekCriticals = scansLastWeek.reduce((sum, s) => sum + (s.stats?.danger_count || 0), 0);
-  const criticalTrend = totalCriticals > lastWeekCriticals ? "up" : totalCriticals < lastWeekCriticals ? "down" : "neutral";
 
-  trackEvent('dashboard_view', orgId);
+  // Calculate scan stats
+  const passedScans = recentScans.filter((s) => s.quality_gate_passed === true).length;
+  const failedScans = recentScans.filter((s) => s.quality_gate_passed === false).length;
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      {/* Nav */}
-      <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 font-bold text-lg tracking-tight text-slate-900">
-            <Image
-              src={dogImg}
-              alt="Skylos"
-              width={32}
-              height={32}
-              className="h-8 w-8 object-contain"
-              priority
-            />
-            Skylos
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-              Beta
-            </span>
-          </Link>
-          
-          <div className="flex items-center gap-6">
-            <Link href="/docs" className="text-sm text-slate-500 hover:text-slate-900 transition flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4" />
-              Docs
-            </Link>
-            <div className="h-4 w-px bg-slate-200" />
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
-                {user.email?.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-sm text-slate-600 hidden md:block">{user.email}</span>
-              <form action="/auth/logout" method="POST">
-                <button 
-                  type="submit"
-                  className="text-sm text-slate-400 hover:text-slate-600 transition"
-                >
-                  Logout
-                </button>
-              </form>
+    <main className="min-h-screen bg-gray-50 text-slate-900 font-sans">
+      <div className="p-6 lg:p-8">
+        <div className="max-w-[1600px] mx-auto space-y-8">
+          {/* HEADER */}
+          <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-slate-200">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Skylos Dashboard</h1>
+              <p className="text-slate-500 mt-1 flex items-center gap-3 text-sm">
+                <span className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${isStale ? "bg-amber-500" : "bg-emerald-500"} animate-pulse`} />
+                  {isStale ? "Scans stale" : "Scans fresh"}
+                </span>
+                <span className="text-slate-300">•</span>
+                <span>{projectCount || 0} projects monitored</span>
+              </p>
             </div>
-          </div>
-        </div>
-      </nav>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-            <p className="text-slate-500 text-sm mt-1">
-              {projects?.length || 0} project{(projects?.length || 0) !== 1 ? 's' : ''} • {scansThisWeek.length} scan{scansThisWeek.length !== 1 ? 's' : ''} this week
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-
-            <Link 
-                href="/dashboard/rules" 
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+            <div className="flex gap-3">
+              <Link
+                href="/dashboard/issues"
+                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition shadow-sm"
               >
-                Rules
-            </Link>
-
-            <Link 
-                href="/dashboard/compliance" 
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+                <Layers className="w-4 h-4" /> Mission Control
+              </Link>
+              <Link
+                href="/dashboard/scans"
+                className="flex items-center gap-2 bg-white text-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition border border-slate-200 shadow-sm"
               >
-                Compliance
-            </Link>
-
-            <Link 
-              href="/dashboard/settings" 
-              className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
-            >
-              Settings
-            </Link>
-            <CreateProjectButton orgId={orgId} />
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatCard
-            label="Total Projects"
-            value={projects?.length || 0}
-            icon={FolderOpen}
-            color="slate"
-          />
-          <StatCard
-            label="Critical Issues"
-            value={totalCriticals}
-            subValue={criticalTrend === "down" ? "↓ from last week" : criticalTrend === "up" ? "↑ from last week" : "no change"}
-            icon={AlertOctagon}
-            trend={criticalTrend}
-            color={totalCriticals > 0 ? "red" : "slate"}
-          />
-          <StatCard
-            label="Passing Gates"
-            value={`${passingProjects}/${latestScans.length}`}
-            subValue={`${failingProjects} failing`}
-            icon={Shield}
-            color={failingProjects > 0 ? "amber" : "emerald"}
-          />
-          <StatCard
-            label="Scans This Week"
-            value={scansThisWeek.length}
-            icon={Activity}
-            color="slate"
-          />
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Projects List - 2 columns */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">Projects</h2>
-              <Link href="/dashboard/projects" className="text-sm text-slate-500 hover:text-slate-900 transition flex items-center gap-1">
-                View all <ArrowRight className="w-3.5 h-3.5" />
+                <History className="w-4 h-4" /> Scan History
               </Link>
             </div>
+          </header>
 
-            {(!projects || projects.length === 0) ? (
-              <div className="bg-white border border-slate-200 border-dashed rounded-xl p-12 text-center">
-                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FolderOpen className="w-8 h-8 text-slate-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">No projects yet</h3>
-                <p className="text-slate-500 text-sm mb-6 max-w-sm mx-auto">
-                  Connect your first repository to start scanning for security issues and code quality problems.
-                </p>
-                <CreateProjectButton orgId={orgId} />
+          {/* QUICK STATS */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+              <div className="flex items-center gap-2 text-slate-500 text-xs font-medium uppercase tracking-wider">
+                <Layers className="w-3.5 h-3.5" /> Open Issues
               </div>
-            ) : (
-              <div className="space-y-3">
-                {projects.slice(0, 6).map((p) => {
-                  const scans = (p.scans || []).sort((a: any, b: any) => 
-                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                  );
-                  const latestScan = scans[0];
-                  const criticals = latestScan?.stats?.danger_count || 0;
-                  const passed = latestScan?.quality_gate_passed;
-                  const newIssues = latestScan?.stats?.new_issues || 0;
+              <div className="mt-2 text-3xl font-bold text-slate-900">{openCount}</div>
+              <div className="mt-1 text-xs text-slate-500">Unique problems to triage</div>
+            </div>
 
-                  return (
-                    <Link 
-                      key={p.id} 
-                      href={`/dashboard/projects/${p.id}`} 
-                      className="group bg-white border border-slate-200 rounded-xl p-5 hover:border-slate-300 hover:shadow-md transition flex items-center gap-5"
-                    >
-                      {/* Status indicator */}
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                        !latestScan ? 'bg-slate-100' : passed ? 'bg-emerald-50' : 'bg-red-50'
-                      }`}>
-                        {!latestScan ? (
-                          <Clock className="w-5 h-5 text-slate-400" />
-                        ) : passed ? (
-                          <CheckCircle className="w-5 h-5 text-emerald-600" />
-                        ) : (
-                          <XCircle className="w-5 h-5 text-red-600" />
-                        )}
-                      </div>
-
-                      {/* Project info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-slate-900 truncate group-hover:text-slate-700 transition">
-                            {p.name}
-                          </h3>
-                          {latestScan?.branch && (
-                            <span className="flex items-center gap-1 text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                              <GitBranch className="w-3 h-3" />
-                              {latestScan.branch}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4 text-xs text-slate-500">
-                          {latestScan ? (
-                            <>
-                              <span>Last scan {timeAgo(latestScan.created_at)}</span>
-                              <span className="text-slate-300">•</span>
-                              <span>{scans.length} total scan{scans.length !== 1 ? 's' : ''}</span>
-                            </>
-                          ) : (
-                            <span>No scans yet</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Stats */}
-                      <div className="flex items-center gap-4 shrink-0">
-                        {latestScan && (
-                          <>
-                            {criticals > 0 && (
-                              <div className="text-center">
-                                <div className="text-lg font-bold text-red-600">{criticals}</div>
-                                <div className="text-[10px] text-slate-400 uppercase tracking-wide">Critical</div>
-                              </div>
-                            )}
-                            {newIssues > 0 && (
-                              <div className="text-center">
-                                <div className="text-lg font-bold text-amber-600">{newIssues}</div>
-                                <div className="text-[10px] text-slate-400 uppercase tracking-wide">New</div>
-                              </div>
-                            )}
-                            {criticals === 0 && newIssues === 0 && (
-                              <div className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full">
-                                Clean
-                              </div>
-                            )}
-                          </>
-                        )}
-                        <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all" />
-                      </div>
-                    </Link>
-                  );
-                })}
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+              <div className="flex items-center gap-2 text-rose-600 text-xs font-medium uppercase tracking-wider">
+                <ShieldAlert className="w-3.5 h-3.5" /> Urgent
               </div>
-            )}
+              <div className="mt-2 text-3xl font-bold text-rose-600">{urgentCount}</div>
+              <div className="mt-1 text-xs text-slate-500">Critical + High severity</div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+              <div className="flex items-center gap-2 text-slate-500 text-xs font-medium uppercase tracking-wider">
+                <History className="w-3.5 h-3.5" /> Recent Scans
+              </div>
+              <div className="mt-2 text-3xl font-bold text-slate-900">{recentScans.length}</div>
+              <div className="mt-1 text-xs text-slate-500">
+                <span className="text-emerald-600">{passedScans} passed</span>
+                {failedScans > 0 && <span className="text-rose-600"> • {failedScans} failed</span>}
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+              <div className="flex items-center gap-2 text-slate-500 text-xs font-medium uppercase tracking-wider">
+                <Clock className="w-3.5 h-3.5" /> Last Scan
+              </div>
+              <div className="mt-2 text-3xl font-bold text-slate-900">
+                {latestScan ? timeAgo(latestScan.created_at).replace(" ago", "") : "—"}
+              </div>
+              <div className="mt-1 text-xs text-slate-500">
+                {latestScan ? latestScan.projects?.name : "No scans yet"}
+              </div>
+            </div>
           </div>
 
-          {/* Right sidebar */}
-          <div className="space-y-6">
-            {/* Recent Activity */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-semibold text-slate-900">Recent Activity</h3>
-                <Activity className="w-4 h-4 text-slate-400" />
-              </div>
-              
-              {(!recentScans || recentScans.length === 0) ? (
-                <div className="p-6 text-center text-sm text-slate-500">
-                  No scans yet. Run your first scan to see activity here.
+          {/* MAIN TWO-COLUMN LAYOUT */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            {/* ========================================== */}
+            {/* LEFT: MISSION CONTROL (ISSUES = ENTITIES) */}
+            {/* ========================================== */}
+            <section className="space-y-6">
+              {/* Section Header */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-900">Mission Control</h2>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-500 max-w-md">
+                    <span className="text-slate-700 font-medium">Issues are persistent problems</span> that exist across multiple scans. 
+                    Each issue is deduplicated — fix it once, it's gone everywhere.
+                  </p>
                 </div>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {recentScans.slice(0, 5).map((scan: any) => (
-                    <Link 
-                      key={scan.id}
-                      href={`/dashboard/scans/${scan.id}`}
-                      className="px-5 py-3 flex items-start gap-3 hover:bg-slate-50 transition"
+                <Link
+                  href="/dashboard/issues"
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                >
+                  View all <ArrowUpRight className="w-3 h-3" />
+                </Link>
+              </div>
+
+              {/* Urgent Issues */}
+              {urgentCount > 0 && (
+                <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-rose-700 text-xs font-bold uppercase tracking-wider mb-3">
+                    <Zap className="w-3.5 h-3.5" /> Needs immediate attention
+                  </div>
+                  <div className="space-y-2">
+                    {criticalHighGroups.slice(0, 3).map((g) => (
+                      <Link
+                        key={g.id}
+                        href={`/dashboard/issues/${g.id}`}
+                        className="block bg-white border border-rose-200 rounded-lg p-3 hover:border-rose-300 hover:shadow-sm transition group"
+                      >
+                        <div className="flex items-start gap-3">
+                          <SeverityPill severity={g.severity} />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium text-slate-900 truncate group-hover:text-rose-700 transition">
+                              {g.rule_id}
+                            </div>
+                            <div className="text-xs text-slate-500 truncate mt-0.5">
+                              {g.canonical_file}:{g.canonical_line}
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-slate-500 shrink-0">
+                            {g.occurrence_count || 1}× across scans
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  {urgentCount > 3 && (
+                    <Link
+                      href="/dashboard/issues?severity=critical,high"
+                      className="mt-3 block text-center text-xs font-medium text-rose-700 hover:text-rose-800"
                     >
-                      <div className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                        scan.quality_gate_passed ? 'bg-emerald-100' : 'bg-red-100'
-                      }`}>
-                        {scan.quality_gate_passed ? (
-                          <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <XCircle className="w-3.5 h-3.5 text-red-600" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-slate-900 truncate">
-                          {scan.projects?.name}
-                        </div>
-                        <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                          <span>{timeAgo(scan.created_at)}</span>
-                          {scan.branch && (
-                            <>
-                              <span className="text-slate-300">•</span>
-                              <span className="truncate">{scan.branch}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      {scan.stats?.danger_count > 0 && (
-                        <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
-                          {scan.stats.danger_count}
-                        </span>
-                      )}
+                      +{urgentCount - 3} more urgent issues →
                     </Link>
-                  ))}
+                  )}
                 </div>
               )}
-            </div>
 
-            {/* Quick Actions */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100">
-                <h3 className="font-semibold text-slate-900">Quick Actions</h3>
-              </div>
-              <div className="p-3 space-y-1">
-                <Link 
-                  href="/docs"
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
-                >
-                  <BookOpen className="w-4 h-4 text-slate-400" />
-                  Read Documentation
-                </Link>
-                <Link 
-                  href="/docs#cli"
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
-                >
-                  <Terminal className="w-4 h-4 text-slate-400" />
-                  Install CLI
-                </Link>
-                <Link 
-                  href="/dashboard/settings"
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
-                >
-                  <Zap className="w-4 h-4 text-slate-400" />
-                  Configure Integrations
-                </Link>
-              </div>
-            </div>
+              {/* Open Issues List */}
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-900">Open Issues</span>
+                  <span className="text-xs text-slate-500">{openCount} total</span>
+                </div>
 
-            {/* CLI Prompt */}
-            <div className="bg-slate-900 rounded-xl p-5 text-white">
-              <div className="flex items-center gap-2 mb-3">
-                <Terminal className="w-4 h-4 text-slate-400" />
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Quick Start</span>
+                {openSorted.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <div className="w-12 h-12 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                    <div className="text-sm font-medium text-slate-900">All clear!</div>
+                    <div className="text-xs text-slate-500 mt-1">No open issues to triage.</div>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {openSorted.slice(0, 6).map((g) => (
+                      <Link
+                        key={g.id}
+                        href={`/dashboard/issues/${g.id}`}
+                        className="block p-4 hover:bg-slate-50 transition group"
+                      >
+                        <div className="flex items-start gap-3">
+                          <SeverityPill severity={g.severity} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-slate-900 truncate group-hover:text-indigo-600 transition">
+                                {g.rule_id}
+                              </span>
+                              {g.verification_status === "VERIFIED" && (
+                                <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase">
+                                  Verified
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-500 truncate mt-0.5">
+                              {g.projects?.name} • {g.canonical_file}
+                            </div>
+                            {/* ISSUE-SPECIFIC METADATA */}
+                            <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
+                              <span className="flex items-center gap-1">
+                                <Eye className="w-3 h-3" />
+                                Seen {g.occurrence_count || 1}×
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <TrendingUp className="w-3 h-3" />
+                                First: {g.first_seen_at ? formatDate(g.first_seen_at) : "—"}
+                              </span>
+                              <span>
+                                Last: {g.last_seen_at ? timeAgo(g.last_seen_at) : "—"}
+                              </span>
+                            </div>
+                          </div>
+                          <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition shrink-0" />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                {openCount > 6 && (
+                  <div className="px-4 py-3 border-t border-slate-100 bg-slate-50">
+                    <Link
+                      href="/dashboard/issues"
+                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center justify-center gap-1"
+                    >
+                      View all {openCount} issues <ArrowUpRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+                )}
               </div>
-              <div className="font-mono text-sm space-y-1.5">
-                <div><span className="text-emerald-400">$</span> pip install skylos</div>
-                <div><span className="text-emerald-400">$</span> skylos . --danger</div>
+
+              {/* Issues Explainer */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded bg-slate-200 text-slate-600 shrink-0">
+                    <FileSearch className="w-4 h-4" />
+                  </div>
+                  <div className="text-xs text-slate-600 leading-relaxed">
+                    <span className="text-slate-900 font-medium">Issues are entities, not events.</span> The same vulnerability 
+                    appearing in 10 scans = 1 issue with 10 occurrences. Track lifecycle (open → fixed → reintroduced), 
+                    assign owners, verify/refute, and add notes.
+                  </div>
+                </div>
               </div>
-              <a 
-                href="https://pypi.org/project/skylos/" 
-                target="_blank"
-                className="mt-4 flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition"
-              >
-                View on PyPI <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
+            </section>
+
+            {/* ========================================== */}
+            {/* RIGHT: SCAN TIMELINE (SCANS = EVENTS)     */}
+            {/* ========================================== */}
+            <section className="space-y-6">
+              {/* Section Header */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-600">
+                      <History className="w-5 h-5" />
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-900">Scan Timeline</h2>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-500 max-w-md">
+                    <span className="text-slate-700 font-medium">Scans are point-in-time snapshots.</span> Each scan 
+                    records exactly what Skylos found on a specific commit — your immutable audit trail.
+                  </p>
+                </div>
+                <Link
+                  href="/dashboard/scans"
+                  className="text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1"
+                >
+                  View all <ArrowUpRight className="w-3 h-3" />
+                </Link>
+              </div>
+
+              {/* Latest Scan Hero */}
+              {latestScan && (
+                <Link
+                  href={`/dashboard/scans/${latestScan.id}`}
+                  className="block bg-white border border-slate-200 rounded-xl p-5 hover:border-slate-300 hover:shadow-md transition group shadow-sm"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Latest Scan</span>
+                    <GateBadge passed={latestScan.quality_gate_passed} />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${latestScan.quality_gate_passed ? "bg-emerald-500" : "bg-rose-500"}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-lg font-semibold text-slate-900 truncate group-hover:text-indigo-600 transition">
+                        {latestScan.projects?.name || "Unknown Project"}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                        <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                          {String(latestScan.commit_hash || "").slice(0, 7)}
+                        </code>
+                        <span>•</span>
+                        <span>{timeAgo(latestScan.created_at)}</span>
+                      </div>
+                    </div>
+                    <ArrowUpRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-500 transition" />
+                  </div>
+                  {/* Scan stats */}
+                  <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-lg font-bold text-slate-900">
+                        {Number(latestScan.stats?.new_issues ?? 0)}
+                      </div>
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wider">New</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-slate-500">
+                        {Number(latestScan.stats?.legacy_issues ?? 0)}
+                      </div>
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wider">Legacy</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-slate-400">
+                        {Number(latestScan.stats?.suppressed_new_issues ?? 0)}
+                      </div>
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wider">Suppressed</div>
+                    </div>
+                  </div>
+                </Link>
+              )}
+
+              {/* Scan History List */}
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-900">Recent Scans</span>
+                  <span className="text-xs text-slate-500">
+                    <span className="text-emerald-600">{passedScans}</span> / {recentScans.length} passed
+                  </span>
+                </div>
+
+                {recentScans.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <GitPullRequest className="w-6 h-6" />
+                    </div>
+                    <div className="text-sm font-medium text-slate-900">No scans yet</div>
+                    <div className="text-xs text-slate-500 mt-1">Run your first scan to populate the timeline.</div>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {recentScans.slice(1, 7).map((scan) => (
+                      <Link
+                        key={scan.id}
+                        href={`/dashboard/scans/${scan.id}`}
+                        className="block p-4 hover:bg-slate-50 transition group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                              scan.quality_gate_passed ? "bg-emerald-500" : "bg-rose-500"
+                            }`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-slate-900 truncate group-hover:text-slate-700 transition">
+                                {scan.projects?.name || "Unknown"}
+                              </span>
+                              <code className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                {String(scan.commit_hash || "").slice(0, 7)}
+                              </code>
+                            </div>
+                            {/* SCAN-SPECIFIC METADATA */}
+                            <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-400">
+                              <span>New: {Number(scan.stats?.new_issues ?? 0)}</span>
+                              <span>Legacy: {Number(scan.stats?.legacy_issues ?? 0)}</span>
+                              <GateBadge passed={scan.quality_gate_passed} />
+                            </div>
+                          </div>
+                          <div className="text-xs text-slate-400 shrink-0">
+                            {timeAgo(scan.created_at).replace(" ago", "")}
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                {recentScans.length > 7 && (
+                  <div className="px-4 py-3 border-t border-slate-100 bg-slate-50">
+                    <Link
+                      href="/dashboard/scans"
+                      className="text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1"
+                    >
+                      View full scan history <ArrowUpRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* Scans Explainer */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded bg-slate-200 text-slate-600 shrink-0">
+                    <GitPullRequest className="w-4 h-4" />
+                  </div>
+                  <div className="text-xs text-slate-600 leading-relaxed">
+                    <span className="text-slate-900 font-medium">Scans are events, not entities.</span> Use scans 
+                    for audit trails, quality gate decisions, debugging ingestion, and historical evidence 
+                    ("it was clean on Jan 29, broken on Jan 30").
+                  </div>
+                </div>
+              </div>
+
+              {/* Add Project CTA */}
+              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-6 relative overflow-hidden">
+                <h3 className="font-bold text-lg text-slate-900 mb-2 relative z-10">Add another project</h3>
+                <p className="text-slate-600 text-sm mb-4 relative z-10">
+                  Secure more repositories. Skylos is ready to scan.
+                </p>
+                <Link
+                  href="/dashboard/projects"
+                  className="block w-full text-center bg-indigo-600 text-white font-bold py-2.5 rounded-lg text-sm hover:bg-indigo-500 transition relative z-10"
+                >
+                  Connect Repository
+                </Link>
+              </div>
+            </section>
           </div>
         </div>
       </div>

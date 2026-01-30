@@ -124,6 +124,7 @@ function pickCategory(
 
 export function sarifToSkylosPayload(sarif: AnyObj): NormalizedPayload {
   const findings: NormalizedFinding[] = [];
+  const seen = new Set<string>();
 
   const runs: AnyObj[] = Array.isArray(sarif.runs) ? sarif.runs : [];
   const toolsUsed = new Set<string>();
@@ -154,6 +155,12 @@ export function sarifToSkylosPayload(sarif: AnyObj): NormalizedPayload {
 
       const region = phys?.region || {};
       const line = Number(region?.startLine || 0) || 0;
+
+      const dedupKey = `${toolRuleId}::${filePath}::${line}`;
+      if (seen.has(dedupKey)) {
+        continue;
+      }
+      seen.add(dedupKey);
 
       const snippet =
         typeof region?.snippet?.text === "string"
