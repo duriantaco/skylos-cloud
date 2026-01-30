@@ -368,7 +368,7 @@ export default async function Home() {
               <h3 className="text-xl font-semibold text-slate-900">Pro</h3>
               <p className="mt-2 text-slate-600">For teams shipping fast</p>
               <div className="mt-6 text-5xl font-bold text-slate-900">
-                $29<span className="text-lg font-normal text-slate-500">/mo</span>
+                $-<span className="text-lg font-normal text-slate-500">/mo</span>
               </div>
               <ul className="mt-8 space-y-3 text-sm text-slate-600">
                 <li className="flex items-center gap-2">
