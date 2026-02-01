@@ -1,6 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
-import crypto from "crypto";
+import { generateApiKey } from "@/lib/api-key";
+import { serverError } from "@/lib/api-error";
+
 
 export async function POST(
   request: Request,
@@ -40,16 +42,16 @@ export async function POST(
     return NextResponse.json({ error: "Not authorized" }, { status: 403 });
   }
 
-  const newKey = "sk_live_" + crypto.randomBytes(24).toString("hex");
+  const { plain: newKey, hash: newKeyHash } = generateApiKey();
 
   const { data: updated, error: updErr } = await supabase
     .from("projects")
-    .update({ api_key: newKey })
+    .update({ api_key_hash: newKeyHash })
     .eq("id", id)
     .select("id");
 
   if (updErr) {
-    return NextResponse.json({ error: updErr.message }, { status: 500 });
+    return serverError(updErr, "Rotate API key");
   }
 
   if (!updated || updated.length === 0) {

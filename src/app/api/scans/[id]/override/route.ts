@@ -1,5 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { serverError } from "@/lib/api-error";
+
 
 export async function POST(
   request: Request,
@@ -54,7 +56,7 @@ export async function POST(
     .eq("id", id);
 
   if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+    return serverError(updateError, "Override scan quality gate");
   }
 
   if (process.env.GITHUB_TOKEN && scanData.projects?.repo_url) {

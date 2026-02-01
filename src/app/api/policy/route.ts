@@ -1,5 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { serverError } from "@/lib/api-error";
+
 
 type GateMode = "zero-new" | "category" | "severity" | "both";
 
@@ -103,11 +105,11 @@ export async function POST(req: Request) {
       .eq("id", projectId);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverError(error, "Update project policy");
     }
 
     return NextResponse.json({ success: true, policy_config, exclude_paths });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
+    return serverError(e, "Project policy update");
   }
 }

@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { serverError } from "@/lib/api-error";
+
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -88,11 +90,7 @@ export async function GET(req: Request) {
     };
 
     return NextResponse.json(config);
-  } catch (e: any) {
-    console.error("Sync config error:", e);
-    return NextResponse.json(
-      { error: "Server error" },
-      { status: 500 }
-    );
+  } catch (e) {
+    return serverError(e, "Sync config");
   }
 }

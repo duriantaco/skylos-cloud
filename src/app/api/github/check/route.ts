@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Octokit } from "@octokit/rest";
+import { serverError } from "@/lib/api-error";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -78,8 +79,7 @@ export async function POST(request: Request) {
     });
     
   } catch (error) {
-    console.error("GitHub check error:", error);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return serverError(error, "GitHub check");
   }
 }
 

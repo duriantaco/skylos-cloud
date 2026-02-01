@@ -10,6 +10,8 @@ import { trackEvent } from "@/lib/analytics";
 import { groupFindings, Finding  } from '@/lib/grouping';
 import crypto from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { serverError } from "@/lib/api-error";
+
 
 function getSupabaseAdmin(): SupabaseClient | null {
   const url =
@@ -332,14 +334,12 @@ type NotificationPayload = {
 export async function POST(req: Request) {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
+    console.error("Server misconfigured: missing Supabase env vars", {
+      SUPABASE_URL: !process.env.SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: !process.env.SUPABASE_SERVICE_ROLE_KEY,
+    });
     return NextResponse.json(
-      {
-        error: "Server misconfigured: missing Supabase env vars",
-        missing: {
-          SUPABASE_URL: !process.env.SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL,
-          SUPABASE_SERVICE_ROLE_KEY: !process.env.SUPABASE_SERVICE_ROLE_KEY,
-        },
-      },
+      { error: "Something went wrong" },
       { status: 500 }
     );
   }
@@ -968,11 +968,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json(response)
-  } catch (e: any) {
-    console.error('Report API Error:', e)
-    return NextResponse.json({ 
-      error: "Server error processing report",
-      details: process.env.NODE_ENV === "development" ? e.message : undefined
-    }, { status: 500 })
+  } catch (e) {
+    return serverError(e, "Report API");
   }
 }

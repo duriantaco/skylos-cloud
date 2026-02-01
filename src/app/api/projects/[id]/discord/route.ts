@@ -1,6 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { testSlackWebhook } from "@/lib/slack";
+import { serverError } from "@/lib/api-error";
+
 
 export async function GET(
   request: Request,
@@ -24,7 +26,6 @@ export async function GET(
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  // Mask the webhook URL for security (only show last 8 chars)
   const maskedWebhook = project.slack_webhook_url
     ? "••••••••" + project.slack_webhook_url.slice(-8)
     : null;
@@ -49,7 +50,6 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Verify user has access to this project
   const { data: project } = await supabase
     .from("projects")
     .select("id, name, org_id")
@@ -83,7 +83,6 @@ export async function POST(
     return NextResponse.json({ success: true, message: "Test message sent!" });
   }
 
-  // Validate webhook URL if provided
   if (webhookUrl && !webhookUrl.startsWith("https://hooks.slack.com/")) {
     return NextResponse.json(
       { error: "Invalid webhook URL. Must be a Slack Incoming Webhook URL." },
@@ -91,7 +90,6 @@ export async function POST(
     );
   }
 
-  // Validate notifyOn value
   const validNotifyOn = ["failure", "always", "recovery"];
   if (notifyOn && !validNotifyOn.includes(notifyOn)) {
     return NextResponse.json(
@@ -100,7 +98,6 @@ export async function POST(
     );
   }
 
-  // Build update object
   const updates: Record<string, any> = {};
   
   if (webhookUrl !== undefined) {
@@ -123,8 +120,7 @@ export async function POST(
     .eq("id", id);
 
   if (updateError) {
-    console.error("Failed to update Slack settings:", updateError);
-    return NextResponse.json({ error: "Failed to save settings" }, { status: 500 });
+    return serverError(updateError, "Update Slack settings");
   }
 
   return NextResponse.json({ success: true });
@@ -151,7 +147,7 @@ export async function DELETE(
     .eq("id", id);
 
   if (error) {
-    return NextResponse.json({ error: "Failed to remove webhook" }, { status: 500 });
+    return serverError(error, "Delete Slack webhook");
   }
 
   return NextResponse.json({ success: true });

@@ -1,5 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { serverError } from "@/lib/api-error";
+
 
 export async function POST(request: Request) {
   try {
@@ -53,7 +55,7 @@ export async function POST(request: Request) {
       .in("id", validIds);
 
     if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+      return serverError(deleteError, "Bulk delete projects");
     }
 
     return NextResponse.json({ 
@@ -62,7 +64,6 @@ export async function POST(request: Request) {
       message: `Deleted ${validIds.length} project${validIds.length !== 1 ? 's' : ''}`
     });
   } catch (e: any) {
-    console.error("Bulk delete error:", e);
-    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+    return serverError(e, "Bulk delete projects");
   }
 }

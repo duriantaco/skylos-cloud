@@ -2,6 +2,8 @@ import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
+import { serverError } from "@/lib/api-error";
+
 
 async function getInstallationOctokit(installationId: number): Promise<Octokit> {
   const auth = createAppAuth({
@@ -159,8 +161,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, pr_url: pr.html_url });
 
-  } catch (error: any) {
-    console.error("GitHub API Error:", error);
-    return NextResponse.json({ error: error.message || "Failed to create PR" }, { status: 500 });
+  } catch (error) {
+    return serverError(error, "GitHub API");
   }
 }

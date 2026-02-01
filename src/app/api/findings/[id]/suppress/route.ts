@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { serverError } from "@/lib/api-error";
 
 export async function POST(
   request: Request,
@@ -9,7 +10,8 @@ export async function POST(
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) 
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
   const reason: string | null = typeof body.reason === "string" ? body.reason : null;
@@ -51,7 +53,7 @@ export async function POST(
     );
 
   if (supErr) {
-    return NextResponse.json({ error: supErr.message }, { status: 500 });
+    return serverError(supErr, "Suppression query");
   }
 
   const { error: upErr } = await supabase
@@ -63,7 +65,7 @@ export async function POST(
     .eq("line_number", finding.line_number || 0);
 
   if (upErr) {
-    return NextResponse.json({ error: upErr.message }, { status: 500 });
+    return serverError(upErr, "Update query");
   }
 
   const { count: unsuppressedNewCount } = await supabase
@@ -84,7 +86,7 @@ export async function POST(
     .eq("id", scan.id);
 
   if (scanUpErr) {
-    return NextResponse.json({ error: scanUpErr.message }, { status: 500 });
+    return serverError(scanUpErr, "Scan update query");
   }
 
   const projectRef = scan.projects as any;

@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { serverError } from "@/lib/api-error";
 
 export async function GET(
   request: Request,
@@ -26,6 +27,8 @@ export async function GET(
 
   const { data, error } = await query;
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) 
+    return serverError(error, "Fetch suppressions");
+  
   return NextResponse.json({ rows: data || [] });
 }

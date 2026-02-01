@@ -1,5 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { serverError } from "@/lib/api-error";
+
 
 export async function PATCH(
   req: NextRequest,
@@ -48,12 +50,12 @@ export async function PATCH(
       .eq("id", id);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverError(error, "Update project");
     }
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
+    return serverError(e, "Project update");
   }
 }
 
@@ -107,11 +109,11 @@ export async function DELETE(
     const { error } = await supabase.from("projects").delete().eq("id", id);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return serverError(error, "Delete project");
     }
 
     return NextResponse.json({ success: true });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
+    return serverError(e, "Project delete");
   }
 }

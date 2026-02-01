@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { serverError } from "@/lib/api-error";
+
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("Missing Supabase environment variables");
@@ -350,9 +352,6 @@ export async function POST(req: Request) {
     });
 
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e.message || "Server error" },
-      { status: 500 }
-    );
+    return serverError(e, "Verify API");
   }
 }

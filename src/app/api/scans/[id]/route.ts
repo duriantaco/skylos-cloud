@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { serverError } from "@/lib/api-error";
 
 
 export async function DELETE(
@@ -41,7 +42,7 @@ export async function DELETE(
       .eq("id", id)
       .select("id");
     if (delErr) {
-      return NextResponse.json({ error: delErr.message }, { status: 500 });
+      return serverError(delErr, "Scan delete");
     }
 
     if (!deleted || deleted.length === 0) {
@@ -50,8 +51,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, deleted: deleted[0].id });
     
-  } catch (e: any) {
-    console.error("Scan delete error:", e);
-    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+  } catch (e) {
+    return serverError(e, "Scan delete");
   }
 }

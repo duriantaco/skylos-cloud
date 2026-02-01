@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { serverError } from "@/lib/api-error";
+
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -27,10 +29,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .eq("group_id", id)
     .limit(5000);
 
-  if (fErr) return NextResponse.json({ error: fErr.message }, { status: 500 });
-  if (!findings?.length) return NextResponse.json({ error: "No findings in group" }, { status: 404 });
+  if (fErr) 
+    return serverError(fErr, "Fetch findings for suppression");
+  if (!findings?.length) 
+    return NextResponse.json({ error: "No findings in group" }, { status: 404 });
 
-  // upsert suppressions signatures (assumes you have suppressions table + unique key)
   const suppressionRows = findings.map((f: any) => ({
     project_id: group.project_id,
     rule_id: f.rule_id,
@@ -45,21 +48,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .from("suppressions")
     .upsert(suppressionRows, { onConflict: "project_id,rule_id,line_number,file_path" });
 
-  if (sErr) return NextResponse.json({ error: sErr.message }, { status: 500 });
+  if (sErr) 
+    return serverError(sErr, "Upsert suppressions");
 
   const { error: markErr } = await supabase
     .from("findings")
     .update({ is_suppressed: true })
     .eq("group_id", id);
 
-  if (markErr) return NextResponse.json({ error: markErr.message }, { status: 500 });
+  if (markErr) 
+    return serverError(markErr, "Mark findings as suppressed");
 
   const { error: groupErr } = await supabase
     .from("issue_groups")
     .update({ status: "suppressed" })
     .eq("id", id);
 
-  if (groupErr) return NextResponse.json({ error: groupErr.message }, { status: 500 });
+  if (groupErr) 
+    return serverError(groupErr, "Update issue group status");
 
   return NextResponse.json({ success: true });
 }

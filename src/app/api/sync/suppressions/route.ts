@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
+import { serverError } from '@/lib/api-error';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -48,11 +49,7 @@ export async function GET(request: NextRequest) {
     .is('revoked_at', null)
 
   if (suppError) {
-    console.error('Suppressions query error:', suppError)
-    return NextResponse.json(
-      { error: 'Failed to fetch suppressions' },
-      { status: 500 }
-    )
+    return serverError(suppError, "Suppressions query");
   }
 
   const suppressions = (rows || [])

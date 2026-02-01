@@ -1,5 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { serverError } from "@/lib/api-error";
+
 
 export async function GET(
   req: Request,
@@ -105,6 +107,6 @@ export async function GET(
       },
     });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
+    return serverError(e, "Export scan findings");
   }
 }

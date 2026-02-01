@@ -1,7 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
-import crypto from "crypto";
+import { generateApiKey } from "@/lib/api-key";
 import { trackEvent } from "@/lib/analytics";
+import { serverError } from "@/lib/api-error";
 
 export async function POST(req: Request) {
   try {
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 
-    const apiKey = "sk_live_" + crypto.randomBytes(24).toString("hex");
+    const { plain: apiKey, hash: apiKeyHash } = generateApiKey();
 
     const { data: project, error: insertError } = await supabase
       .from("projects")
@@ -38,19 +39,23 @@ export async function POST(req: Request) {
         org_id,
         name: name.trim(),
         repo_url: repo_url?.trim() || null,
-        api_key: apiKey,
+        api_key_hash: apiKeyHash,
       })
       .select()
       .single();
 
+    if (project) {
+      (project as any).api_key = apiKey;
+    }
+
     if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      return serverError(insertError, "Create project");
     }
 
     trackEvent("project_created", org_id);
 
     return NextResponse.json({ success: true, project });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
+    return serverError(e, "Project create");
   }
 }

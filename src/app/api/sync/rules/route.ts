@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { serverError } from "@/lib/api-error";
+
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -56,11 +58,7 @@ export async function GET(request: NextRequest) {
     .eq('enabled', true)
 
   if (rulesError) {
-    console.error('Error fetching rules:', rulesError)
-    return NextResponse.json(
-      { error: 'Failed to fetch rules' },
-      { status: 500 }
-    )
+    return serverError(rulesError, "Fetch custom rules")
   }
 
   const filteredRules = (rules || []).filter(rule => {

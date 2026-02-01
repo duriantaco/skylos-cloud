@@ -1,5 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { serverError } from "@/lib/api-error";
+
 
 export async function POST(
   request: Request,
@@ -32,6 +34,8 @@ export async function POST(
     .eq("line_number", line_number)
     .is("revoked_at", null);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) 
+    return serverError(error, "Revoke suppression");
+
   return NextResponse.json({ success: true });
 }

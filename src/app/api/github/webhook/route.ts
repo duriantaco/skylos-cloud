@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
 import crypto from "crypto";
+import { serverError } from "@/lib/api-error";
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -216,7 +217,6 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    console.error("Webhook error:", e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return serverError(e, "Webhook");
   }
 }

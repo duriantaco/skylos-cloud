@@ -1,5 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { serverError } from "@/lib/api-error";
+
 
 export async function GET(
   request: Request,
@@ -51,7 +53,7 @@ export async function GET(
   const { data, count, error } = await query;
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return serverError(error, "Fetch scan findings");
   }
 
   return NextResponse.json({

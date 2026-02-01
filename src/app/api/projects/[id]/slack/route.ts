@@ -1,6 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { testSlackWebhook } from "@/lib/slack";
+import { serverError } from "@/lib/api-error";
+
 
 export async function GET(
   request: Request,
@@ -117,8 +119,7 @@ export async function POST(
     .eq("id", id);
 
   if (updateError) {
-    console.error("Failed to update Slack settings:", updateError);
-    return NextResponse.json({ error: "Failed to save settings" }, { status: 500 });
+    return serverError(updateError, "Update Slack settings");
   }
 
   return NextResponse.json({ success: true });
@@ -145,7 +146,7 @@ export async function DELETE(
     .eq("id", id);
 
   if (error) {
-    return NextResponse.json({ error: "Failed to remove webhook" }, { status: 500 });
+    return serverError(error, "Delete Slack webhook");
   }
 
   return NextResponse.json({ success: true });

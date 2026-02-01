@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { serverError } from "@/lib/api-error";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -35,7 +36,8 @@ export async function GET(request: Request) {
   if (projectId) q = q.eq("project_id", projectId);
 
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) 
+    return serverError(error, "Fetch issue groups");
 
   return NextResponse.json({ groups: data || [] });
 }
