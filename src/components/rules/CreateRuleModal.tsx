@@ -181,7 +181,7 @@ export function CreateRuleModal({
                 onClick={() => setRuleType("yaml")}
                 className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition ${
                   ruleType === "yaml"
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                    ? "border-gray-500 bg-indigo-50 text-indigo-700"
                     : "border-slate-200 hover:border-slate-300"
                 }`}
               >
@@ -194,7 +194,7 @@ export function CreateRuleModal({
                 disabled={!canUsePython}
                 className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition ${
                   ruleType === "python"
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                    ? "border-gray-500 bg-indigo-50 text-indigo-700"
                     : !canUsePython
                     ? "border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed"
                     : "border-slate-200 hover:border-slate-300"
@@ -238,7 +238,7 @@ export function CreateRuleModal({
                 onChange={(e) => setRuleId(e.target.value.toUpperCase())}
                 placeholder="ACME-001"
                 required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
               />
             </div>
             <div>
@@ -249,7 +249,7 @@ export function CreateRuleModal({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Require Auth Decorator"
                 required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
               />
             </div>
           </div>
@@ -261,7 +261,7 @@ export function CreateRuleModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Explain what this rule enforces..."
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
             />
           </div>
 
@@ -271,7 +271,7 @@ export function CreateRuleModal({
               <select
                 value={severity}
                 onChange={(e) => setSeverity(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
               >
                 {SEVERITY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -283,7 +283,7 @@ export function CreateRuleModal({
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
               >
                 {CATEGORY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -316,7 +316,7 @@ export function CreateRuleModal({
 }`}
                 rows={10}
                 required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
               />
             </div>
           ) : (
@@ -337,7 +337,7 @@ class MyRule(SkylosRule):
         return None`}
                 rows={12}
                 required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
               />
             </div>
           )}

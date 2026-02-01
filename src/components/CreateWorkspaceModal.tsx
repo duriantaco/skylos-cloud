@@ -78,7 +78,7 @@ export default function CreateWorkspaceModal({
       {/* Modal */}
       <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 px-6 py-8 text-center">
+        <div className="bg-gradient-to-br from-gray-500 to-purple-600 px-6 py-8 text-center">
           <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Sparkles className="w-8 h-8 text-white" />
           </div>
@@ -96,7 +96,7 @@ export default function CreateWorkspaceModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="My Workspace"
-            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !loading) handleCreate()

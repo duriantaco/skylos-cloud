@@ -86,7 +86,7 @@ function ScanCard({ scan }: { scan: Scan }) {
         <div className="flex-1 min-w-0">
           {/* Project + Gate status */}
           <div className="flex items-center gap-3 mb-3">
-            <span className="font-semibold text-slate-900 group-hover:text-indigo-600 transition">
+            <span className="font-semibold text-slate-900 group-hover:text-gray-700 transition">
               {scan.projects?.name || "Unknown Project"}
             </span>
             <GateBadge passed={scan.quality_gate_passed} />
@@ -221,7 +221,7 @@ export default async function ScansPage() {
           {/* Info box */}
           <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-indigo-100 text-indigo-600 shrink-0">
+              <div className="p-2 rounded-lg bg-indigo-100 text-gray-700 shrink-0">
                 <History className="w-4 h-4" />
               </div>
               <div className="text-sm">
@@ -230,7 +230,7 @@ export default async function ScansPage() {
                 </p>
                 <p className="text-indigo-700/70 mt-1">
                   Looking for persistent issues across scans? Go to{" "}
-                  <Link href="/dashboard/issues" className="font-medium text-indigo-600 hover:text-indigo-800 underline">
+                  <Link href="/dashboard/issues" className="font-medium text-gray-700 hover:text-indigo-800 underline">
                     Mission Control →
                   </Link>
                 </p>

@@ -85,7 +85,7 @@ function SeverityBadge({ severity }: { severity: string }) {
     HIGH: "bg-orange-50 text-orange-700 ring-orange-600/20",
     MEDIUM: "bg-yellow-50 text-yellow-700 ring-yellow-600/20",
     LOW: "bg-blue-50 text-blue-700 ring-blue-700/10",
-    UNKNOWN: "bg-gray-50 text-gray-600 ring-gray-500/10"
+    UNKNOWN: "bg-gray-50 text-gray-700 ring-gray-500/10"
   };
   const activeStyle = styles[s as keyof typeof styles] || styles.UNKNOWN;
   return (

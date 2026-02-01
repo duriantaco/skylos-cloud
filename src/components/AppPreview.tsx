@@ -8,7 +8,7 @@
 //     <div className="rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-[#0f111a] flex flex-col md:flex-row h-[600px] w-full max-w-6xl mx-auto">
       
 //       <aside className="hidden md:flex flex-col w-16 bg-[#0b0c14] border-r border-white/5 items-center py-6 gap-6">
-//         <div className="w-8 h-8 rounded bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+//         <div className="w-8 h-8 rounded bg-gray-500/20 flex items-center justify-center text-indigo-400">
 //           <Shield className="w-5 h-5" />
 //         </div>
 //         <nav className="flex flex-col gap-4 w-full px-2">
@@ -61,7 +61,7 @@
 
 // function SidebarIcon({ icon, active }: any) {
 //   return (
-//     <div className={`w-10 h-10 rounded mx-auto flex items-center justify-center cursor-pointer transition ${active ? 'bg-indigo-500/10 text-indigo-400' : 'text-slate-600 hover:text-slate-300 hover:bg-white/5'}`}>
+//     <div className={`w-10 h-10 rounded mx-auto flex items-center justify-center cursor-pointer transition ${active ? 'bg-gray-500/10 text-indigo-400' : 'text-slate-600 hover:text-slate-300 hover:bg-white/5'}`}>
 //       <div className="w-5 h-5">{icon}</div>
 //     </div>
 //   )

@@ -86,7 +86,7 @@ function ProjectCard({
       }}
       className={`p-1.5 rounded-lg transition ${
         isSelected 
-          ? 'bg-indigo-100 text-indigo-600' 
+          ? 'bg-indigo-100 text-gray-700' 
           : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
       }`}
     >
@@ -403,42 +403,14 @@ export default function ProjectsPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      {/* Nav */}
-      <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="p-2 -ml-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <Link href="/" className="flex items-center gap-2.5 font-bold text-lg tracking-tight text-slate-900">
-              <Image src={dogImg} alt="Skylos" width={28} height={28} className="h-7 w-7 object-contain" />
-              Skylos
-              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                Beta
-              </span>
-            </Link>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            {user && (
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
-                  {user.email?.charAt(0).toUpperCase()}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
-
       {/* Selection toolbar */}
       {selectionMode && (
-        <div className="sticky top-16 z-40 bg-indigo-600 text-white shadow-lg">
+        <div className="sticky top-16 z-40 bg-gray-700 text-white shadow-lg">
           <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={clearSelection}
-                className="p-1.5 hover:bg-indigo-500 rounded-lg transition"
+                className="p-1.5 hover:bg-gray-500 rounded-lg transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -449,7 +421,7 @@ export default function ProjectsPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={selectAll}
-                className="px-3 py-1.5 text-sm font-medium hover:bg-indigo-500 rounded-lg transition"
+                className="px-3 py-1.5 text-sm font-medium hover:bg-gray-500 rounded-lg transition"
               >
                 Select all ({filteredProjects.length})
               </button>

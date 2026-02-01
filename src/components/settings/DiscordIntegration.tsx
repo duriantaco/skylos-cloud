@@ -326,7 +326,7 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
                 value={webhookUrl}
                 onChange={(e) => setWebhookUrl(e.target.value)}
                 placeholder="https://discord.com/api/webhooks/..."
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-indigo-400"
               />
               <p className="mt-1.5 text-xs text-slate-500">
                 Server Settings → Integrations → Webhooks →{' '}
@@ -334,7 +334,7 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
                   href="https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-indigo-600 hover:underline inline-flex items-center gap-0.5"
+                  className="text-gray-700 hover:underline inline-flex items-center gap-0.5"
                 >
                   Create Webhook
                   <ExternalLink className="w-3 h-3" />

@@ -49,7 +49,7 @@ export default function IssueList({
             key={group.id}
             onClick={() => onSelect(group)}
             className={`w-full text-left p-4 transition hover:bg-slate-50 ${
-              isSelected ? 'bg-indigo-50 border-l-2 border-indigo-500' : ''
+              isSelected ? 'bg-indigo-50 border-l-2 border-gray-500' : ''
             }`}
           >
             <div className="flex items-start gap-3">

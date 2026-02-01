@@ -655,7 +655,7 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
             <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                  <Code2 className="w-5 h-5 text-indigo-600" />
+                  <Code2 className="w-5 h-5 text-gray-700" />
                   {group.category === 'DEAD_CODE' ? 'Unused Code' : 'Flagged Code'}
                 </h2>
                 <span className="text-sm text-slate-500">Line {group.canonical_line}</span>
@@ -751,7 +751,7 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
                       {' '}Install the Skylos GitHub App to enable one-click fixes.
                     </div>
                     <Link href="/dashboard/settings/github"
-                      className="inline-flex items-center gap-1 mt-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+                      className="inline-flex items-center gap-1 mt-2 text-sm text-gray-700 hover:text-indigo-700 font-medium">
                       Install GitHub App<ArrowUpRight className="w-3 h-3" />
                     </Link>
                   </div>
@@ -855,7 +855,7 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
                 <div className="text-sm font-medium text-slate-900 mb-1">{project?.name || 'Loading...'}</div>
                 {project?.repo_url && (
                   <a href={project.repo_url} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                    className="text-xs text-gray-700 hover:text-indigo-700 flex items-center gap-1">
                     {project.repo_url.replace('https://github.com/', '')}
                     <ExternalLink className="w-3 h-3" />
                   </a>

@@ -47,25 +47,6 @@ export default async function RulesPage() {
 
   return (
     <main className="min-h-screen bg-slate-50">
-      {/* Nav */}
-      <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2.5 font-bold text-lg tracking-tight text-slate-900">
-            <Image src={dogImg} alt="Skylos" width={32} height={32} className="h-8 w-8 object-contain" priority />
-            Skylos
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-              Beta
-            </span>
-          </Link>
-          
-          <div className="flex items-center gap-6">
-            <Link href="/docs" className="text-sm text-slate-500 hover:text-slate-900 transition flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4" />
-              Docs
-            </Link>
-          </div>
-        </div>
-      </nav>
 
       <div className="max-w-5xl mx-auto px-6 py-8">
         {/* Breadcrumb */}
@@ -103,7 +84,7 @@ export default async function RulesPage() {
           <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-8 mb-8">
             <div className="flex items-start gap-6">
               <div className="p-3 bg-white rounded-xl shadow-sm">
-                <Shield className="w-8 h-8 text-indigo-600" />
+                <Shield className="w-8 h-8 text-gray-700" />
               </div>
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-slate-900 mb-2">
@@ -116,25 +97,25 @@ export default async function RulesPage() {
                 </p>
                 <div className="grid md:grid-cols-2 gap-2 mb-6 text-sm text-slate-700">
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full" />
                     YAML-based rules (no code required)
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full" />
                     Sync rules across all repositories
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full" />
                     Block PRs that violate policies
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full" />
                     Python plugins for advanced logic
                   </div>
                 </div>
                 <Link
                   href="/dashboard/settings"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-700 text-white rounded-lg font-medium hover:bg-indigo-700 transition"
                 >
                   Upgrade to Pro — $49/mo
                   <Zap className="w-4 h-4" />

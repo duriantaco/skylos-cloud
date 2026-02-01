@@ -32,7 +32,7 @@ export default function FixPrButton({ findingId }: { findingId: string }) {
     <button
       onClick={handleFix}
       disabled={loading}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50"
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-700 text-white hover:bg-indigo-700 transition disabled:opacity-50"
     >
       {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <GitPullRequest className="w-3 h-3" />}
       {loading ? "Creating PR..." : "Fix in PR"}

@@ -12,7 +12,7 @@ export default function FixPreview({
   return (
     <div className="h-full flex flex-col">
       {/* Explanation */}
-      <div className="px-6 py-4 bg-indigo-500/10 border-b border-indigo-500/20">
+      <div className="px-6 py-4 bg-gray-500/10 border-b border-gray-500/20">
         <div className="flex items-start gap-3">
           <span className="text-2xl">💡</span>
           <div>

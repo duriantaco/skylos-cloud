@@ -88,7 +88,7 @@ function NoProjectsState({ userPlan }: { userPlan: string }) {
                 Current Plan: 
                 <span className={`ml-2 px-3 py-1 rounded-full text-sm ${
                   ['pro'].includes(userPlan)
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-gray-700 text-white'
                     : 'bg-slate-600 text-white'
                 }`}>
                   {userPlan === 'pro' ? '⚡ Pro' : 'Free'}
@@ -102,7 +102,7 @@ function NoProjectsState({ userPlan }: { userPlan: string }) {
             </div>
             
             {!['pro'].includes(userPlan) && (
-              <a href="/pricing" className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700">
+              <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700">
                 Upgrade to Pro
               </a>
             )}
@@ -156,7 +156,7 @@ function ProjectPicker({ projects, userPlan }: {
                 Current Plan: 
                 <span className={`ml-2 px-3 py-1 rounded-full text-sm ${
                   ['pro'].includes(userPlan)
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-gray-700 text-white'
                     : 'bg-slate-600 text-white'
                 }`}>
                   {userPlan === 'pro' ? '⚡ Pro' : 'Free'}
@@ -170,7 +170,7 @@ function ProjectPicker({ projects, userPlan }: {
             </div>
             
             {!['pro'].includes(userPlan) && (
-              <a href="/pricing" className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700">
+              <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700">
                 Upgrade to Pro
               </a>
             )}
@@ -290,7 +290,7 @@ export default async function SettingsPage({
                 Organization Plan: 
                 <span className={`ml-2 px-3 py-1 rounded-full text-sm ${
                   ['pro'].includes(userPlan)
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-gray-700 text-white'
                     : 'bg-slate-600 text-white'
                 }`}>
                   {userPlan === 'pro' ? '⚡ Pro' : 'Free'}
@@ -304,7 +304,7 @@ export default async function SettingsPage({
             </div>
             
             {!['pro'].includes(userPlan) && (
-              <a href="/pricing" className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700">
+              <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700">
                 Upgrade to Pro
               </a>
             )}
@@ -316,7 +316,7 @@ export default async function SettingsPage({
           <section className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
             <div className="flex items-start gap-4 mb-6">
               <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
-                <Key className="w-5 h-5 text-indigo-600" />
+                <Key className="w-5 h-5 text-gray-700" />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-slate-900">API Configuration</h2>
@@ -350,7 +350,7 @@ export default async function SettingsPage({
                 <div className="absolute inset-0 flex items-center justify-center bg-white/90">
                   <div className="text-center">
                     <p className="font-semibold mb-2">🔒 Pro Feature</p>
-                    <a href="/pricing" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">
+                    <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">
                       Upgrade to Pro
                     </a>
                   </div>
@@ -380,7 +380,7 @@ export default async function SettingsPage({
                 <div className="absolute inset-0 flex items-center justify-center bg-white/90">
                   <div className="text-center">
                     <p className="font-semibold mb-2">🔒 Pro Feature</p>
-                    <a href="/pricing" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">
+                    <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">
                       Upgrade to Pro
                     </a>
                   </div>

@@ -82,7 +82,7 @@ export default function SuppressionsTable({ projectId }: { projectId: string }) 
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search by rule / file / reason / user..."
-          className="w-full md:w-[420px] bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm"
+          className="w-full md:w-[420px] bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-500 transition shadow-sm"
         />
 
         <div className="flex flex-wrap gap-4 items-center text-sm text-slate-600">

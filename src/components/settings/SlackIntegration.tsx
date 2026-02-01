@@ -316,7 +316,7 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
                 value={webhookUrl}
                 onChange={(e) => setWebhookUrl(e.target.value)}
                 placeholder="https://hooks.slack.com/services/..."
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-indigo-400"
               />
               <p className="mt-1.5 text-xs text-slate-500">
                 Create an{' '}
@@ -324,7 +324,7 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
                   href="https://api.slack.com/messaging/webhooks"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-indigo-600 hover:underline inline-flex items-center gap-0.5"
+                  className="text-gray-700 hover:underline inline-flex items-center gap-0.5"
                 >
                   Incoming Webhook
                   <ExternalLink className="w-3 h-3" />
@@ -350,7 +350,7 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
               <button
                 onClick={handleSave}
                 disabled={saving || !webhookUrl.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-sm font-medium text-white bg-gray-700 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50 flex items-center gap-2"
               >
                 {saving ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

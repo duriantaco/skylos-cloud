@@ -13,9 +13,9 @@ export function PlanBadge({ plan, size = 'sm' }: { plan: Plan; size?: 'sm' | 'md
     },
     pro: {
       label: 'Pro',
-      bg: 'bg-indigo-600',
+      bg: 'bg-gray-700',
       text: 'text-white',
-      border: 'border-indigo-600',
+      border: 'border-gray-700',
       icon: <Zap className="w-3 h-3" />,
     },
     enterprise: {

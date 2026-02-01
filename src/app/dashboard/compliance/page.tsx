@@ -185,7 +185,7 @@ export default async function CompliancePage() {
                         {isEnabled ? (
                           <CheckCircle className="w-5 h-5 text-emerald-600" />
                         ) : (
-                          <button className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                          <button className="text-sm text-gray-700 hover:text-indigo-800 font-medium">
                             Enable
                           </button>
                         )}

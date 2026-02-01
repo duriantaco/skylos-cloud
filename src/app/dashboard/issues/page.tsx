@@ -75,7 +75,7 @@ export default async function IssuesInboxPage() {
 
           <Link
             href="/dashboard"
-            className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+            className="text-sm font-semibold text-gray-700 hover:text-indigo-700"
           >
             ← Back to Dashboard
           </Link>
@@ -117,7 +117,7 @@ export default async function IssuesInboxPage() {
                       {g.category} • {g.canonical_file}:{g.canonical_line}
                     </div>
                   </div>
-                  <div className="shrink-0 text-xs text-indigo-600 font-semibold">Open →</div>
+                  <div className="shrink-0 text-xs text-gray-700 font-semibold">Open →</div>
                 </div>
               </Link>
             ))}

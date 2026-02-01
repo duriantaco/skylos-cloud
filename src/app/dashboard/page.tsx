@@ -123,7 +123,7 @@ export default async function DashboardPage() {
             <p className="text-slate-500 mt-2">Connect your first repository to start scanning.</p>
             <Link
               href="/dashboard/projects"
-              className="inline-flex mt-6 items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition"
+              className="inline-flex mt-6 items-center gap-2 bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-500 transition"
             >
               <Box className="w-4 h-4" />
               Connect Repository
@@ -225,7 +225,7 @@ export default async function DashboardPage() {
             <div className="flex gap-3">
               <Link
                 href="/dashboard/issues"
-                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition shadow-sm"
+                className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-500 transition shadow-sm"
               >
                 <Layers className="w-4 h-4" /> Mission Control
               </Link>
@@ -290,7 +290,7 @@ export default async function DashboardPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600">
+                    <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-100 text-gray-700">
                       <Layers className="w-5 h-5" />
                     </div>
                     <h2 className="text-xl font-bold text-slate-900">Mission Control</h2>
@@ -302,7 +302,7 @@ export default async function DashboardPage() {
                 </div>
                 <Link
                   href="/dashboard/issues"
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                  className="text-xs font-medium text-gray-700 hover:text-indigo-700 flex items-center gap-1"
                 >
                   View all <ArrowUpRight className="w-3 h-3" />
                 </Link>
@@ -376,7 +376,7 @@ export default async function DashboardPage() {
                           <SeverityPill severity={g.severity} />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-slate-900 truncate group-hover:text-indigo-600 transition">
+                              <span className="text-sm font-medium text-slate-900 truncate group-hover:text-gray-700 transition">
                                 {g.rule_id}
                               </span>
                               {g.verification_status === "VERIFIED" && (
@@ -403,7 +403,7 @@ export default async function DashboardPage() {
                               </span>
                             </div>
                           </div>
-                          <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition shrink-0" />
+                          <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-gray-500 transition shrink-0" />
                         </div>
                       </Link>
                     ))}
@@ -414,7 +414,7 @@ export default async function DashboardPage() {
                   <div className="px-4 py-3 border-t border-slate-100 bg-slate-50">
                     <Link
                       href="/dashboard/issues"
-                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center justify-center gap-1"
+                      className="text-xs font-medium text-gray-700 hover:text-indigo-700 flex items-center justify-center gap-1"
                     >
                       View all {openCount} issues <ArrowUpRight className="w-3 h-3" />
                     </Link>
@@ -476,7 +476,7 @@ export default async function DashboardPage() {
                   <div className="flex items-center gap-3">
                     <div className={`w-3 h-3 rounded-full ${latestScan.quality_gate_passed ? "bg-emerald-500" : "bg-rose-500"}`} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-lg font-semibold text-slate-900 truncate group-hover:text-indigo-600 transition">
+                      <div className="text-lg font-semibold text-slate-900 truncate group-hover:text-gray-700 transition">
                         {latestScan.projects?.name || "Unknown Project"}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
@@ -487,7 +487,7 @@ export default async function DashboardPage() {
                         <span>{timeAgo(latestScan.created_at)}</span>
                       </div>
                     </div>
-                    <ArrowUpRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-500 transition" />
+                    <ArrowUpRight className="w-5 h-5 text-slate-300 group-hover:text-gray-500 transition" />
                   </div>
                   {/* Scan stats */}
                   <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-3 gap-4 text-center">
@@ -603,7 +603,7 @@ export default async function DashboardPage() {
                 </p>
                 <Link
                   href="/dashboard/projects"
-                  className="block w-full text-center bg-indigo-600 text-white font-bold py-2.5 rounded-lg text-sm hover:bg-indigo-500 transition relative z-10"
+                  className="block w-full text-center bg-gray-700 text-white font-bold py-2.5 rounded-lg text-sm hover:bg-gray-500 transition relative z-10"
                 >
                   Connect Repository
                 </Link>

@@ -36,7 +36,7 @@ export default function DevPlanToggle({ currentPlan }: { currentPlan: string }) 
         <h3 className="text-lg font-semibold">DEV MODE: Plan Toggle</h3>
       </div>
 
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-gray-700 mb-4">
         For testing only. This will be changed when we go out of beta
       </p>
 

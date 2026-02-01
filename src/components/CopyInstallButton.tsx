@@ -26,7 +26,7 @@ export default function CopyInstallButton({
       className="w-full sm:w-auto inline-flex items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-5 py-3 font-mono text-sm text-slate-900 hover:bg-slate-100 transition"
       aria-label="Copy install command"
     >
-      <span className="text-indigo-600">$</span> {command}
+      <span className="text-gray-700">$</span> {command}
       {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
     </button>
   )

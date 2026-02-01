@@ -171,7 +171,7 @@ function IssueRow({ group }: { group: IssueGroup }) {
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition truncate">
+            <span className="text-sm font-semibold text-slate-900 group-hover:text-gray-700 transition truncate">
               {formatRuleName(group.rule_id)}
             </span>
             {group.verification_status === 'VERIFIED' && (
@@ -207,7 +207,7 @@ function IssueRow({ group }: { group: IssueGroup }) {
 
         {/* Arrow */}
         <div className="pt-2">
-          <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all" />
+          <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all" />
         </div>
       </div>
     </Link>
@@ -298,7 +298,7 @@ export default function MissionControl({ orgId }: { orgId: string }) {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-lg">
-                <Layers className="w-6 h-6 text-indigo-600" />
+                <Layers className="w-6 h-6 text-gray-700" />
               </div>
               <h1 className="text-2xl font-bold text-slate-900">Mission Control</h1>
             </div>
@@ -398,7 +398,7 @@ export default function MissionControl({ orgId }: { orgId: string }) {
                 placeholder="Search by rule, file, or category..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500/20 transition"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-300 focus:ring-2 focus:ring-gray-500/20 transition"
               />
             </div>
 
@@ -408,7 +408,7 @@ export default function MissionControl({ orgId }: { orgId: string }) {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500/20"
+                className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-indigo-300 focus:ring-2 focus:ring-gray-500/20"
               >
                 <option value="severity">Sort by Severity</option>
                 <option value="occurrences">Sort by Occurrences</option>
@@ -422,7 +422,7 @@ export default function MissionControl({ orgId }: { orgId: string }) {
         <div className="space-y-3">
           {loading ? (
             <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm">
-              <div className="animate-spin w-8 h-8 border-2 border-slate-200 border-t-indigo-600 rounded-full mx-auto mb-4" />
+              <div className="animate-spin w-8 h-8 border-2 border-slate-200 border-t-gray-700 rounded-full mx-auto mb-4" />
               <p className="text-slate-500">Loading issues...</p>
             </div>
           ) : filteredGroups.length === 0 ? (
