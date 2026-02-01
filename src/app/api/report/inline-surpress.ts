@@ -123,17 +123,36 @@ export function filterInlineSuppressed(findings: Finding[]): Finding[] {
   return processed.filter((f) => !f.inline_suppressed);
 }
 
+export function getSuppressionStatsFromProcessed(processed: Finding[]): {
+  total: number;
+  inlineSuppressed: number;
+  active: number;
+} {
+  const inlineSuppressed = processed.filter((f) => f.inline_suppressed).length;
+
+  return {
+    total: processed.length,
+    inlineSuppressed,
+    active: processed.length - inlineSuppressed,
+  };
+}
+
 export function getSuppressionStats(findings: Finding[]): {
   total: number;
   inlineSuppressed: number;
   active: number;
 } {
   const processed = processInlineSuppressions(findings);
-  const inlineSuppressed = processed.filter((f) => f.inline_suppressed).length;
+  return getSuppressionStatsFromProcessed(processed);
+}
 
+export function processAndGetStats(findings: Finding[]): {
+  filtered: Finding[];
+  stats: { total: number; inlineSuppressed: number; active: number };
+} {
+  const processed = processInlineSuppressions(findings);
   return {
-    total: findings.length,
-    inlineSuppressed,
-    active: findings.length - inlineSuppressed,
+    filtered: processed.filter((f) => !f.inline_suppressed),
+    stats: getSuppressionStatsFromProcessed(processed),
   };
 }

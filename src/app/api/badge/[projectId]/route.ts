@@ -73,11 +73,26 @@ export async function GET(
   }
 
   try {
-    const { data: project } = await supabase
+    let query = supabase
       .from('projects')
-      .select('id, badge_enabled')
+      .select(`
+        id, 
+        badge_enabled,
+        scans!inner (
+          quality_gate_passed,
+          created_at,
+          branch
+        )
+      `)
       .eq('id', projectId)
-      .single()
+      .order('scans(created_at)', { ascending: false })
+      .limit(1, { foreignTable: 'scans' })
+
+    if (branch) {
+      query = query.eq('scans.branch', branch)
+    }
+
+    const { data: project } = await query.single()
 
     if (!project || !project.badge_enabled) {
       const svg = generateBadge("skylos", "not found", COLORS.unknown, style)
@@ -87,20 +102,7 @@ export async function GET(
       })
     }
 
-    // Get latest scan
-    let query = supabase
-      .from('scans')
-      .select('quality_gate_passed, created_at')
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-
-    if (branch) {
-      query = query.eq('branch', branch)
-    }
-
-    const { data: scans } = await query
-    const scan = scans?.[0]
+    const scan = (project.scans as any)?.[0]
 
     let message: string
     let color: string

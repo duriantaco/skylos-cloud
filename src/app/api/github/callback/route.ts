@@ -19,6 +19,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
+  const { data: project, error: projectError } = await supabase
+    .from('projects')
+    .select('id, org_id')
+    .eq('id', projectId)
+    .single()
+
+  if (projectError || !project) {
+    return NextResponse.redirect(new URL('/dashboard/settings?error=project_not_found', req.url))
+  }
+
+  const { data: member, error: memberError } = await supabase
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', user.id)
+    .eq('org_id', project.org_id)
+    .single()
+
+  if (memberError || !member) {
+    return NextResponse.redirect(new URL('/dashboard/settings?error=unauthorized', req.url))
+  }
+
   const { error } = await supabase
     .from('projects')
     .update({ github_installation_id: parseInt(installationId) })

@@ -38,7 +38,8 @@ export async function GET(
   }
 
   if (search) {
-    query = query.or(`message.ilike.%${search}%,file_path.ilike.%${search}%,rule_id.ilike.%${search}%`);
+    const sanitized = search.replace(/[%_\\]/g, '\\$&');
+    query = query.or(`message.ilike.%${sanitized}%,file_path.ilike.%${sanitized}%,rule_id.ilike.%${sanitized}%`);
   }
 
   query = query.order('severity');

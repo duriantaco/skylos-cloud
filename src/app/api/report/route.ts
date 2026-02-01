@@ -77,6 +77,9 @@ export async function createOrUpdateIssueGroups(
 
   console.log("[grouping] groups:", (grouped as any)?.size ?? "unknown");
 
+  const upsertRows: any[] = [];
+  const fingerprintToItems: Map<string, InsertedFinding[]> = new Map();
+
   for (const [_, items] of grouped as any as Iterable<[string, InsertedFinding[]]>) {
     const canonical = items?.[0];
     if (!canonical) continue;
@@ -93,55 +96,67 @@ export async function createOrUpdateIssueGroups(
       new Set(items.map((x) => String(x.file_path || "")).filter(Boolean))
     );
 
-    const { data: groupRow, error: gErr } = await supabase
+    upsertRows.push({
+      org_id: orgId,
+      project_id: projectId,
+      fingerprint,
+      rule_id: ruleId,
+      category: String(canonical.category || "SECURITY"),
+      severity: String(canonical.severity || "MEDIUM"),
+      canonical_file: filePath,
+      canonical_line: line,
+      canonical_snippet: canonical.snippet || null,
+      occurrence_count: items.length,
+      affected_files: affectedFiles,
+      last_seen_at: scanCreatedAtIso,
+      last_seen_scan_id: scanId,
+      status: "open",
+    });
+
+    fingerprintToItems.set(fingerprint, items);
+  }
+
+  if (upsertRows.length === 0) {
+    return mapping;
+  }
+
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < upsertRows.length; i += BATCH_SIZE) {
+    const batch = upsertRows.slice(i, i + BATCH_SIZE);
+    const fingerprints = batch.map((r) => r.fingerprint);
+
+    const { data: upsertedRows, error: upsertErr } = await supabase
       .from("issue_groups")
-      .upsert(
-        {
-          org_id: orgId,
-          project_id: projectId,
-          fingerprint,
+      .upsert(batch, { onConflict: "org_id,project_id,fingerprint" })
+      .select("id, fingerprint, first_seen_scan_id");
 
-          rule_id: ruleId,
-          category: String(canonical.category || "SECURITY"),
-          severity: String(canonical.severity || "MEDIUM"),
-
-          canonical_file: filePath,
-          canonical_line: line,
-          canonical_snippet: canonical.snippet || null,
-
-          occurrence_count: items.length,
-          affected_files: affectedFiles,
-
-          last_seen_at: scanCreatedAtIso,
-          last_seen_scan_id: scanId,
-
-          status: "open",
-        },
-        { onConflict: "org_id,project_id,fingerprint" }
-      )
-      .select("id, first_seen_scan_id, first_seen_at")
-      .single();
-
-    if (gErr || !groupRow?.id) {
-      throw new Error(gErr?.message || "Failed to upsert issue_group");
+    if (upsertErr) {
+      throw new Error(`Batch upsert failed: ${upsertErr.message}`);
     }
 
-    const groupId = String(groupRow.id);
-
-    if (!groupRow.first_seen_scan_id) {
+    const needsFirstSeen = (upsertedRows || []).filter((r) => !r.first_seen_scan_id);
+    if (needsFirstSeen.length > 0) {
+      const idsToUpdate = needsFirstSeen.map((r) => r.id);
       const { error: firstErr } = await supabase
         .from("issue_groups")
         .update({
           first_seen_at: scanCreatedAtIso,
           first_seen_scan_id: scanId,
         })
-        .eq("id", groupId);
+        .in("id", idsToUpdate);
 
-      if (firstErr) throw new Error(`Failed to set first_seen fields: ${firstErr.message}`);
+      if (firstErr) {
+        throw new Error(`Failed to set first_seen fields: ${firstErr.message}`);
+      }
     }
 
-    for (const it of items) {
-      if (it?.id) mapping[String(it.id)] = groupId;
+    for (const row of upsertedRows || []) {
+      const items = fingerprintToItems.get(row.fingerprint);
+      if (items) {
+        for (const it of items) {
+          if (it?.id) mapping[String(it.id)] = String(row.id);
+        }
+      }
     }
   }
 
