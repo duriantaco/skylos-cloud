@@ -1,0 +1,119 @@
+---
+title: "Surviving the AI PR Tsunami"
+excerpt: "AI generates code instantly. Humans review at 10 lines per minute. The math doesn't work anymore. Here is why the 'LGTM' culture is destroying quality and how to automate the 'Verify' step."
+publishedAt: "2026-02-01"
+updatedAt: "2026-02-01"
+tags: ["engineering-management", "code-review", "devops", "productivity", "burnout"]
+keywords:
+  - AI code review bottleneck
+  - automated code quality gates
+  - engineering burnout ai
+  - future of pull requests
+  - DORA metrics 2026
+  - automated security triage
+canonicalUrl: "/blog/ai-tsunami"
+---
+
+# Surviving the AI PR Tsunami
+
+There is a crisis happening within engineering teams right now. It isn't a lack of talent. It isn't a lack of tools.
+
+It is **Review Fatigue.**
+
+In 2021, a Senior Engineer might review 5 Pull Requests a day, each containing ~50 lines of hand-written logic.
+In 2026, that same engineer is receiving 15 PRs a day, each containing ~300 lines of AI-generated boilerplate.
+
+The cognitive load has tripled, but the number of hours in a day has not changed. The result? **The "LGTM" Syndrome.** For the uninitiated, LGTM stands for Looks Good To Me. 
+We are merging code faster than we can understand it, and it is creating a technical debt bubble. One the likes that we've never seen or experienced before.
+
+---
+
+## The Math Problem: Infinite Generation vs. Finite Verification
+
+The core problem is an asymmetry in effort.
+
+* **Cost to Generate Code:** Near Zero (Seconds via Copilot/Cursor)
+* **Cost to Review Code:** High (Minutes/Hours of deep focus)
+
+When the cost of generation drops to zero, the volume of code explodes. A junior developer with an AI assistant can now output more lines of code per day than a Principal Engineer can read in a week.
+
+
+
+This breaks the contract of the Pull Request: *"I have thought about this change, please verify my thinking."*
+Now it is: *"The AI suggested this, please tell me if it works."*
+
+### The "Context Window" Fallacy
+
+AI is brilliant at the **Snippet Level** (50 lines) but terrible at the **System Level** (50,000 lines).
+
+An LLM can absolutely write a perfect `auth_user()` function in isolation. However, what it doesn't know is the relationships and context for a codebase that has millions of lines of code with hundreds and possibly thousands of scripts.
+
+The human reviewer is the only one with this "System Context." But when they are drowning in boilerplate PRs, they stop checking for system level coherence and start just checking for syntax errors.
+
+---
+
+## The Consequences of "LGTM" Culture
+
+When review quality drops, three specific metrics degrade:
+
+### 1. The "Re-Fix" Loop
+We are seeing a massive spike in "Fixing the fix" commits. There is also a serious disconnect between the actual and perceived velocity of code merges. Let me explain. PRs are merged, break integration, and require immediate follow-up PRs. This makes the *perceived* velocity high (lots of commits!) but the *actual* velocity low (features take longer to stabilize).
+
+### 2. Security "Death by a Thousand Cuts"
+It is rarely one massive vulnerability but usually ten small ones. A missing scope check here, a hardcoded timeout there. Individually, they look fine to a tired reviewer. Together, they create a fragile system.
+
+### 3. Senior Engineer Burnout
+Your best engineers are becoming "Human Linters." They spend 80% of their time catching trivial AI mistakes (unused imports, hallucinated variables) instead of solving hard architecture problems.
+
+**This is why you are exhausted.** You are doing a machine's job.
+
+---
+
+## The Solution: Policy-as-Code (The "Auto-Reject")
+
+The only way to survive the Tsunami is to stop reviewing low-quality code. The machine must review the machine.
+
+You need a **Quality Gate** that runs *before* a human ever sees the code.
+
+### 1. Ban the "Obvious"
+If a PR contains:
+* Secrets
+* Dead code
+* Console logs
+* Deprecated API calls
+
+It should be **auto-rejected**. No human should have to type "Please remove the `print()` statement" in 2026. This is a waste of a $200k/year salary.
+
+### 2. Verify, Don't Just Read
+Static analysis needs to evolve from "Linting" (style) to "Logic Checking" (correctness).
+If the code adds an API route but adds no tests? **Block the merge.**
+If the code imports a library that isn't in `package.json`? **Block the merge.**
+
+### 3. The "Review Budget"
+Innovative teams are now implementing "Review Budgets."
+* **Small PR (<200 lines):** 1 Reviewer
+* **Medium PR (<500 lines):** 2 Reviewers
+* **Large PR (>500 lines):** **BLOCKED.** The PR must be split.
+
+AI tends to generate massive "God Functions." Enforcing smallness forces the developer (and the AI) to be modular.
+
+---
+
+## The New Role: From "Reviewer" to "Auditor"
+
+The role of the Senior Engineer is shifting. You are no longer reading every line. You are now an auditor.
+
+* **Old World:** "I caught a bug in line 42."
+* **New World:** "I updated the CI rule to automatically catch bugs like the one in line 42."
+
+This is the only way to scale. You cannot beat the GPU. It's impossible. You have to out-automate it.
+
+<div className="bg-slate-50 p-6 rounded-lg border border-slate-200 my-8">
+  <h3 className="font-bold text-slate-900 mb-2">Build Your Quality Gate</h3>
+  <p className="text-slate-600 mb-4">
+    Don't let "Vibe Coding" rot your codebase. Skylos provides an instant, zero-config quality gate that catches security flaws, dead code, and logic errors <i>before</i> you review the PR.
+  </p>
+  <a href="/" className="text-blue-600 font-medium hover:underline">
+    Set up your gate without any hassle →
+  </a>
+</div>
