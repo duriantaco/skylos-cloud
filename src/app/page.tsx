@@ -4,7 +4,7 @@ import Navbar from '@/components/Navbar'
 import CopyInstallButton from '@/components/CopyInstallButton'
 // import SkylosHeroSandbox from '@/components/SkylosHeroSandbox'
 import { getGithubRepo, getSiteUrl } from '@/lib/site'
-import { ArrowRight, Terminal, Shield, AlertTriangle, Code2, GitBranch } from 'lucide-react'
+import { ArrowRight, Terminal, Shield, AlertTriangle, Code2, GitBranch, MessageCircle } from 'lucide-react'
 
 async function getGithubStars(): Promise<number | null> {
   const repo = getGithubRepo()
@@ -29,6 +29,8 @@ async function getGithubStars(): Promise<number | null> {
 export default async function Home() {
   const stars = await getGithubStars()
   const siteUrl = getSiteUrl()
+  const DISCORD_URL = process.env.NEXT_PUBLIC_DISCORD_URL || "https://discord.gg/YOUR_INVITE"
+
 
   const faq = [
     {
@@ -171,6 +173,18 @@ export default async function Home() {
               </Link>
 
               <CopyInstallButton command="pip install skylos" />
+
+              <a
+                href={DISCORD_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-8 py-4 text-base font-semibold text-slate-900 hover:bg-slate-50 transition-all"
+              >
+                <svg width="18" height="18" viewBox="0 0 127.14 96.36" aria-hidden="true" className="fill-[#5865F2]">
+                  <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77.34,77.34,0,0,0,6.89,11.1,105.25,105.25,0,0,0,32.19-16.14C130.23,52.84,122.06,29.11,107.7,8.07ZM42.45,65.69c-6.18,0-11.2-5.67-11.2-12.62s4.92-12.63,11.2-12.63S53.7,46.1,53.65,53.07,48.73,65.69,42.45,65.69Zm42.24,0c-6.18,0-11.2-5.67-11.2-12.62s4.92-12.63,11.2-12.63S95.94,46.1,95.89,53.07,91,65.69,84.69,65.69Z"/>
+                </svg>
+                Join Discord
+              </a>
             </div>
 
             <p className="mt-4 text-sm text-slate-500">Free for open source. No credit card required.</p>
@@ -437,6 +451,15 @@ export default async function Home() {
             </Link>
 
             <CopyInstallButton command="pip install skylos" />
+            <a
+              href={DISCORD_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-8 py-4 text-base font-semibold text-slate-900 hover:bg-slate-50 transition-all"
+            >
+              Join Discord
+              <MessageCircle className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition" />
+            </a>
           </div>
         </div>
       </section>
@@ -452,7 +475,8 @@ export default async function Home() {
           <div className="flex items-center gap-6 text-sm text-slate-600">
             <Link href="/docs" className="hover:text-slate-900 transition">Docs</Link>
             <Link href="/login" className="hover:text-slate-900 transition">Login</Link>
-            <a href="mailto:hello@skylos.dev" className="hover:text-slate-900 transition">Contact</a>
+            <a href={DISCORD_URL} target="_blank" rel="noreferrer" className="hover:text-slate-900 transition">Discord</a>
+            <a href="mailto:founder@skylos.dev" className="hover:text-slate-900 transition">Contact</a>
           </div>
         </div>
       </footer>
