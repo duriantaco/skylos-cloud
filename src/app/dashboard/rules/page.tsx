@@ -1,19 +1,16 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { 
-  Code2, FileCode, Shield, Zap, BookOpen,
-  ToggleLeft, ToggleRight, Trash2, Pencil
+  Code2, FileCode, Shield, Zap
 } from "lucide-react";
-import dogImg from "../../../../public/assets/favicon-96x96.png";
 import { CreateRuleModal } from "@/components/rules/CreateRuleModal";
 import { RuleActions } from "@/components/rules/RuleActions";
 
 const RULE_LIMITS: Record<string, number> = {
-  free: 0,
-  pro: 20,
-  team: 70,
+  free: 3,
+  pro: 50,
+  team: 100,
   enterprise: 999999
 };
 
@@ -32,11 +29,10 @@ export default async function RulesPage() {
 
   const orgId = member.org_id;
   const plan = (member.organizations as any)?.plan || "free";
-  const canUseRules = ["pro", "team", "enterprise"].includes(plan);
+  const canUseRules = ["free", "pro", "team", "enterprise"].includes(plan);
   const canUsePython = ["team", "enterprise"].includes(plan);
   const maxRules = RULE_LIMITS[plan] || 0;
 
-  // Get custom rules
   const { data: rules } = await supabase
     .from("custom_rules")
     .select("*")
@@ -79,8 +75,7 @@ export default async function RulesPage() {
           )}
         </div>
 
-        {/* Upgrade CTA for free users */}
-        {!canUseRules && (
+        {(!canUseRules || (plan === "free" && ruleCount >= maxRules)) && (
           <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-8 mb-8">
             <div className="flex items-start gap-6">
               <div className="p-3 bg-white rounded-xl shadow-sm">

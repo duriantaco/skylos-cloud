@@ -14,14 +14,12 @@ const supabase = createClient(
 
 type Plan = "free" | "pro" | "enterprise";
 
-function isPaid(plan: string) {
-  const p = String(plan || "free").toLowerCase();
-  return p === "pro" || p === "enterprise";
-}
+type VerifyLimitRow = { allowed: boolean; new_count: number };
 
 function parseRepo(repoUrl: string) {
   const m = String(repoUrl || "").match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
-  if (!m) return null;
+  if (!m) 
+    return null;
   return { owner: m[1], repo: m[2] };
 }
 
@@ -151,7 +149,7 @@ export async function POST(req: Request) {
       .from("projects")
       .select(`
         id, name, repo_url, github_token,
-        organizations(plan)
+        organizations(id, plan)
       `)
       .eq("api_key", token)
       .single();
@@ -164,19 +162,46 @@ export async function POST(req: Request) {
     }
 
     const orgRef: any = (project as any).organizations;
-    const plan = String((Array.isArray(orgRef) ? orgRef?.[0]?.plan : orgRef?.plan) || "free");
+    const orgId = String(Array.isArray(orgRef) ? orgRef?.[0]?.id : orgRef?.id || "");
+    const plan = String((Array.isArray(orgRef) ? orgRef?.[0]?.plan : orgRef?.plan) || "free").toLowerCase();
 
-    if (!isPaid(plan)) {
-      return NextResponse.json(
-        {
-          error: "Verify is a Pro feature",
-          code: "PLAN_REQUIRED",
-          plan,
-          upgrade_url: "/dashboard/settings?upgrade=true",
-        },
-        { status: 402 }
-      );
+    const p = (plan || "free") as Plan;
+
+    const ownerId = orgId || project.id;
+
+    if (p === "free") {
+      const FREE_DAILY_VERIFY_LIMIT = 20;
+
+      const { data: lim, error: limErr } = await supabase
+        .rpc("bump_verify_usage_daily", {
+          p_owner_id: ownerId,
+          p_limit: FREE_DAILY_VERIFY_LIMIT,
+        })
+        .single();
+
+      const limTyped = lim as unknown as VerifyLimitRow | null;
+
+      if (limErr) {
+        return NextResponse.json(
+          { error: "Verify temporarily unavailable", code: "VERIFY_LIMITER_ERROR" },
+          { status: 503 }
+        );
+      }
+
+      if (limTyped && limTyped.allowed === false) {
+        return NextResponse.json(
+          {
+            error: "Verify daily limit reached for Free plan",
+            code: "RATE_LIMITED",
+            plan: p,
+            limit_per_day: FREE_DAILY_VERIFY_LIMIT,
+            upgrade_url: "/dashboard/settings?upgrade=true",
+          },
+          { status: 429 }
+        );
+      }
     }
+
 
     const body = await req.json();
     const findings = Array.isArray(body?.findings) ? body.findings : [];
@@ -202,12 +227,17 @@ export async function POST(req: Request) {
     });
 
     const blobs = Array.isArray(tree?.tree) ? tree.tree : [];
+    const MAX_TREE_FILES = p === "free" ? 120 : 250;
+    const MAX_FETCH_FILES = p === "free" ? 30 : 80;
+
     const pyFiles = blobs
       .filter((x: any) => x?.type === "blob" && typeof x?.path === "string" && x.path.endsWith(".py"))
-      .slice(0, 250);
+      .slice(0, MAX_TREE_FILES);
 
     const fileMap: Record<string, string> = {};
-    for (const f of pyFiles.slice(0, 80)) {
+
+    for (const f of pyFiles.slice(0, MAX_FETCH_FILES)) {
+
       try {
         const content = await fetchFileContent({
           owner: repo.owner,

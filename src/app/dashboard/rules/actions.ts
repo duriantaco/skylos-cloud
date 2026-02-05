@@ -28,16 +28,16 @@ async function getOrgContext() {
     user, 
     orgId: member.org_id, 
     plan,
-    canUseRules: ["pro", "team", "enterprise"].includes(plan),
+    canUseRules: ["free", "pro", "team", "enterprise"].includes(plan),
     canUsePython: ["team", "enterprise"].includes(plan)
   };
 }
 
 function getRuleLimit(plan: string): number {
   const limits: Record<string, number> = {
-    free: 0,
-    pro: 10,
-    team: 50,
+    free: 3,
+    pro: 50,
+    team: 100,
     enterprise: 999999
   };
   return limits[plan] || 0;
@@ -62,7 +62,11 @@ export async function createRule(formData: FormData) {
 
   const limit = getRuleLimit(plan);
   if ((count || 0) >= limit) {
-    return { success: false, error: `Rule limit reached (${limit} rules on ${plan} plan)` };
+    return { 
+      success: false, 
+      error: `Rule limit reached (${limit} rules on ${plan} plan)`,
+      upgrade_url: "/dashboard/settings?upgrade=true",
+    };
   }
 
   const ruleType = String(formData.get("rule_type") || "yaml");

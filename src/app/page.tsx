@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Script from 'next/script'
 import Navbar from '@/components/Navbar'
 import CopyInstallButton from '@/components/CopyInstallButton'
-// import SkylosHeroSandbox from '@/components/SkylosHeroSandbox'
+import SkylosHeroSandbox from '@/components/SkylosHeroSandbox'
 import { getGithubRepo, getSiteUrl } from '@/lib/site'
 import { ArrowRight, Terminal, Shield, AlertTriangle, Code2, GitBranch, MessageCircle } from 'lucide-react'
 
@@ -39,7 +39,7 @@ export default async function Home() {
     },
     {
       q: 'How do I get started?',
-      a: 'Install the CLI with pip install skylos and run skylos . --danger --quality in your project. For PR gating, connect your GitHub repo.',
+      a: 'Install the CLI with pip install skylos and run skylos . --danger --quality --upload to view results in the dashboard (gate status, suppressions, history). For PR gating, connect your GitHub repo.',
     },
     {
       q: 'Can I run it without GitHub?',
@@ -209,9 +209,15 @@ export default async function Home() {
           </div>
 
           {/* SANDBOX DEMO */}
-          {/* <div className="mt-20">
+          <div className="mt-16 md:mt-20">
             <SkylosHeroSandbox />
-          </div> */}
+
+            <p className="mt-4 text-center text-sm text-slate-500">
+              Want history + suppressions + verification?{" "}
+              <span className="font-mono">skylos . --danger --quality --upload</span>
+            </p>
+
+          </div>
         </div>
       </section>
 
@@ -307,10 +313,13 @@ export default async function Home() {
               <div className="pt-8 pl-8">
                 <h3 className="text-xl font-semibold text-slate-900 mb-3">Scan</h3>
                 <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm text-slate-300">
-                  <span className="text-emerald-400">$</span> skylos . --danger --quality
+                  <span className="text-emerald-400">$</span> skylos . --danger --quality --upload
                 </div>
                 <p className="mt-4 text-slate-600">
-                  Get findings with file, line, and severity.
+                  Upload to the dashboard for gate status, suppressions, and history.
+                  <span className="block text-sm text-slate-500 mt-1">
+                    Local only: <span className="font-mono">skylos . --danger --quality</span>
+                  </span>
                 </p>
               </div>
             </div>

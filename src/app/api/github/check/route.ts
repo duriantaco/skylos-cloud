@@ -66,7 +66,7 @@ export async function POST(request: Request) {
         conclusion: conclusion,
         output: {
           title: summary,
-          summary: formatReport(report),
+          summary: formatReport(report, { plan, repo_owner, repo_name, sha }),
         },
       });
     }
@@ -90,12 +90,32 @@ function checkQualityGate(report: any): boolean {
   return criticalCount === 0 && highCount < 10;
 }
 
-function formatReport(report: any): string {
-  const issues = [
-    `Critical: ${report.critical_issues?.length || 0}`,
-    `High: ${report.high_issues?.length || 0}`,
-    `Medium: ${report.medium_issues?.length || 0}`,
-  ].join("\n");
-  
-  return `## Scan Results\n\n${issues}`;
+function formatReport(
+  report: any,
+  ctx: { plan: string; repo_owner: string; repo_name: string; sha: string }
+): string {
+  const critical = report.critical_issues?.length || 0;
+  const high = report.high_issues?.length || 0;
+  const medium = report.medium_issues?.length || 0;
+
+  const newCritical = report.new_critical_count ?? null;
+  const newHigh = report.new_high_count ?? null;
+
+  const lines = [
+    `**Repo:** ${ctx.repo_owner}/${ctx.repo_name}`,
+    `**Commit:** ${ctx.sha.slice(0, 7)}`,
+    ``,
+    `### Findings`,
+    `- Critical: ${critical}${newCritical !== null ? ` (new: ${newCritical})` : ""}`,
+    `- High: ${high}${newHigh !== null ? ` (new: ${newHigh})` : ""}`,
+    `- Medium: ${medium}`,
+    ``,
+    `### Actions`,
+    `- View findings: https://skylos.dev/dashboard`,
+    ctx.plan === "free"
+      ? `- Upgrade to block merges + auto-fix PRs: https://skylos.dev/dashboard/settings?upgrade=true`
+      : `- Auto-fix (opens PR): https://skylos.dev/dashboard`,
+  ];
+
+  return lines.join("\n");
 }

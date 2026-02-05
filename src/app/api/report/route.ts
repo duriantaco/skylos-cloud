@@ -182,11 +182,11 @@ type PlanCapabilities = {
 
 const PLAN_CAPABILITIES: Record<Plan, PlanCapabilities> = {
   free: {
-    maxScansStored: 10,
-    prDiffEnabled: false,
-    suppressionsEnabled: false,
+    maxScansStored: 50,
+    prDiffEnabled: true,
+    suppressionsEnabled: true,
     overridesEnabled: false,
-    checkRunsEnabled: false,
+    checkRunsEnabled: true,
     sarifEnabled: false,
     slackEnabled: false,
     discordEnabled: false,
@@ -1037,7 +1037,7 @@ export async function POST(req: Request) {
     };
 
     if (plan === "free") {
-      response.upgrade_hint = "Upgrade to Pro for PR diff analysis, suppressions, check runs, and Slack/Discord notifications.";
+      response.upgrade_hint = "Upgrade to Pro for overrides, SARIF import, and Slack/Discord notifications (plus higher limits).";
       response.upgrade_url = "/dashboard/settings?upgrade=true";
     }
 

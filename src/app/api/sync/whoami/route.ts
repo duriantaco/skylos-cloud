@@ -40,8 +40,19 @@ export async function GET(request: NextRequest) {
 
   const orgRef = project.organizations as any
   const org = Array.isArray(orgRef) ? orgRef[0] : orgRef
-  const plan = String(org?.plan || 'free')
+  const plan = String(org?.plan || 'free').toLowerCase()
   const isPaid = plan === 'pro' || plan === 'enterprise'
+  const isEnterprise = plan === 'enterprise'
+
+  const capabilities = {
+    pr_diff: true,
+    suppressions: true,
+    check_runs: true,
+    verify: true,
+
+    overrides: isPaid,
+    sarif_import: isEnterprise,
+  }
 
   return NextResponse.json({
     ok: true,
@@ -54,14 +65,7 @@ export async function GET(request: NextRequest) {
       id: org?.id,
       name: org?.name || 'My Workspace',
     },
-    plan: plan,
-    capabilities: {
-      pr_diff: isPaid,
-      suppressions: isPaid,
-      overrides: isPaid,
-      check_runs: isPaid,
-      sarif_import: isPaid,
-      verify: isPaid
-    },
+    plan,
+    capabilities,
   })
 }
