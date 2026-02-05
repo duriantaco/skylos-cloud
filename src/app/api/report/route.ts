@@ -12,7 +12,6 @@ import crypto from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { serverError } from "@/lib/api-error";
 
-
 function getSupabaseAdmin(): SupabaseClient | null {
   const url =
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL; // fallback for dev
@@ -315,6 +314,27 @@ async function cleanupOldScans(
     const idsToDelete = oldScans.map((s: any) => s.id);
     const { error: delErr } = await supabase.from("scans").delete().in("id", idsToDelete);
     if (delErr) throw new Error(`Failed to delete old scans: ${delErr.message}`);
+  }
+}
+
+
+async function getPrNumberForCommit(args: {
+  octokit: any;
+  owner: string;
+  repo: string;
+  sha: string;
+}): Promise<number | null> {
+  const { octokit, owner, repo, sha } = args;
+  try {
+    const { data } = await octokit.repos.listPullRequestsAssociatedWithCommit({
+      owner,
+      repo,
+      commit_sha: sha,
+      per_page: 1,
+    });
+    return data?.[0]?.number ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -816,6 +836,66 @@ export async function POST(req: Request) {
         console.error("GitHub CheckRun failed:", e);
       }
     }
+
+    if ((project as any).github_installation_id) {
+    try {
+      const sha = commit_hash || "local";
+      if (sha !== "local") {
+        const { getInstallationOctokit } = await import("@/lib/github-app");
+        const { upsertSkylosPrComment, buildSkylosCommentBody } = await import(
+          "@/lib/github/upsertSkylosPrComment"
+        );
+
+        const octokit = await getInstallationOctokit((project as any).github_installation_id);
+
+        const [owner, repo] = (project.repo_url || "")
+          .replace("https://github.com/", "")
+          .replace(".git", "")
+          .split("/");
+
+        if (owner && repo) {
+          const prNumber =
+            (diffScope && (diffScope as any).prNumber) ||
+            (await getPrNumberForCommit({ octokit, owner, repo, sha }));
+
+          if (prNumber) {
+            const scanUrl = `${process.env.APP_BASE_URL || getSiteUrl()}/dashboard/scans/${scan.id}`;
+
+            const reasons: string[] = [];
+            if (!passedGate) {
+              if (criticalSecurityIssues > 0) reasons.push(`${criticalSecurityIssues} critical security issue(s)`);
+              if (unsuppressedNewCount > 0) reasons.push(`${unsuppressedNewCount} new unsuppressed issue(s) introduced`);
+            }
+
+            const summaryMd = [
+              `**New (unsuppressed):** ${unsuppressedNewCount}`,
+              `**Suppressed new:** ${suppressedNewCount}`,
+              `**Total findings:** ${finalFindings.length}`,
+            ].join("\n");
+
+            const body = buildSkylosCommentBody({
+              title: "Skylos Review",
+              summaryMd,
+              scanUrl,
+              gatePassed: passedGate,
+              reasons,
+              statsLine: `**Commit:** \`${sha.slice(0, 7)}\` • **Branch:** \`${branch || "unknown"}\``,
+            });
+
+            await upsertSkylosPrComment({
+              octokit,
+              owner,
+              repo,
+              prNumber,
+              body,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Skylos PR comment upsert failed:", e);
+    }
+  }
     
     const notificationPayload: NotificationPayload = {
       passed: passedGate,

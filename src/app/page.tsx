@@ -351,8 +351,8 @@ export default async function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <div className="rounded-2xl border border-slate-200 bg-white p-8">
+          <div className="grid md:grid-cols-1 gap-8 max-w-4xl mx-auto">
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 max-w-md w-full mx-auto">
               <h3 className="text-xl font-semibold text-slate-900">Community</h3>
               <p className="mt-2 text-slate-600">For individuals and OSS</p>
               <div className="mt-6 text-5xl font-bold text-slate-900">$0</div>
@@ -375,7 +375,7 @@ export default async function Home() {
               </Link>
             </div>
 
-            <div className="rounded-2xl border-2 border-slate-900 bg-white p-8 relative">
+            {/* <div className="rounded-2xl border-2 border-slate-900 bg-white p-8 relative">
               <div className="absolute -top-3 left-6 px-3 py-1 bg-slate-900 text-white text-xs font-semibold rounded-full">
                 Popular
               </div>
@@ -404,7 +404,7 @@ export default async function Home() {
               >
                 Start free trial
               </Link>
-            </div>
+            </div> */}
           </div>
         </div>
       </section>
