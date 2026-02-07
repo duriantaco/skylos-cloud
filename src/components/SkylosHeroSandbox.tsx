@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
-  CheckCircle,
   Copy,
   FileText,
   Search,
@@ -163,8 +162,12 @@ function runQuickDemo(code: string): Finding[] {
   ];
 
   for (const p of secretPatterns) {
+    p.re.lastIndex = 0;
     if (p.re.test(code)) {
-      const ln = lineOf((l) => p.re.test(l), 1);
+        const ln = lineOf((l) => {
+        p.re.lastIndex = 0;
+        return p.re.test(l);
+        }, 1);
       findings.push({
         id: `${p.rule}:${ln}`,
         severity: p.sev,
@@ -185,8 +188,9 @@ function runQuickDemo(code: string): Finding[] {
   const hasExecute = /\bexecute\(/.test(code);
   const hasSqlString = /(SELECT|UPDATE|INSERT|DELETE)\s+/i.test(code);
   const hasInterpolation =
-    /f\s*["'][^"']*(SELECT|UPDATE|INSERT|DELETE)[^"']*\{[^}]+\}[^"']*["']/i.test(code) ||
-    /["'][^"']*(SELECT|UPDATE|INSERT|DELETE)[^"']*%s[^"']*["']\s*%/i.test(code);
+  /f\s*["'][\s\S]*?(SELECT|UPDATE|INSERT|DELETE)[\s\S]*?\{[^}]+\}[\s\S]*?["']/i.test(code) ||
+  /["'][\s\S]*?(SELECT|UPDATE|INSERT|DELETE)[\s\S]*?%s[\s\S]*?["']\s*%/i.test(code);
+
   const hasTaintedSource =
     /\brequest\.(args|form|json|get_json)\b/.test(code) || /\bos\.environ\b/.test(code) || /\binput\(/.test(code);
 
