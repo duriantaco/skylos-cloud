@@ -3,8 +3,8 @@ import path from 'path';
 import matter from 'gray-matter';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, Calendar, Clock } from 'lucide-react';
 import dogImg from "../../../public/assets/favicon-96x96.png";
+import BlogList from '@/components/BlogList';
 
 interface Post {
   slug: string;
@@ -14,17 +14,9 @@ interface Post {
   tags: string[];
 }
 
-const tagColors: Record<string, string> = {
-  security: 'bg-red-100 text-red-700 border-red-200',
-  sast: 'bg-blue-100 text-blue-700 border-blue-200',
-  appsec: 'bg-purple-100 text-purple-700 border-purple-200',
-  devtools: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  default: 'bg-slate-100 text-slate-700 border-slate-200',
-};
-
 function getPosts(): Post[] {
   const postsDirectory = path.join(process.cwd(), 'src/content/blog');
-  
+
   if (!fs.existsSync(postsDirectory)) {
     return [];
   }
@@ -73,7 +65,7 @@ export default function BlogPage() {
               Beta
             </span>
           </Link>
-          
+
           <div className="flex items-center gap-6">
             <Link href="/blog" className="text-sm text-slate-900 font-medium">
               Blog
@@ -92,84 +84,19 @@ export default function BlogPage() {
       </nav>
 
       {/* Hero Section */}
-      <div className="border-b border-slate-200 bg-white">
-        <div className="max-w-4xl mx-auto px-6 py-16 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
+      <div className="border-b border-slate-200 bg-gradient-to-b from-white to-slate-50">
+        <div className="max-w-4xl mx-auto px-6 py-20 text-center">
+          <h1 className="text-5xl md:text-6xl font-bold text-slate-900 mb-5">
             Blog
           </h1>
-          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-            Insights on application security, SAST, and building better developer tools
+          <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
+            Insights on application security, static analysis, and building tools that developers actually want to use
           </p>
         </div>
       </div>
 
-      {/* Posts Grid */}
-      <div className="max-w-6xl mx-auto px-6 py-12">
-        {posts.length === 0 ? (
-          <div className="bg-white border border-slate-200 border-dashed rounded-xl p-12 text-center">
-            <p className="text-slate-500">No posts yet. Check back soon!</p>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-6">
-            {posts.map(post => (
-              <Link 
-                key={post.slug}
-                href={`/blog/${post.slug}`}
-                className="group bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-slate-300 hover:shadow-lg transition-all"
-              >
-                <div className="p-6">
-                  {/* Tags */}
-                  {post.tags.length > 0 && (
-                    <div className="flex gap-2 mb-3">
-                        {post.tags.map(tag => (
-                        <span 
-                            key={tag}
-                            className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                            tagColors[tag.toLowerCase()] || tagColors.default
-                            }`}
-                        >
-                            {tag}
-                        </span>
-                        ))}
-                    </div>
-                    )}
-
-                  {/* Title */}
-                  <h2 className="text-xl font-bold text-slate-900 mb-3 group-hover:text-slate-700 transition line-clamp-2">
-                    {post.title}
-                  </h2>
-
-                  {/* Excerpt */}
-                  <p className="text-slate-600 mb-4 line-clamp-3 leading-relaxed">
-                    {post.excerpt}
-                  </p>
-
-                  {/* Meta */}
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                    <div className="flex items-center gap-4 text-sm text-slate-500">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-4 h-4" />
-                        <time>
-                          {new Date(post.publishedAt).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </time>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-1 text-sm font-medium text-slate-900 group-hover:gap-2 transition-all">
-                      Read more
-                      <ArrowRight className="w-4 h-4" />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Blog List with Search and Filtering */}
+      <BlogList posts={posts} />
     </div>
   );
 }
