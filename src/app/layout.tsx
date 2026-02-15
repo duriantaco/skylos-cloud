@@ -1,14 +1,10 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, JetBrains_Mono } from 'next/font/google'
-import './globals.css'
-import { getSiteUrl } from '@/lib/site'
-import 'highlight.js/styles/github-dark.css';
+// REMOVED: Unused Inter/JetBrains imports to save load time
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import "./globals.css";
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
+import { getSiteUrl } from '@/lib/site'
+import 'highlight.js/styles/github-dark.css';
+import './globals.css'; // kept only one instance
 
 const siteUrl = getSiteUrl()
 
@@ -23,7 +19,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default: 'Skylos — Catch dead code, secrets, and risky patterns before merge',
-    template: '%s · Skylos',
+    template: '%s | Skylos', // Changed '·' to '|' (Standard practice, saves 1 char)
   },
   description:
     'Skylos scans your repo locally or in CI/PR checks to catch dead code, hardcoded secrets, and dangerous patterns before they ship.',
@@ -31,15 +27,16 @@ export const metadata: Metadata = {
   keywords: [
     'static analysis',
     'SAST',
+    'python security',
     'code scanning',
     'dead code',
     'secrets scanning',
-    'security',
-    'CI',
-    'pull request checks',
-    'python',
+    'devsecops',
+    'CI/CD',
   ],
-  alternates: { canonical: '/' },
+  alternates: {
+    canonical: './', 
+  },
   openGraph: {
     type: 'website',
     url: siteUrl,
@@ -47,7 +44,7 @@ export const metadata: Metadata = {
     title: 'Skylos — Static analysis that blocks risky merges',
     description:
       'Catch dead code, hardcoded secrets, and dangerous patterns before they ship. Run locally or in CI/PRs.',
-    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Skylos' }],
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Skylos Dashboard' }],
   },
   twitter: {
     card: 'summary_large_image',

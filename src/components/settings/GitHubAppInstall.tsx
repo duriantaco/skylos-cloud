@@ -33,7 +33,7 @@ export default function GitHubAppInstall({ currentPlan, githubInstallationId, re
           <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">PRO</span>
         </div>
         
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-gray-700 mb-4">
           Automatically block PRs that fail the quality gate. Upgrade to Pro to enable.
         </p>
         

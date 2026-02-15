@@ -376,28 +376,65 @@ export async function POST(req: Request) {
 
     const authHeader = req.headers.get('authorization')
     if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Missing token. Run with --token or set SKYLOS_TOKEN env var.',
         code: 'NO_TOKEN'
       }, { status: 401 })
     }
     const token = authHeader.split(' ')[1]
+    const authMode = req.headers.get('x-skylos-auth')
 
-    const { data: project, error: projError } = await supabase
-      .from('projects')
-      .select(`
-        id, name, org_id, strict_mode, repo_url, policy_config,
-        github_installation_id, slack_webhook_url, slack_notifications_enabled, 
-        slack_notify_on, discord_webhook_url, discord_notifications_enabled, 
-        discord_notify_on, organizations(plan)`)
-      .eq('api_key', token)
-      .single()
+    let project: any;
 
-    if (projError || !project) {
-      return NextResponse.json({ 
-        error: 'Invalid API Token. Check your SKYLOS_TOKEN.',
-        code: 'INVALID_TOKEN'
-      }, { status: 403 })
+    if (authMode === 'oidc') {
+      // Tokenless CI: verify GitHub Actions OIDC JWT
+      const { verifyGitHubOIDC } = await import('@/lib/github-oidc')
+      const claims = await verifyGitHubOIDC(token)
+      if (!claims) {
+        return NextResponse.json({
+          error: 'Invalid OIDC token. Ensure your workflow has id-token: write permission.',
+          code: 'INVALID_OIDC'
+        }, { status: 401 })
+      }
+
+      const repoUrl = `https://github.com/${claims.repository}`
+      const { data: oidcProject, error: oidcError } = await supabase
+        .from('projects')
+        .select(`
+          id, name, org_id, strict_mode, repo_url, policy_config,
+          github_installation_id, slack_webhook_url, slack_notifications_enabled,
+          slack_notify_on, discord_webhook_url, discord_notifications_enabled,
+          discord_notify_on, organizations(plan)`)
+        .or(`repo_url.eq.${repoUrl},repo_url.eq.${repoUrl}.git`)
+        .limit(1)
+        .maybeSingle()
+
+      if (oidcError || !oidcProject) {
+        return NextResponse.json({
+          error: `No project linked to ${claims.repository}. Create a project at skylos.dev and set the repo URL.`,
+          code: 'REPO_NOT_LINKED'
+        }, { status: 404 })
+      }
+      project = oidcProject
+    } else {
+      // Standard API key auth
+      const { data: apiKeyProject, error: projError } = await supabase
+        .from('projects')
+        .select(`
+          id, name, org_id, strict_mode, repo_url, policy_config,
+          github_installation_id, slack_webhook_url, slack_notifications_enabled,
+          slack_notify_on, discord_webhook_url, discord_notifications_enabled,
+          discord_notify_on, organizations(plan)`)
+        .eq('api_key', token)
+        .single()
+
+      if (projError || !apiKeyProject) {
+        return NextResponse.json({
+          error: 'Invalid API Token. Check your SKYLOS_TOKEN.',
+          code: 'INVALID_TOKEN'
+        }, { status: 403 })
+      }
+      project = apiKeyProject
     }
 
     const orgRef: any = (project as any).organizations
@@ -896,7 +933,76 @@ export async function POST(req: Request) {
       console.error("Skylos PR comment upsert failed:", e);
     }
   }
-    
+
+    // PR DECORATION: Inline review comments on changed lines (Pro+ only)
+    if (
+      plan !== "free" &&
+      (project as any).github_installation_id &&
+      diffScope &&
+      (diffScope as any).prNumber
+    ) {
+      try {
+        const { getInstallationOctokit } = await import("@/lib/github-app");
+        const octokit = await getInstallationOctokit(
+          (project as any).github_installation_id
+        );
+
+        const [owner, repo] = (project.repo_url || "")
+          .replace("https://github.com/", "")
+          .replace(".git", "")
+          .split("/");
+
+        const prNumber = (diffScope as any).prNumber;
+
+        if (owner && repo && prNumber) {
+          // Filter to new, unsuppressed findings in changed files only
+          const changedFiles = diffScope.changedFiles;
+          const inlineFindings = finalFindings.filter(
+            (f: any) =>
+              f.is_new &&
+              !f.is_suppressed &&
+              changedFiles.has(f.file_path) &&
+              f.line_number > 0
+          );
+
+          // Cap at 10 inline comments to avoid spam
+          const MAX_INLINE_COMMENTS = 10;
+          const commentsToPost = inlineFindings.slice(0, MAX_INLINE_COMMENTS);
+
+          if (commentsToPost.length > 0) {
+            const sevEmoji: Record<string, string> = {
+              CRITICAL: "🔴",
+              HIGH: "🟠",
+              MEDIUM: "🟡",
+              LOW: "🔵",
+            };
+
+            const reviewComments = commentsToPost.map((f: any) => ({
+              path: f.file_path,
+              line: f.line_number,
+              body: `${sevEmoji[f.severity] || "⚠️"} **${f.rule_id}** (${f.severity})\n\n${f.message || "Issue detected by Skylos"}`,
+            }));
+
+            const truncatedNote =
+              inlineFindings.length > MAX_INLINE_COMMENTS
+                ? `\n\n> Showing ${MAX_INLINE_COMMENTS} of ${inlineFindings.length} new findings. [View all →](${process.env.APP_BASE_URL || getSiteUrl()}/dashboard/scans/${scan.id})`
+                : "";
+
+            await octokit.pulls.createReview({
+              owner,
+              repo,
+              pull_number: prNumber,
+              event: "COMMENT",
+              body: `Skylos found **${inlineFindings.length}** new issue(s) in this PR.${truncatedNote}`,
+              comments: reviewComments,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Skylos PR inline decoration failed:", e);
+      }
+    }
+
     const notificationPayload: NotificationPayload = {
       passed: passedGate,
       isRecovery: false,

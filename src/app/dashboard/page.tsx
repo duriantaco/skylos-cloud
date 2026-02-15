@@ -2,7 +2,6 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
-  ShieldCheck,
   ShieldAlert,
   ArrowUpRight,
   GitPullRequest,
@@ -16,9 +15,10 @@ import {
   Eye,
   FileSearch,
   Zap,
+  BarChart3,
 } from "lucide-react";
+import MiniSparkline from "@/components/MiniSparkline";
 
-// --- Types ---
 type ScanRow = {
   id: string;
   created_at: string;
@@ -45,13 +45,14 @@ type IssueGroupRow = {
   projects?: { name: string | null; repo_url: string | null } | null;
 };
 
-// --- Helpers ---
 function timeAgo(dateString: string) {
   const date = new Date(dateString);
   const now = new Date();
   const diff = (now.getTime() - date.getTime()) / 1000;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 3600) 
+    return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) 
+    return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
@@ -64,9 +65,12 @@ function formatDate(dateString: string) {
 
 function sevRank(sev: string) {
   const s = String(sev || "").toUpperCase();
-  if (s === "CRITICAL") return 4;
-  if (s === "HIGH") return 3;
-  if (s === "MEDIUM") return 2;
+  if (s === "CRITICAL") 
+    return 4;
+  if (s === "HIGH") 
+    return 3;
+  if (s === "MEDIUM") 
+    return 2;
   return 1;
 }
 
@@ -89,7 +93,8 @@ function SeverityPill({ severity }: { severity: string }) {
 }
 
 function GateBadge({ passed }: { passed: boolean | null }) {
-  if (passed === null) return <span className="text-slate-400 text-xs">—</span>;
+  if (passed === null) 
+    return <span className="text-slate-400 text-xs">—</span>;
   return passed ? (
     <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 uppercase tracking-wide">
       <CheckCircle2 className="w-3 h-3" /> Passed
@@ -134,7 +139,6 @@ export default async function DashboardPage() {
     );
   }
 
-  // Fetch all data
   const [
     { count: projectCount },
     { data: recentScansRaw },
@@ -193,16 +197,23 @@ export default async function DashboardPage() {
     : null;
   const isStale = daysSinceLastScan === null || daysSinceLastScan >= 3;
 
-  // Sort open issues by severity
   const openSorted = openGroups.slice().sort((a, b) => {
     const d = sevRank(b.severity) - sevRank(a.severity);
-    if (d !== 0) return d;
+    if (d !== 0) 
+      return d;
     return new Date(b.last_seen_at || 0).getTime() - new Date(a.last_seen_at || 0).getTime();
   });
 
-  // Calculate scan stats
   const passedScans = recentScans.filter((s) => s.quality_gate_passed === true).length;
   const failedScans = recentScans.filter((s) => s.quality_gate_passed === false).length;
+
+  const sparklineScans = [...recentScans].reverse();
+  const totalSparkline = sparklineScans.map((s) => {
+    const st = s.stats || {};
+    return (st.danger_count || 0) + (st.quality_count || 0) + (st.dead_code_count || 0) + (st.secret_count || 0);
+  });
+  const urgentSparkline = sparklineScans.map((s) => Number(s.stats?.new_issues ?? 0));
+  const passSparkline = sparklineScans.map((s) => s.quality_gate_passed ? 1 : 0);
 
   return (
     <main className="min-h-screen bg-gray-50 text-slate-900 font-sans">
@@ -246,6 +257,7 @@ export default async function DashboardPage() {
               </div>
               <div className="mt-2 text-3xl font-bold text-slate-900">{openCount}</div>
               <div className="mt-1 text-xs text-slate-500">Unique problems to triage</div>
+              <MiniSparkline data={totalSparkline} color="#64748b" />
             </div>
 
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
@@ -254,6 +266,7 @@ export default async function DashboardPage() {
               </div>
               <div className="mt-2 text-3xl font-bold text-rose-600">{urgentCount}</div>
               <div className="mt-1 text-xs text-slate-500">Critical + High severity</div>
+              <MiniSparkline data={urgentSparkline} color="#e11d48" />
             </div>
 
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
@@ -265,6 +278,7 @@ export default async function DashboardPage() {
                 <span className="text-emerald-600">{passedScans} passed</span>
                 {failedScans > 0 && <span className="text-rose-600"> • {failedScans} failed</span>}
               </div>
+              <MiniSparkline data={passSparkline} color="#10b981" />
             </div>
 
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
@@ -280,11 +294,7 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {/* MAIN TWO-COLUMN LAYOUT */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-            {/* ========================================== */}
-            {/* LEFT: MISSION CONTROL (ISSUES = ENTITIES) */}
-            {/* ========================================== */}
             <section className="space-y-6">
               {/* Section Header */}
               <div className="flex items-start justify-between">
@@ -595,6 +605,27 @@ export default async function DashboardPage() {
                 </div>
               </div>
 
+              {/* Trends Quick Link */}
+              <Link
+                href="/dashboard/trends"
+                className="block bg-white border border-slate-200 rounded-xl p-5 hover:border-slate-300 hover:shadow-md transition group shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-100 text-blue-600">
+                    <BarChart3 className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition">
+                      View Trends
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      Track how your code quality changes over time
+                    </div>
+                  </div>
+                  <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition" />
+                </div>
+              </Link>
+
               {/* Add Project CTA */}
               <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-6 relative overflow-hidden">
                 <h3 className="font-bold text-lg text-slate-900 mb-2 relative z-10">Add another project</h3>
@@ -607,6 +638,20 @@ export default async function DashboardPage() {
                 >
                   Connect Repository
                 </Link>
+              </div>
+
+              {/* Book a Demo CTA */}
+              <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-6 text-white relative overflow-hidden">
+                <h3 className="font-bold text-lg mb-2 relative z-10">Need more from Skylos?</h3>
+                <p className="text-slate-300 text-sm mb-4 relative z-10">
+                  Get trend dashboards, PR decoration, team collaboration, and more with a Pro plan.
+                </p>
+                <a
+                  href="mailto:founder@skylos.dev"
+                  className="block w-full text-center bg-white text-slate-900 font-bold py-2.5 rounded-lg text-sm hover:bg-slate-100 transition relative z-10"
+                >
+                  Book a Demo
+                </a>
               </div>
             </section>
           </div>

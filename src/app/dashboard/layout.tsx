@@ -3,7 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, Target, FolderOpen, Settings, Shield } from "lucide-react";
+import { BookOpen, Target, FolderOpen, Settings, Shield, TrendingUp } from "lucide-react";
 import dogImg from "../../../public/assets/favicon-96x96.png";
 
 export default async function DashboardLayout({
@@ -33,6 +33,7 @@ export default async function DashboardLayout({
             {/* Main Nav Links */}
             <div className="hidden md:flex items-center gap-1">
               <NavLink href="/dashboard" icon={Target}>Mission Control</NavLink>
+              <NavLink href="/dashboard/trends" icon={TrendingUp}>Trends</NavLink>
               <NavLink href="/dashboard/projects" icon={FolderOpen}>Projects</NavLink>
               <NavLink href="/dashboard/rules" icon={Shield}>Rules</NavLink>
               <NavLink href="/dashboard/settings" icon={Settings}>Settings</NavLink>

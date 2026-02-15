@@ -4,16 +4,13 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import { 
-  ArrowLeft, ExternalLink, CheckCircle, XCircle, Clock, 
-  GitCommit, FileCode, AlertTriangle, Shield, Eye, History,
+  ArrowLeft, ExternalLink, CheckCircle, XCircle, 
+  GitCommit, FileCode, Shield, Eye, History,
   ChevronRight, Copy, Check, Sparkles, Ban, GitPullRequest,
   Layers, Code2, ArrowUpRight, Trash2, Bug,
   Key, Zap, Loader2
 } from 'lucide-react';
 
-// ============================================================================
-// TYPES
-// ============================================================================
 
 type IssueGroup = {
   id: string;
@@ -50,10 +47,6 @@ type Project = {
   repo_url: string | null;
   github_installation_id: number | null;
 };
-
-// ============================================================================
-// CATEGORY CONTEXT
-// ============================================================================
 
 const CATEGORY_CONTEXT: Record<string, {
   icon: any;
@@ -116,10 +109,6 @@ const CATEGORY_CONTEXT: Record<string, {
     defaultRemediation: 'Safely remove the unused code after verifying it has no side effects.',
   },
 };
-
-// ============================================================================
-// RULE KNOWLEDGE BASE
-// ============================================================================
 
 const RULE_INFO: Record<string, { 
   title: string; 
@@ -277,7 +266,8 @@ function getRuleInfo(ruleId: string, category: string) {
   const info = RULE_INFO[ruleId.toUpperCase()];
   const ctx = CATEGORY_CONTEXT[category.toUpperCase()] || CATEGORY_CONTEXT.QUALITY;
   
-  if (info) return info;
+  if (info) 
+    return info;
   
   return {
     title: formatRuleName(ruleId),
@@ -290,10 +280,6 @@ function getRuleInfo(ruleId: string, category: string) {
 function getCategoryContext(category: string) {
   return CATEGORY_CONTEXT[category.toUpperCase()] || CATEGORY_CONTEXT.QUALITY;
 }
-
-// ============================================================================
-// HELPERS
-// ============================================================================
 
 function formatRuleName(ruleId: string): string {
   return ruleId.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -329,14 +315,12 @@ function getLanguage(filePath: string): string {
 }
 
 function getGitHubUrl(repoUrl: string | null, filePath: string, line: number) {
-  if (!repoUrl) return null;
+  if (!repoUrl) 
+    return null;
   const clean = repoUrl.replace(/\.git$/, '').replace(/\/$/, '');
   return `${clean}/blob/main/${filePath}#L${line}`;
 }
 
-// ============================================================================
-// COMPONENTS
-// ============================================================================
 
 function SeverityBadge({ severity, size = 'md' }: { severity: string; size?: 'sm' | 'md' | 'lg' }) {
   const s = (severity || 'UNKNOWN').toUpperCase();
@@ -455,10 +439,6 @@ function CodeBlock({ code, highlightLine, filePath }: {
   );
 }
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
 export default function IssueDetailClient({ group }: { group: IssueGroup }) {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [project, setProject] = useState<Project | null>(null);
@@ -501,7 +481,8 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
 
   useEffect(() => {
     async function loadFile() {
-      if (!group.last_seen_scan_id) return;
+      if (!group.last_seen_scan_id) 
+        return;
       setLoadingFile(true);
       try {
         const res = await fetch(`/api/scans/${group.last_seen_scan_id}/file?path=${encodeURIComponent(group.canonical_file)}`);
@@ -526,7 +507,8 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
   }, {} as Record<string, Finding[]>);
 
   async function handleCreateFixPR() {
-    if (!findings.length) return;
+    if (!findings.length) 
+      return;
     setIsCreatingPR(true);
     setPrResult(null);
     try {
@@ -547,19 +529,74 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
 
   async function handleMarkFalsePositive() {
     setIsActioning(true);
-    try { alert('TODO: Mark as false positive'); } 
-    finally { setIsActioning(false); }
+    try {
+      const response = await fetch(`/api/issue-groups/${group.id}/suppress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason: 'False Positive',
+          expires_at: null
+        })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to mark as false positive');
+      }
+
+      window.location.reload();
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
+    } finally {
+      setIsActioning(false);
+    }
   }
 
   async function handleSuppress() {
     setIsActioning(true);
-    try { alert('TODO: Suppress issue'); } 
-    finally { setIsActioning(false); }
+    try {
+      const reason = prompt('Reason for suppression (optional):');
+      if (reason === null) {
+        setIsActioning(false);
+        return;
+      }
+
+      const expiryDays = prompt('Suppress for how many days? (leave empty for permanent):');
+      let expires_at: string | null = null;
+
+      if (expiryDays && expiryDays.trim()) {
+        const days = parseInt(expiryDays.trim());
+        if (!isNaN(days) && days > 0) {
+          const expiryDate = new Date();
+          expiryDate.setDate(expiryDate.getDate() + days);
+          expires_at = expiryDate.toISOString();
+        }
+      }
+
+      const response = await fetch(`/api/issue-groups/${group.id}/suppress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason: reason.trim() || null,
+          expires_at
+        })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to suppress issue');
+      }
+
+      window.location.reload();
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
+    } finally {
+      setIsActioning(false);
+    }
   }
 
   return (
     <div className="min-h-screen bg-gray-50 text-slate-900 font-sans">
-      {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-6 py-4">
           {/* Breadcrumb */}
@@ -574,7 +611,6 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
             <span className="text-slate-900 font-medium truncate max-w-xs">{group.rule_id}</span>
           </div>
 
-          {/* Title row */}
           <div className="flex items-start justify-between gap-6">
             <div className="min-w-0">
               <div className="flex items-center gap-3 mb-2">
@@ -588,7 +624,6 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
               </p>
             </div>
 
-            {/* Actions */}
             <div className="flex items-center gap-2 shrink-0">
               {githubUrl && (
                 <a href={githubUrl} target="_blank" rel="noopener noreferrer"
@@ -805,7 +840,6 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
             </section>
           </div>
 
-          {/* Right column - Metadata */}
           <div className="space-y-6">
             {/* Quick stats */}
             <div className="grid grid-cols-2 gap-4">
@@ -843,7 +877,6 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
               </div>
             </section>
 
-            {/* Project info */}
             <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
                 <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">

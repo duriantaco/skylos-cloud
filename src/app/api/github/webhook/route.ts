@@ -33,6 +33,114 @@ async function getInstallationOctokit(installationId: number): Promise<Octokit> 
   return new Octokit({ auth: token });
 }
 
+const SKYLOS_WORKFLOW_YAML = `name: Skylos Quality Gate
+
+on:
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  id-token: write
+  checks: write
+
+jobs:
+  skylos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Skylos
+        run: pip install skylos
+
+      - name: Run Skylos Scan & Upload
+        run: skylos . --danger --upload
+`;
+
+async function createWorkflowPR(octokit: Octokit, owner: string, repo: string, defaultBranch: string) {
+  // Check if workflow already exists
+  try {
+    await octokit.repos.getContent({
+      owner,
+      repo,
+      path: '.github/workflows/skylos.yml',
+      ref: defaultBranch,
+    });
+    console.log(`Workflow already exists in ${owner}/${repo}, skipping PR`);
+    return;
+  } catch (e: any) {
+    if (e.status !== 404) throw e;
+  }
+
+  // Get the latest commit SHA on default branch
+  const { data: ref } = await octokit.git.getRef({
+    owner,
+    repo,
+    ref: `heads/${defaultBranch}`,
+  });
+  const baseSha = ref.object.sha;
+
+  // Create a new branch
+  const branchName = 'skylos/add-quality-gate';
+  try {
+    await octokit.git.createRef({
+      owner,
+      repo,
+      ref: `refs/heads/${branchName}`,
+      sha: baseSha,
+    });
+  } catch (e: any) {
+    if (e.status === 422) {
+      console.log(`Branch ${branchName} already exists in ${owner}/${repo}, skipping PR`);
+      return;
+    }
+    throw e;
+  }
+
+  // Create the workflow file
+  const content = Buffer.from(SKYLOS_WORKFLOW_YAML).toString('base64');
+  await octokit.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path: '.github/workflows/skylos.yml',
+    message: 'Add Skylos quality gate',
+    content,
+    branch: branchName,
+  });
+
+  // Open PR
+  await octokit.pulls.create({
+    owner,
+    repo,
+    title: 'Add Skylos Quality Gate',
+    body: [
+      '## Skylos Quality Gate',
+      '',
+      'This PR adds automatic code scanning on every pull request.',
+      '',
+      '**What it does:**',
+      '- Scans for security vulnerabilities, dead code, and hardcoded secrets',
+      '- Uploads results to your [Skylos dashboard](https://skylos.dev/dashboard)',
+      '- Uses tokenless authentication (no secrets needed)',
+      '',
+      '**No configuration required.** Merge this PR and Skylos will start scanning automatically.',
+      '',
+      '---',
+      '_Created automatically by the [Skylos GitHub App](https://skylos.dev)._',
+    ].join('\n'),
+    head: branchName,
+    base: defaultBranch,
+  });
+
+  console.log(`Created workflow PR in ${owner}/${repo}`);
+}
+
 async function handleInstallation(payload: any) {
   const installationId = payload.installation.id;
   const repos = payload.repositories || [];
@@ -94,6 +202,13 @@ async function handleInstallation(payload: any) {
       });
       
       console.log(`Enabled branch protection for ${fullName}:${defaultBranch}`);
+
+      // Auto-create workflow PR if skylos.yml doesn't exist
+      try {
+        await createWorkflowPR(octokit, owner, repoName, defaultBranch);
+      } catch (prErr: any) {
+        console.warn(`Could not create workflow PR for ${fullName}:`, prErr.message);
+      }
     } catch (e: any) {
       console.warn(`Could not configure branch protection for ${fullName}:`, e.message);
     }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Shield, Calendar, Zap, BookOpen, CheckCircle, XCircle } from "lucide-react";
 import dogImg from "../../../../public/assets/favicon-96x96.png";
+import ComplianceReportButton from "@/components/ComplianceReportButton";
 
 export default async function CompliancePage() {
   const supabase = await createClient();
@@ -129,29 +130,35 @@ export default async function CompliancePage() {
                   <p className="text-sm text-slate-500">Select frameworks below to start tracking compliance</p>
                 </div>
               ) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-4">
                   {enabledFrameworks.map((ef) => {
                     const fw = ef.compliance_frameworks as any;
                     return (
-                      <div 
+                      <div
                         key={ef.id}
                         className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition"
                       >
                         <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="font-semibold text-slate-900">{fw.name}</h3>
-                            <p className="text-sm text-slate-500">{fw.version}</p>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="font-semibold text-slate-900 text-lg">{fw.name}</h3>
+                              <div className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-sm font-medium rounded-full">
+                                Active
+                              </div>
+                            </div>
+                            <p className="text-sm text-slate-500 mb-3">{fw.version}</p>
+                            {ef.next_audit_date && (
+                              <div className="flex items-center gap-1.5 text-sm text-slate-500">
+                                <Calendar className="w-4 h-4" />
+                                Next audit: {new Date(ef.next_audit_date).toLocaleDateString()}
+                              </div>
+                            )}
                           </div>
-                          <div className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-sm font-medium rounded-full">
-                            Active
-                          </div>
+                          <ComplianceReportButton
+                            frameworkCode={fw.code}
+                            frameworkName={fw.name}
+                          />
                         </div>
-                        {ef.next_audit_date && (
-                          <div className="flex items-center gap-1.5 text-sm text-slate-500">
-                            <Calendar className="w-4 h-4" />
-                            Next audit: {new Date(ef.next_audit_date).toLocaleDateString()}
-                          </div>
-                        )}
                       </div>
                     );
                   })}

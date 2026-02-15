@@ -102,9 +102,14 @@ function NoProjectsState({ userPlan }: { userPlan: string }) {
             </div>
             
             {!['pro'].includes(userPlan) && (
-              <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700">
-                Upgrade to Pro
-              </a>
+              <div className="flex items-center gap-3">
+                <a href="mailto:founder@skylos.dev" className="px-4 py-2 border border-slate-200 text-slate-900 rounded-lg font-semibold hover:bg-slate-50 transition text-sm">
+                  Book a Demo
+                </a>
+                <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm">
+                  Upgrade to Pro
+                </a>
+              </div>
             )}
           </div>
         </div>
@@ -170,9 +175,14 @@ function ProjectPicker({ projects, userPlan }: {
             </div>
             
             {!['pro'].includes(userPlan) && (
-              <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700">
-                Upgrade to Pro
-              </a>
+              <div className="flex items-center gap-3">
+                <a href="mailto:founder@skylos.dev" className="px-4 py-2 border border-slate-200 text-slate-900 rounded-lg font-semibold hover:bg-slate-50 transition text-sm">
+                  Book a Demo
+                </a>
+                <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm">
+                  Upgrade to Pro
+                </a>
+              </div>
             )}
           </div>
         </div>
@@ -304,9 +314,14 @@ export default async function SettingsPage({
             </div>
             
             {!['pro'].includes(userPlan) && (
-              <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700">
-                Upgrade to Pro
-              </a>
+              <div className="flex items-center gap-3">
+                <a href="mailto:founder@skylos.dev" className="px-4 py-2 border border-slate-200 text-slate-900 rounded-lg font-semibold hover:bg-slate-50 transition text-sm">
+                  Book a Demo
+                </a>
+                <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm">
+                  Upgrade to Pro
+                </a>
+              </div>
             )}
           </div>
         </div>
