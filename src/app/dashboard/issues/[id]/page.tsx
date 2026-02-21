@@ -7,8 +7,12 @@ export default async function IssueDetailPage(
 ) {
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  console.log('[dashboard/issues/[id]] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
+  if (!user) {
+    console.log('[dashboard/issues/[id]] no user, redirecting to /login');
+    redirect("/login");
+  }
 
   const { id } = await props.params;
 

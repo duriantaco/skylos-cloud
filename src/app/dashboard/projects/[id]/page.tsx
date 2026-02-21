@@ -33,9 +33,13 @@ export default async function ProjectPage({
   const { id } = await params;
 
   const {
-    data: { user },
+    data: { user }, error: authErr,
   } = await supabase.auth.getUser();
-  if (!user) return redirect("/login");
+  console.log('[dashboard/projects/[id]] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
+  if (!user) {
+    console.log('[dashboard/projects/[id]] no user, redirecting to /login');
+    return redirect("/login");
+  }
 
   // ---- Load project
   const { data: project, error: projectErr } = await supabase

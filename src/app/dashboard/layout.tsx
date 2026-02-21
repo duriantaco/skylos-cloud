@@ -12,9 +12,14 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) return redirect("/login");
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  console.log('[dashboard/layout] getUser result:', { user: user?.email ?? null, error: error?.message ?? null });
+
+  if (!user) {
+    console.log('[dashboard/layout] no user, redirecting to /login');
+    return redirect("/login");
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">

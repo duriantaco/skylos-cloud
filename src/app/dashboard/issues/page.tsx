@@ -30,8 +30,12 @@ function SeverityPill({ severity }: { severity: string }) {
 
 export default async function IssuesInboxPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return redirect("/login");
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  console.log('[dashboard/issues] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
+  if (!user) {
+    console.log('[dashboard/issues] no user, redirecting to /login');
+    return redirect("/login");
+  }
 
   const { data: anyProject } = await supabase
     .from("projects")

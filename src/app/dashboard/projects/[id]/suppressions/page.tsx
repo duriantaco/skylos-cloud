@@ -8,8 +8,12 @@ export default async function SuppressionsPage({ params }: { params: Promise<{ i
   const supabase = await createClient();
   const { id } = await params;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return redirect("/login");
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  console.log('[dashboard/projects/[id]/suppressions] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
+  if (!user) {
+    console.log('[dashboard/projects/[id]/suppressions] no user, redirecting to /login');
+    return redirect("/login");
+  }
 
   return (
     <main className="min-h-screen bg-gray-50 text-slate-900 font-sans">

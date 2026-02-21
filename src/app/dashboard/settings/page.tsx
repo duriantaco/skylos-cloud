@@ -19,7 +19,8 @@ async function updatePlan(formData: FormData) {
   const supabase = await createClient()
   const plan = formData.get('plan') as string
   
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  console.log('[settings/updatePlan] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
   if (!user) return { success: false }
   
   const { data: membership } = await supabase

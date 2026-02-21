@@ -10,9 +10,12 @@ export async function updateSession(request: NextRequest) {
     {
       cookies: {
         getAll() {
-          return request.cookies.getAll();
+          const all = request.cookies.getAll();
+          console.log('[supabase/middleware] getAll cookies:', all.map(c => c.name));
+          return all;
         },
         setAll(cookiesToSet) {
+          console.log('[supabase/middleware] setAll cookies:', cookiesToSet.map(c => c.name));
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
@@ -25,7 +28,8 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  console.log('[supabase/middleware] getUser:', { user: user?.email ?? null, error: error?.message ?? null });
 
   return supabaseResponse;
 }

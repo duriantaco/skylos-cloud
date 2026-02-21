@@ -8,8 +8,12 @@ import ComplianceReportButton from "@/components/ComplianceReportButton";
 
 export default async function CompliancePage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return redirect("/login");
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  console.log('[dashboard/compliance] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
+  if (!user) {
+    console.log('[dashboard/compliance] no user, redirecting to /login');
+    return redirect("/login");
+  }
 
   const { data: member } = await supabase
     .from("organization_members")

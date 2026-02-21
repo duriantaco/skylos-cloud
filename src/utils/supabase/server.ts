@@ -10,16 +10,18 @@ export async function createClient() {
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll();
+          const all = cookieStore.getAll();
+          console.log('[supabase/server] getAll cookies:', all.map(c => c.name));
+          return all;
         },
         setAll(cookiesToSet) {
           try {
+            console.log('[supabase/server] setAll cookies:', cookiesToSet.map(c => c.name));
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
-          } catch {
-            // setAll called from a Server Component — safe to ignore.
-            // The middleware will handle refreshing the session.
+          } catch (e) {
+            console.log('[supabase/server] setAll FAILED (Server Component):', (e as Error).message);
           }
         },
       },

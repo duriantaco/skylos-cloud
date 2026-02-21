@@ -10,8 +10,10 @@ type EnsureWorkspaceResult = {
 export async function ensureWorkspace(): Promise<EnsureWorkspaceResult> {
   const supabase = await createClient();
   
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  console.log('[ensureWorkspace] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
   if (!user) {
+    console.log('[ensureWorkspace] no user');
     return { user: null, orgId: null, supabase };
   }
 

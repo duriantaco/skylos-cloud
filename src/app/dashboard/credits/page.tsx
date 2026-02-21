@@ -8,8 +8,10 @@ export default async function CreditsPage() {
   const supabase = await createClient();
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();
+  console.log('[dashboard/credits] getUser:', { user: user?.email ?? null, error: userError?.message ?? null });
 
   if (userError || !user) {
+    console.log('[dashboard/credits] no user, redirecting to /login');
     redirect('/login');
   }
 
