@@ -104,24 +104,46 @@ export default async function CreditsPage() {
             </div>
 
             <div className="p-6">
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-4 gap-4">
                 <div className="border-2 border-slate-200 rounded-xl p-6 hover:border-slate-300 transition">
                   <div className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
                     Starter
                   </div>
                   <div className="mb-4">
-                    <span className="text-4xl font-black text-slate-900">1,000</span>
+                    <span className="text-4xl font-black text-slate-900">500</span>
                     <span className="text-lg text-slate-500 ml-2">credits</span>
                   </div>
-                  <div className="text-2xl font-bold text-slate-900 mb-4">
-                    $10
+                  <div className="text-2xl font-bold text-slate-900 mb-1">
+                    $9
                   </div>
-                  <button
-                    disabled
-                    className="w-full px-4 py-2 bg-slate-100 text-slate-400 text-sm font-semibold rounded-lg cursor-not-allowed"
+                  <p className="text-xs text-slate-500 mb-4">$0.018 per credit</p>
+                  <Link
+                    href="/dashboard/billing"
+                    className="block w-full px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-800 transition text-center"
                   >
-                    Coming Soon
-                  </button>
+                    Buy Now
+                  </Link>
+                </div>
+
+                <div className="border-2 border-slate-200 rounded-xl p-6 hover:border-slate-300 transition">
+                  <div className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                    Builder
+                  </div>
+                  <div className="mb-4">
+                    <span className="text-4xl font-black text-slate-900">2,500</span>
+                    <span className="text-lg text-slate-500 ml-2">credits</span>
+                  </div>
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className="text-2xl font-bold text-slate-900">$39</span>
+                    <span className="text-sm text-emerald-600 font-semibold">Save 11%</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-4">$0.016 per credit</p>
+                  <Link
+                    href="/dashboard/billing"
+                    className="block w-full px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-800 transition text-center"
+                  >
+                    Buy Now
+                  </Link>
                 </div>
 
                 <div className="border-2 border-slate-900 rounded-xl p-6 relative">
@@ -132,47 +154,46 @@ export default async function CreditsPage() {
                     Team
                   </div>
                   <div className="mb-4">
-                    <span className="text-4xl font-black text-slate-900">5,000</span>
+                    <span className="text-4xl font-black text-slate-900">10,000</span>
                     <span className="text-lg text-slate-500 ml-2">credits</span>
                   </div>
                   <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-2xl font-bold text-slate-900">$40</span>
-                    <span className="text-sm text-emerald-600 font-semibold">Save 20%</span>
+                    <span className="text-2xl font-bold text-slate-900">$129</span>
+                    <span className="text-sm text-emerald-600 font-semibold">Save 28%</span>
                   </div>
-                  <p className="text-xs text-slate-500 mb-4">$0.008 per credit</p>
-                  <button
-                    disabled
-                    className="w-full px-4 py-2 bg-slate-100 text-slate-400 text-sm font-semibold rounded-lg cursor-not-allowed"
+                  <p className="text-xs text-slate-500 mb-4">$0.013 per credit</p>
+                  <Link
+                    href="/dashboard/billing"
+                    className="block w-full px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-800 transition text-center"
                   >
-                    Coming Soon
-                  </button>
+                    Buy Now
+                  </Link>
                 </div>
 
-                {/* Pro Pack */}
                 <div className="border-2 border-slate-200 rounded-xl p-6 hover:border-slate-300 transition">
                   <div className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                    Pro
+                    Scale
                   </div>
                   <div className="mb-4">
-                    <span className="text-4xl font-black text-slate-900">25,000</span>
+                    <span className="text-4xl font-black text-slate-900">50,000</span>
                     <span className="text-lg text-slate-500 ml-2">credits</span>
                   </div>
                   <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-2xl font-bold text-slate-900">$150</span>
-                    <span className="text-sm text-emerald-600 font-semibold">Save 40%</span>
+                    <span className="text-2xl font-bold text-slate-900">$499</span>
+                    <span className="text-sm text-emerald-600 font-semibold">Save 45%</span>
                   </div>
-                  <p className="text-xs text-slate-500 mb-4">$0.006 per credit</p>
-                  <button
-                    disabled
-                    className="w-full px-4 py-2 bg-slate-100 text-slate-400 text-sm font-semibold rounded-lg cursor-not-allowed"
+                  <p className="text-xs text-slate-500 mb-4">$0.010 per credit</p>
+                  <Link
+                    href="/dashboard/billing"
+                    className="block w-full px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-800 transition text-center"
                   >
-                    Coming Soon
-                  </button>
+                    Buy Now
+                  </Link>
                 </div>
               </div>
 
               <p className="text-xs text-slate-500 text-center mt-6">
-                💡 Credits never expire and roll over forever
+                Credits never expire and roll over forever
               </p>
             </div>
           </div>

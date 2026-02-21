@@ -624,18 +624,18 @@ export default async function Home() {
               </Link>
             </div>
 
-            {/* Team Tier */}
+            {/* Credits Tier */}
             <div className="rounded-2xl border-2 border-slate-900 bg-white p-8 flex flex-col relative">
               <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-900 text-white text-xs font-semibold">
                   <Zap className="w-3 h-3" /> Most Popular
                 </span>
               </div>
-              <h3 className="text-xl font-semibold text-slate-900">Team</h3>
-              <p className="mt-2 text-slate-600 text-sm">For teams shipping secure code</p>
+              <h3 className="text-xl font-semibold text-slate-900">Pay as you go</h3>
+              <p className="mt-2 text-slate-600 text-sm">Buy credits, use what you need</p>
               <div className="mt-6">
-                <span className="text-5xl font-bold text-slate-900">$15</span>
-                <span className="text-slate-500 text-sm ml-1">/dev/month</span>
+                <span className="text-5xl font-bold text-slate-900">$9</span>
+                <span className="text-slate-500 text-sm ml-1">/ 500 credits</span>
               </div>
               <ul className="mt-8 space-y-3 text-sm text-slate-600 flex-1">
                 <li className="flex items-center gap-2">
@@ -648,23 +648,23 @@ export default async function Home() {
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> PR decoration (inline comments)
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Team collaboration (up to 10)
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Team collaboration
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Slack & Discord alerts
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> 10 repos, 90-day history
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Credits never expire
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Email support
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Volume discounts up to 45%
                 </li>
               </ul>
               <Link
                 href="/login"
                 className="mt-8 block w-full text-center rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white hover:bg-slate-800 transition"
               >
-                Start free trial
+                Get started
               </Link>
             </div>
 

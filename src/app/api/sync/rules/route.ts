@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       rules: [],
       count: 0,
       plan,
-      message: 'Custom rules require Pro plan or higher'
+      message: 'Custom rules require a paid plan'
     })
   }
 

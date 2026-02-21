@@ -34,7 +34,7 @@ export default function GitHubAppInstall({ currentPlan, githubInstallationId, re
         </div>
         
         <p className="text-sm text-gray-700 mb-4">
-          Automatically block PRs that fail the quality gate. Upgrade to Pro to enable.
+          Automatically block PRs that fail the quality gate. Purchase credits to enable.
         </p>
         
         <ul className="text-sm text-gray-500 mb-4 space-y-1">
@@ -43,12 +43,12 @@ export default function GitHubAppInstall({ currentPlan, githubInstallationId, re
           <li>🔒 Show check status on PRs</li>
         </ul>
         
-        <button
-          disabled
-          className="px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed"
+        <a
+          href="/dashboard/billing"
+          className="inline-block px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition"
         >
-          Upgrade to Pro
-        </button>
+          Buy Credits
+        </a>
       </div>
     )
   }

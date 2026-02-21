@@ -1220,8 +1220,8 @@ export async function POST(req: Request) {
     }
 
     if (plan === "free") {
-      response.upgrade_hint = "Upgrade to Pro for overrides, SARIF import, and Slack/Discord notifications (plus higher limits).";
-      response.upgrade_url = "/dashboard/settings?upgrade=true";
+      response.upgrade_hint = "Purchase credits to unlock overrides, SARIF import, Slack/Discord notifications, and higher limits.";
+      response.upgrade_url = "/dashboard/billing";
     }
 
     trackEvent('scan_completed', project.org_id, {

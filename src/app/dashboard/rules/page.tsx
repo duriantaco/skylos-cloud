@@ -109,10 +109,10 @@ export default async function RulesPage() {
                   </div>
                 </div>
                 <Link
-                  href="/dashboard/settings"
+                  href="/dashboard/billing"
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-700 text-white rounded-lg font-medium hover:bg-indigo-700 transition"
                 >
-                  Upgrade to Pro — $49/mo
+                  Buy Credits
                   <Zap className="w-4 h-4" />
                 </Link>
               </div>

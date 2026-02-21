@@ -52,7 +52,7 @@ export async function createRule(formData: FormData) {
   const { supabase, orgId, plan, canUseRules, canUsePython, user } = ctx;
 
   if (!canUseRules) {
-    return { success: false, error: "Upgrade to Pro to use custom rules" };
+    return { success: false, error: "Purchase credits to use custom rules" };
   }
 
   const { count } = await supabase

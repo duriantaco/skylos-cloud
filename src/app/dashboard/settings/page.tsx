@@ -106,8 +106,8 @@ function NoProjectsState({ userPlan }: { userPlan: string }) {
                 <a href="mailto:founder@skylos.dev" className="px-4 py-2 border border-slate-200 text-slate-900 rounded-lg font-semibold hover:bg-slate-50 transition text-sm">
                   Book a Demo
                 </a>
-                <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm">
-                  Upgrade to Pro
+                <a href="/dashboard/billing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm">
+                  Buy Credits
                 </a>
               </div>
             )}
@@ -179,8 +179,8 @@ function ProjectPicker({ projects, userPlan }: {
                 <a href="mailto:founder@skylos.dev" className="px-4 py-2 border border-slate-200 text-slate-900 rounded-lg font-semibold hover:bg-slate-50 transition text-sm">
                   Book a Demo
                 </a>
-                <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm">
-                  Upgrade to Pro
+                <a href="/dashboard/billing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm">
+                  Buy Credits
                 </a>
               </div>
             )}
@@ -318,8 +318,8 @@ export default async function SettingsPage({
                 <a href="mailto:founder@skylos.dev" className="px-4 py-2 border border-slate-200 text-slate-900 rounded-lg font-semibold hover:bg-slate-50 transition text-sm">
                   Book a Demo
                 </a>
-                <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm">
-                  Upgrade to Pro
+                <a href="/dashboard/billing" className="px-4 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm">
+                  Buy Credits
                 </a>
               </div>
             )}
@@ -365,8 +365,8 @@ export default async function SettingsPage({
                 <div className="absolute inset-0 flex items-center justify-center bg-white/90">
                   <div className="text-center">
                     <p className="font-semibold mb-2">🔒 Pro Feature</p>
-                    <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">
-                      Upgrade to Pro
+                    <a href="/dashboard/billing" className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">
+                      Buy Credits
                     </a>
                   </div>
                 </div>
@@ -395,8 +395,8 @@ export default async function SettingsPage({
                 <div className="absolute inset-0 flex items-center justify-center bg-white/90">
                   <div className="text-center">
                     <p className="font-semibold mb-2">🔒 Pro Feature</p>
-                    <a href="/pricing" className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">
-                      Upgrade to Pro
+                    <a href="/dashboard/billing" className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">
+                      Buy Credits
                     </a>
                   </div>
                 </div>

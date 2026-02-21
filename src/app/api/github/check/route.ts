@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     
     if (plan === "free") {
       conclusion = "success";
-      summary = `Quality Gate: ${qualityGatePassed ? "✅ PASSED" : "⚠️ FAILED (Info only - Upgrade to Pro to block)"}`;
+      summary = `Quality Gate: ${qualityGatePassed ? "✅ PASSED" : "⚠️ FAILED (Info only - Buy credits to enable blocking)"}`;
     } else if (plan === "pro" || plan === "enterprise" || plan === "beta") {
       conclusion = qualityGatePassed ? "success" : "failure";
       summary = `Quality Gate: ${qualityGatePassed ? "✅ PASSED" : "❌ FAILED - Merge blocked"}`;

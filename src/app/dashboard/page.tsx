@@ -644,7 +644,7 @@ export default async function DashboardPage() {
               <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-6 text-white relative overflow-hidden">
                 <h3 className="font-bold text-lg mb-2 relative z-10">Need more from Skylos?</h3>
                 <p className="text-slate-300 text-sm mb-4 relative z-10">
-                  Get trend dashboards, PR decoration, team collaboration, and more with a Pro plan.
+                  Get trend dashboards, PR decoration, team collaboration, and more with credits.
                 </p>
                 <a
                   href="mailto:founder@skylos.dev"
