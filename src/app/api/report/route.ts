@@ -7,7 +7,7 @@ import { sendSlackNotification } from "@/lib/slack";
 import { sendDiscordNotification } from "@/lib/discord";
 import { getSiteUrl } from "@/lib/site";
 import { trackEvent } from "@/lib/analytics";
-import { groupFindings, Finding  } from '@/lib/grouping';
+import { groupFindings  } from '@/lib/grouping';
 import crypto from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { serverError } from "@/lib/api-error";
@@ -17,7 +17,8 @@ function getSupabaseAdmin(): SupabaseClient | null {
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL; // fallback for dev
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url || !key) return null;
+  if (!url || !key) 
+    return null;
   return createClient(url, key);
 }
 
@@ -83,13 +84,15 @@ export async function createOrUpdateIssueGroups(
 
   for (const [_, items] of grouped as any as Iterable<[string, InsertedFinding[]]>) {
     const canonical = items?.[0];
-    if (!canonical) continue;
+    if (!canonical) 
+      continue;
 
     const ruleId = String(canonical.rule_id || "UNKNOWN");
     const filePath = String(canonical.file_path || "");
     const line = Number(canonical.line_number || 0);
 
-    if (!filePath) continue;
+    if (!filePath) 
+      continue;
 
     const fingerprint = makeGroupFingerprint(projectId, ruleId, filePath, line);
 
@@ -387,7 +390,6 @@ export async function POST(req: Request) {
     let project: any;
 
     if (authMode === 'oidc') {
-      // Tokenless CI: verify GitHub Actions OIDC JWT
       const { verifyGitHubOIDC } = await import('@/lib/github-oidc')
       const claims = await verifyGitHubOIDC(token)
       if (!claims) {
@@ -401,7 +403,7 @@ export async function POST(req: Request) {
       const { data: oidcProject, error: oidcError } = await supabase
         .from('projects')
         .select(`
-          id, name, org_id, strict_mode, repo_url, policy_config,
+          id, name, org_id, strict_mode, repo_url, policy_config, ai_assurance_enabled,
           github_installation_id, slack_webhook_url, slack_notifications_enabled,
           slack_notify_on, discord_webhook_url, discord_notifications_enabled,
           discord_notify_on, organizations(plan)`)
@@ -417,11 +419,10 @@ export async function POST(req: Request) {
       }
       project = oidcProject
     } else {
-      // Standard API key auth
       const { data: apiKeyProject, error: projError } = await supabase
         .from('projects')
         .select(`
-          id, name, org_id, strict_mode, repo_url, policy_config,
+          id, name, org_id, strict_mode, repo_url, policy_config, ai_assurance_enabled,
           github_installation_id, slack_webhook_url, slack_notifications_enabled,
           slack_notify_on, discord_webhook_url, discord_notifications_enabled,
           discord_notify_on, organizations(plan)`)
@@ -445,6 +446,8 @@ export async function POST(req: Request) {
     const normalized = normalizeIncomingReport(body)
     const { summary, findings, commit_hash, branch, actor, tool } = normalized
     const { is_forced } = body
+    const analysis_mode = String(body.analysis_mode || "static");
+    const ai_code = body.ai_code || null;
 
     if (tool === "sarif" && !caps.sarifEnabled) {
       // return NextResponse.json({
@@ -470,6 +473,7 @@ export async function POST(req: Request) {
       snippet: truncate(f.snippet, LIMITS.MAX_SNIPPET_LENGTH),
       severity: String(f.severity || "MEDIUM").toUpperCase(),
       category: String(f.category || "QUALITY").toUpperCase(),
+      metadata: f.metadata || null,
     }));
 
     let diffScope = null;
@@ -640,6 +644,7 @@ export async function POST(req: Request) {
       SECRET: Number(gate.by_category?.SECRET ?? 0),
       QUALITY: Number(gate.by_category?.QUALITY ?? 0),
       DEAD_CODE: Number(gate.by_category?.DEAD_CODE ?? 0),
+      DEPENDENCY: Number(gate.by_category?.DEPENDENCY ?? 0),
     };
 
     const bySeverityThresholds: Record<string, number> = {
@@ -701,6 +706,20 @@ export async function POST(req: Request) {
       passedGate = ok;
     }
 
+    if (ai_code?.detected && (project as any).ai_assurance_enabled) {
+      const aiFiles = new Set(ai_code.ai_files || []);
+      const aiFileFindings = finalFindings.filter(
+        (f: any) => f.is_new && !f.is_suppressed && aiFiles.has(f.file_path)
+      );
+      if (aiFileFindings.length > 0) {
+        passedGate = false;
+      }
+      if (ai_code) {
+        ai_code.gate_passed = aiFileFindings.length === 0;
+        ai_code.ai_findings_count = aiFileFindings.length;
+      }
+    }
+
     const { data: scan, error: scanError } = await supabase
       .from('scans')
       .insert({
@@ -709,6 +728,7 @@ export async function POST(req: Request) {
         branch: branch || 'main',
         actor: actor || 'unknown',
         tool,
+        analysis_mode,
         diff_context: caps.prDiffEnabled ? diffContextForDb(diffScope) : null,
         stats: {
           ...summary,
@@ -726,6 +746,8 @@ export async function POST(req: Request) {
         quality_gate_passed: passedGate,
         is_overridden: isWhitelisted,
         override_reason: isWhitelisted ? `Inherited override` : null,
+        ai_code_detected: !!ai_code?.detected,
+        ai_code_stats: ai_code || null,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -747,6 +769,24 @@ export async function POST(req: Request) {
       is_new: !!f.is_new,
       new_reason: f.new_reason || null,
       is_suppressed: !!f.is_suppressed,
+      analysis_source: f.metadata?.source || null,
+      analysis_confidence: f.metadata?.confidence || null,
+      llm_verdict: f.metadata?.llm_verdict || null,
+      llm_rationale: f.metadata?.llm_rationale ? String(f.metadata.llm_rationale).slice(0, 2000) : null,
+      llm_challenged: !!f.metadata?.llm_challenged,
+      needs_review: !!f.metadata?.needs_review,
+      sca_metadata: f.category === 'DEPENDENCY' && f.metadata ? {
+        vuln_id: f.metadata.vuln_id || null,
+        display_id: f.metadata.display_id || null,
+        aliases: f.metadata.aliases || [],
+        affected_range: f.metadata.affected_range || null,
+        fixed_version: f.metadata.fixed_version || null,
+        cvss_score: f.metadata.cvss_score ?? null,
+        references: f.metadata.references || [],
+        ecosystem: f.metadata.ecosystem || null,
+        package_name: f.metadata.package_name || null,
+        package_version: f.metadata.package_version || null,
+      } : null,
     }))
 
     if (dbRows.length > 0) {
@@ -796,6 +836,44 @@ export async function POST(req: Request) {
     }
 
     await cleanupOldScans(supabase, project.id, caps.maxScansStored);
+
+    let creditsWarning = false;
+    if (plan !== "enterprise") {
+      try {
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("credits")
+          .eq("id", project.org_id)
+          .single();
+
+        if (org && org.credits > 0) {
+          await supabase.rpc("deduct_credits", {
+            p_org_id: project.org_id,
+            p_amount: 1,
+            p_description: "Scan upload",
+            p_metadata: {
+              feature_key: "scan_upload",
+              scan_id: scan.id,
+              project_id: project.id,
+            },
+          });
+
+          const { data: updatedOrg } = await supabase
+            .from("organizations")
+            .select("credits")
+            .eq("id", project.org_id)
+            .single();
+
+          if (updatedOrg && updatedOrg.credits < 50) {
+            creditsWarning = true;
+          }
+        } else {
+          creditsWarning = true;
+        }
+      } catch (creditErr) {
+        console.error("Credit deduction for scan upload failed:", creditErr);
+      }
+    }
 
     if (caps.checkRunsEnabled && (project as any).github_installation_id) {
       try {
@@ -850,7 +928,6 @@ export async function POST(req: Request) {
         console.error("GitHub App CheckRun failed:", e);
       }
     }
-    // Fallback to old method if no GitHub App installed
     else if (caps.checkRunsEnabled) {
       try {
         await postSkylosCheckRun({
@@ -934,7 +1011,6 @@ export async function POST(req: Request) {
     }
   }
 
-    // PR DECORATION: Inline review comments on changed lines (Pro+ only)
     if (
       plan !== "free" &&
       (project as any).github_installation_id &&
@@ -955,7 +1031,6 @@ export async function POST(req: Request) {
         const prNumber = (diffScope as any).prNumber;
 
         if (owner && repo && prNumber) {
-          // Filter to new, unsuppressed findings in changed files only
           const changedFiles = diffScope.changedFiles;
           const inlineFindings = finalFindings.filter(
             (f: any) =>
@@ -965,7 +1040,6 @@ export async function POST(req: Request) {
               f.line_number > 0
           );
 
-          // Cap at 10 inline comments to avoid spam
           const MAX_INLINE_COMMENTS = 10;
           const commentsToPost = inlineFindings.slice(0, MAX_INLINE_COMMENTS);
 
@@ -1051,7 +1125,6 @@ export async function POST(req: Request) {
       return { notify: false, isRecovery: false };
     }
 
-    // SLACK
     if (caps.slackEnabled && project.slack_webhook_url) {
       const slackNotifyOn = project.slack_notify_on || 'failure';
       const slackEnabled = project.slack_notifications_enabled;
@@ -1076,7 +1149,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // DISCORD
     if (caps.discordEnabled && project.discord_webhook_url) {
       const discordNotifyOn = project.discord_notify_on || 'failure';
       const discordEnabled = project.discord_notifications_enabled;
@@ -1141,6 +1213,11 @@ export async function POST(req: Request) {
         discord: caps.discordEnabled,
       }
     };
+
+    if (creditsWarning) {
+      response.credits_warning = true;
+      response.credits_message = "Low credits. Top up at skylos.dev/dashboard/billing";
+    }
 
     if (plan === "free") {
       response.upgrade_hint = "Upgrade to Pro for overrides, SARIF import, and Slack/Discord notifications (plus higher limits).";

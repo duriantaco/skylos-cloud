@@ -61,7 +61,7 @@ export async function POST(
   }
 
   const { data: member } = await supabase
-    .from("org_members")
+    .from("organization_members")
     .select("org_id")
     .eq("user_id", user.id)
     .eq("org_id", project.org_id)

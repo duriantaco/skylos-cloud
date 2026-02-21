@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import { 
-  Shield, AlertTriangle, ChevronRight, Search, 
+  Shield, AlertTriangle, ChevronRight, Search,
   Filter, CheckCircle2, Clock, FileCode, Eye,
-  Layers, TrendingDown, Zap, Key, Trash2, Bug
+  Layers, TrendingDown, Zap, Key, Trash2, Bug, Workflow
 } from 'lucide-react';
 
 // ============================================================================
@@ -197,6 +197,12 @@ function IssueRow({ group }: { group: IssueGroup }) {
               <Clock className="w-3 h-3" />
               {timeAgo(group.last_seen_at)}
             </span>
+            {(group.category === 'SECURITY' || group.category === 'SECRET') && (
+              <span className="flex items-center gap-1 text-indigo-400">
+                <Workflow className="w-3 h-3" />
+                <span className="text-[10px] font-medium">Flow</span>
+              </span>
+            )}
             {group.projects?.name && (
               <span className="text-slate-400 bg-slate-100 px-2 py-0.5 rounded text-[10px] font-medium">
                 {group.projects.name}

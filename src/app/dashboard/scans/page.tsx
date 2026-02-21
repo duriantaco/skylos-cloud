@@ -12,6 +12,7 @@ type Scan = {
   commit_hash: string | null;
   branch: string | null;
   quality_gate_passed: boolean | null;
+  analysis_mode?: "static" | "hybrid" | "agent" | null;
   stats: {
     total?: number;
     new_issues?: number;
@@ -90,6 +91,11 @@ function ScanCard({ scan }: { scan: Scan }) {
               {scan.projects?.name || "Unknown Project"}
             </span>
             <GateBadge passed={scan.quality_gate_passed} />
+            {scan.analysis_mode && scan.analysis_mode !== "static" && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-md bg-purple-50 text-purple-700 border border-purple-200">
+                {scan.analysis_mode.toUpperCase()}
+              </span>
+            )}
           </div>
 
           {/* Branch + Commit */}
@@ -170,7 +176,7 @@ export default async function ScansPage() {
   const { data: scans } = await supabase
     .from("scans")
     .select(`
-      id, created_at, commit_hash, branch, quality_gate_passed, stats,
+      id, created_at, commit_hash, branch, quality_gate_passed, stats, analysis_mode,
       projects!inner(id, name, repo_url, org_id)
     `)
     .eq("projects.org_id", membership.org_id)

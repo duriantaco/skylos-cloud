@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
 import { serverError } from "@/lib/api-error";
+import { generateFix, generateDiffPreview } from "@/lib/fix-generator";
 
 
 async function getInstallationOctokit(installationId: number): Promise<Octokit> {
@@ -21,7 +22,7 @@ function getFixSuggestion(finding: any) {
   }
 
   const ruleId = String(finding.rule_id || "").toUpperCase();
-  
+
   if (ruleId === "SKY-D201") {
     return 'import ast\nval = ast.literal_eval(user_input)';
   }
@@ -90,18 +91,13 @@ export async function POST(
     return NextResponse.json({ error: "GitHub App not installed for this project." }, { status: 400 });
   }
 
-  const fixCode = getFixSuggestion(finding);
-  if (!fixCode) {
-    return NextResponse.json({ error: "No automated fix available for this rule." }, { status: 400 });
-  }
-
   try {
     const octokit = await getInstallationOctokit(project.github_installation_id);
-    
+
     const [owner, repo] = project.repo_url.replace("https://github.com/", "").replace(".git", "").split("/");
-    
+
     const baseSha = finding.scans.commit_hash === 'local' ? 'main' : finding.scans.commit_hash;
-    
+
     const timestamp = Date.now();
     const newBranchName = `skylos-fix-${finding.rule_id.toLowerCase()}-${timestamp}`;
 
@@ -129,39 +125,110 @@ export async function POST(
       throw new Error("Could not retrieve file content.");
     }
 
-    const content = Buffer.from(fileData.content, "base64").toString("utf-8");
-    const lines = content.split("\n");
-    
-    const lineIndex = finding.line_number - 1;
-    
-    const originalLine = lines[lineIndex] || "";
-    const indentation = originalLine.match(/^\s*/)?.[0] || "";
-    
-    lines[lineIndex] = indentation + fixCode;
-    const newContent = lines.join("\n");
+    const originalContent = Buffer.from(fileData.content, "base64").toString("utf-8");
+
+    const hardcodedFix = getFixSuggestion(finding);
+    let newContent: string;
+    let fixExplanation: string;
+    let fixSource: "hardcoded" | "llm";
+
+    if (hardcodedFix) {
+      const lines = originalContent.split("\n");
+      const lineIndex = finding.line_number - 1;
+      const originalLine = lines[lineIndex] || "";
+      const indentation = originalLine.match(/^\s*/)?.[0] || "";
+      lines[lineIndex] = indentation + hardcodedFix;
+      newContent = lines.join("\n");
+      fixExplanation = `Applied known fix pattern for ${finding.rule_id}.`;
+      fixSource = "hardcoded";
+    } else {
+      const llmResult = await generateFix(originalContent, {
+        rule_id: finding.rule_id,
+        message: finding.message,
+        line_number: finding.line_number,
+        severity: finding.severity,
+        snippet: finding.snippet,
+        category: finding.category,
+      });
+
+      if (!llmResult) {
+        try {
+          await octokit.git.deleteRef({ owner, repo, ref: `heads/${newBranchName}` });
+        } catch { /* best effort */ }
+        return NextResponse.json(
+          { error: "Could not generate an automated fix for this finding. Try fixing it manually." },
+          { status: 422 }
+        );
+      }
+
+      newContent = llmResult.fixedContent;
+      fixExplanation = llmResult.explanation;
+      fixSource = "llm";
+    }
 
     await octokit.repos.createOrUpdateFileContents({
       owner,
       repo,
       path: finding.file_path,
-      message: `fix: resolve ${finding.rule_id} (Skylos)`,
+      message: `fix: resolve ${finding.rule_id} in ${finding.file_path} (Skylos)`,
       content: Buffer.from(newContent).toString("base64"),
       branch: newBranchName,
-      sha: fileData.sha, 
+      sha: fileData.sha,
     });
+
+    const diffPreview = generateDiffPreview(originalContent, newContent, finding.file_path);
+    const prBody = buildPrBody(finding, fixExplanation, fixSource, diffPreview);
 
     const { data: pr } = await octokit.pulls.create({
       owner,
       repo,
-      title: `Fix ${finding.rule_id}: ${finding.message}`,
+      title: `fix: ${finding.rule_id} – ${truncate(finding.message, 60)}`,
       head: newBranchName,
       base: "main",
-      body: `## Skylos Security Fix\n\n**Rule:** ${finding.rule_id}\n**Severity:** ${finding.severity}\n\nThis PR automatically fixes the issue detected by Skylos.`,
+      body: prBody,
     });
 
-    return NextResponse.json({ success: true, pr_url: pr.html_url });
+    return NextResponse.json({
+      success: true,
+      pr_url: pr.html_url,
+      fix_source: fixSource,
+    });
 
   } catch (error) {
     return serverError(error, "GitHub API");
   }
+}
+
+function truncate(str: string, max: number): string {
+  if (!str) return "";
+  return str.length > max ? str.slice(0, max - 1) + "\u2026" : str;
+}
+
+function buildPrBody(
+  finding: any,
+  explanation: string,
+  source: "hardcoded" | "llm",
+  diffPreview: string
+): string {
+  const badge = source === "llm" ? " (AI-generated)" : "";
+
+  return `## Skylos Security Fix${badge}
+
+| Field | Value |
+|-------|-------|
+| **Rule** | \`${finding.rule_id}\` |
+| **Severity** | ${finding.severity} |
+| **File** | \`${finding.file_path}:${finding.line_number}\` |
+| **Category** | ${finding.category || "–"} |
+
+### What was found
+${finding.message}
+
+### What changed
+${explanation}
+
+${diffPreview ? `### Diff preview\n${diffPreview}` : ""}
+
+---
+${source === "llm" ? "🤖 *This fix was generated by AI. Please review carefully before merging.*\n\n" : ""}🛡️ Automatically created by [Skylos](https://skylos.dev)`;
 }

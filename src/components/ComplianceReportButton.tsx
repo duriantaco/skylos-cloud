@@ -1,22 +1,49 @@
 'use client';
 
-import { useState } from 'react';
-import { Download, FileText, File, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Download, FileText, File, FileSpreadsheet, Loader2, Coins, AlertCircle } from 'lucide-react';
+import { checkCredits, useFeature, FEATURE_KEYS } from '@/lib/credits';
+import Link from 'next/link';
 
 type Props = {
   frameworkCode: string;
-  frameworkName: string;
 };
 
-export default function ComplianceReportButton({ frameworkCode, frameworkName }: Props) {
+export default function ComplianceReportButton({ frameworkCode }: Props) {
   const [generating, setGenerating] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [hasCredits, setHasCredits] = useState(true);
+  const [creditsRequired, setCreditsRequired] = useState(0);
+  const [checking, setChecking] = useState(true);
+  const [unlimited, setUnlimited] = useState(false);
+
+  useEffect(() => {
+    // Check credits on mount
+    checkCredits(FEATURE_KEYS.COMPLIANCE_REPORT).then((result) => {
+      setHasCredits(result.hasCredits);
+      setCreditsRequired(result.required);
+      setUnlimited(result.unlimited);
+      setChecking(false);
+    });
+  }, []);
 
   async function generateReport(format: 'json' | 'csv' | 'html') {
     setGenerating(true);
     setShowMenu(false);
 
     try {
+      // Deduct credits first
+      if (!unlimited) {
+        const deductResult = await useFeature(FEATURE_KEYS.COMPLIANCE_REPORT, {
+          framework: frameworkCode,
+          format
+        });
+
+        if (!deductResult.success) {
+          throw new Error(deductResult.error || 'Insufficient credits');
+        }
+      }
+
       const response = await fetch('/api/compliance/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29,10 +56,12 @@ export default function ComplianceReportButton({ frameworkCode, frameworkName }:
       }
 
       if (format === 'json') {
+        // For JSON, download as file
         const data = await response.json();
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         downloadBlob(blob, `compliance-report-${frameworkCode}-${Date.now()}.json`);
       } else {
+        // For CSV and HTML, response is already a blob
         const blob = await response.blob();
         const filename = format === 'csv'
           ? `compliance-report-${frameworkCode}-${Date.now()}.csv`
@@ -57,14 +86,40 @@ export default function ComplianceReportButton({ frameworkCode, frameworkName }:
     window.URL.revokeObjectURL(url);
   }
 
+  // Show insufficient credits warning
+  if (!checking && !hasCredits && !unlimited) {
+    return (
+      <div className="inline-flex flex-col gap-2">
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+          <AlertCircle className="w-4 h-4 text-amber-600" />
+          <span className="text-sm text-amber-700 font-medium">
+            Need {creditsRequired} credits to generate report
+          </span>
+        </div>
+        <Link
+          href="/dashboard/credits"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition"
+        >
+          <Coins className="w-4 h-4" />
+          Buy Credits
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="relative">
       <button
         onClick={() => setShowMenu(!showMenu)}
-        disabled={generating}
+        disabled={generating || checking}
         className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {generating ? (
+        {checking ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Checking...
+          </>
+        ) : generating ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
             Generating...
@@ -73,17 +128,20 @@ export default function ComplianceReportButton({ frameworkCode, frameworkName }:
           <>
             <Download className="w-4 h-4" />
             Generate Report
+            {!unlimited && <span className="text-xs opacity-75">({creditsRequired} credits)</span>}
           </>
         )}
       </button>
 
       {showMenu && !generating && (
         <>
+          {/* Backdrop */}
           <div
             className="fixed inset-0 z-10"
             onClick={() => setShowMenu(false)}
           />
 
+          {/* Menu */}
           <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-20">
             <div className="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
               Choose Format

@@ -72,7 +72,7 @@ export async function POST(req: Request) {
       by_severity: {} as Record<string, number>,
     };
 
-    const defaultCats = ["SECURITY", "SECRET", "QUALITY", "DEAD_CODE"];
+    const defaultCats = ["SECURITY", "SECRET", "QUALITY", "DEAD_CODE", "DEPENDENCY"];
     const defaultSev = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
 
     const catObj = (g.by_category && typeof g.by_category === "object") ? g.by_category : {};
@@ -99,9 +99,11 @@ export async function POST(req: Request) {
       dead_code_enabled,
     };
 
+    const ai_assurance_enabled = toBool(body.ai_assurance_enabled, false);
+
     const { error } = await supabase
       .from("projects")
-      .update({ policy_config })
+      .update({ policy_config, ai_assurance_enabled })
       .eq("id", projectId);
 
     if (error) {

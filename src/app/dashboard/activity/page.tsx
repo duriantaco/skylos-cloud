@@ -21,8 +21,6 @@ export default async function ActivityPage() {
     return redirect("/dashboard");
   }
 
-  const orgName = (member.organizations as any)?.name || "Organization";
-
   return (
     <main className="min-h-screen bg-slate-50">
       {/* Nav */}

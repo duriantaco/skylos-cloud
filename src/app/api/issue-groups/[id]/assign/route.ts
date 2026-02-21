@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { serverError } from "@/lib/api-error";
 
-/**
- * GET /api/issue-groups/[id]/assign
- * Get current assignment for an issue group
- */
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -18,7 +15,6 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Fetch assignment with user info
   const { data: assignment, error: assignmentErr } = await supabase
     .from("issue_assignments")
     .select(`
@@ -49,10 +45,7 @@ export async function GET(
   return NextResponse.json({ assignment });
 }
 
-/**
- * POST /api/issue-groups/[id]/assign
- * Assign an issue to a team member
- */
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -68,7 +61,6 @@ export async function POST(
   const body = await request.json().catch(() => ({}));
   const { assigned_to, status, notes } = body;
 
-  // Verify user has access to this issue group
   const { data: group, error: groupErr } = await supabase
     .from("issue_groups")
     .select("id, project_id, projects(org_id)")
@@ -84,7 +76,6 @@ export async function POST(
     return NextResponse.json({ error: "Organization not found" }, { status: 404 });
   }
 
-  // Check user is member of organization
   const { data: member } = await supabase
     .from("organization_members")
     .select("id")
@@ -96,7 +87,6 @@ export async function POST(
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
-  // If assigned_to is provided, verify they're also in the organization
   if (assigned_to) {
     const { data: assigneeMember } = await supabase
       .from("organization_members")
@@ -110,7 +100,6 @@ export async function POST(
     }
   }
 
-  // Upsert assignment (unique constraint on issue_group_id)
   const { data: assignment, error: assignmentErr } = await supabase
     .from("issue_assignments")
     .upsert(
@@ -155,10 +144,7 @@ export async function POST(
   return NextResponse.json({ assignment });
 }
 
-/**
- * PATCH /api/issue-groups/[id]/assign
- * Update assignment status or notes
- */
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -178,12 +164,10 @@ export async function PATCH(
     return NextResponse.json({ error: "At least one field (status or notes) is required" }, { status: 400 });
   }
 
-  // Build update object
   const updateData: any = {};
   if (status) updateData.status = status;
   if (notes !== undefined) updateData.notes = notes;
 
-  // Update assignment
   const { data: assignment, error: updateErr } = await supabase
     .from("issue_assignments")
     .update(updateData)
@@ -218,10 +202,7 @@ export async function PATCH(
   return NextResponse.json({ assignment });
 }
 
-/**
- * DELETE /api/issue-groups/[id]/assign
- * Unassign an issue
- */
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -234,7 +215,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Delete assignment
   const { error: deleteErr } = await supabase
     .from("issue_assignments")
     .delete()

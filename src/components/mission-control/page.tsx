@@ -10,7 +10,7 @@ export default async function MissionControlPage() {
   if (!user) return redirect("/login");
 
   const { data: member } = await supabase
-    .from("org_members")
+    .from("organization_members")
     .select("org_id")
     .eq("user_id", user.id)
     .maybeSingle();

@@ -33,7 +33,6 @@ export async function GET(
     return NextResponse.json({ error: "Organization not found" }, { status: 404 });
   }
 
-  // Check user is member of organization
   const { data: member } = await supabase
     .from("organization_members")
     .select("id")
@@ -45,7 +44,6 @@ export async function GET(
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
-  // Fetch comments with user info (paginated)
   const { data: comments, error: commentsErr, count } = await supabase
     .from("issue_comments")
     .select(`

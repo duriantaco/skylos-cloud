@@ -2,7 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Shield, Calendar, Zap, BookOpen, CheckCircle, XCircle } from "lucide-react";
+import { Shield, Calendar, Zap, BookOpen, CheckCircle } from "lucide-react";
 import dogImg from "../../../../public/assets/favicon-96x96.png";
 import ComplianceReportButton from "@/components/ComplianceReportButton";
 
@@ -156,7 +156,6 @@ export default async function CompliancePage() {
                           </div>
                           <ComplianceReportButton
                             frameworkCode={fw.code}
-                            frameworkName={fw.name}
                           />
                         </div>
                       </div>

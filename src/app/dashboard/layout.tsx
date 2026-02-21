@@ -3,7 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, Target, FolderOpen, Settings, Shield, TrendingUp } from "lucide-react";
+import { BookOpen, Target, FolderOpen, Settings, Shield, TrendingUp, CreditCard } from "lucide-react";
 import dogImg from "../../../public/assets/favicon-96x96.png";
 
 export default async function DashboardLayout({
@@ -18,7 +18,6 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Shared Nav */}
       <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-8">
@@ -30,12 +29,12 @@ export default async function DashboardLayout({
               </span>
             </Link>
             
-            {/* Main Nav Links */}
             <div className="hidden md:flex items-center gap-1">
               <NavLink href="/dashboard" icon={Target}>Mission Control</NavLink>
               <NavLink href="/dashboard/trends" icon={TrendingUp}>Trends</NavLink>
               <NavLink href="/dashboard/projects" icon={FolderOpen}>Projects</NavLink>
               <NavLink href="/dashboard/rules" icon={Shield}>Rules</NavLink>
+              <NavLink href="/dashboard/billing" icon={CreditCard}>Billing</NavLink>
               <NavLink href="/dashboard/settings" icon={Settings}>Settings</NavLink>
             </div>
           </div>

@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") || 50)));
 
   const { data: memberships, error: memberError } = await supabase
-    .from("org_members")
+    .from("organization_members")
     .select("org_id")
     .eq("user_id", user.id);
 

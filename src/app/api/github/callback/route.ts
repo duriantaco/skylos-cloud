@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { data: member, error: memberError } = await supabase
-    .from('org_members')
+    .from('organization_members')
     .select('org_id')
     .eq('user_id', user.id)
     .eq('org_id', project.org_id)

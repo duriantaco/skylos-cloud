@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { Shield, LayoutDashboard, FileCode, Lock, Settings, BookOpen } from 'lucide-react'
 import { useState } from 'react'
+import CreditsDisplay from './credits/CreditsDisplay'
 
 export default function Sidebar() {
   const [expanded, setExpanded] = useState(false)
@@ -34,8 +35,16 @@ export default function Sidebar() {
         <NavItem icon={<Settings />} label="Settings" href="/dashboard/settings" expanded={expanded} />
       </nav>
 
-      <div className="p-4 border-t border-white/5">
-        <div className="w-8 h-8 rounded-full bg-slate-700 mx-auto"></div>
+      <div className="border-t border-white/5">
+        {/* Credits Display */}
+        <div className={`px-2 py-3 overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100' : 'opacity-0'}`}>
+          <CreditsDisplay inline />
+        </div>
+
+        {/* User Profile */}
+        <div className="p-4">
+          <div className="w-8 h-8 rounded-full bg-slate-700 mx-auto"></div>
+        </div>
       </div>
     </aside>
   )

@@ -3,13 +3,16 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
-import { 
-  ArrowLeft, ExternalLink, CheckCircle, XCircle, 
+import {
+  ArrowLeft, ExternalLink, CheckCircle, XCircle,
   GitCommit, FileCode, Shield, Eye, History,
   ChevronRight, Copy, Check, Sparkles, Ban, GitPullRequest,
   Layers, Code2, ArrowUpRight, Trash2, Bug,
   Key, Zap, Loader2
 } from 'lucide-react';
+import IssueComments from '@/components/IssueComments';
+import AssignIssue from '@/components/AssignIssue';
+import FlowVisualizerButton from '@/components/FlowVisualizerButton';
 
 
 type IssueGroup = {
@@ -266,8 +269,7 @@ function getRuleInfo(ruleId: string, category: string) {
   const info = RULE_INFO[ruleId.toUpperCase()];
   const ctx = CATEGORY_CONTEXT[category.toUpperCase()] || CATEGORY_CONTEXT.QUALITY;
   
-  if (info) 
-    return info;
+  if (info) return info;
   
   return {
     title: formatRuleName(ruleId),
@@ -315,12 +317,10 @@ function getLanguage(filePath: string): string {
 }
 
 function getGitHubUrl(repoUrl: string | null, filePath: string, line: number) {
-  if (!repoUrl) 
-    return null;
+  if (!repoUrl) return null;
   const clean = repoUrl.replace(/\.git$/, '').replace(/\/$/, '');
   return `${clean}/blob/main/${filePath}#L${line}`;
 }
-
 
 function SeverityBadge({ severity, size = 'md' }: { severity: string; size?: 'sm' | 'md' | 'lg' }) {
   const s = (severity || 'UNKNOWN').toUpperCase();
@@ -445,6 +445,8 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [loadingFile, setLoadingFile] = useState(false);
   const [isActioning, setIsActioning] = useState(false);
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isCreatingPR, setIsCreatingPR] = useState(false);
   const [prResult, setPrResult] = useState<{ success: boolean; url?: string; error?: string } | null>(null);
 
@@ -457,13 +459,25 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
       const supabase = createClient();
       const { data } = await supabase
         .from('projects')
-        .select('name, repo_url, github_installation_id')
+        .select('name, repo_url, github_installation_id, org_id')
         .eq('id', group.project_id)
         .single();
-      if (data) setProject(data);
+      if (data) {
+        setProject(data);
+        setOrgId((data as any).org_id);
+      }
     }
     loadProject();
   }, [group.project_id]);
+
+  useEffect(() => {
+    async function loadUser() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
+    }
+    loadUser();
+  }, []);
 
   useEffect(() => {
     async function loadFindings() {
@@ -599,7 +613,6 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
     <div className="min-h-screen bg-gray-50 text-slate-900 font-sans">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
             <Link href="/dashboard/issues" className="hover:text-slate-900 transition flex items-center gap-1">
               <ArrowLeft className="w-4 h-4" />
@@ -625,6 +638,14 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {findings.length > 0 && (
+                <FlowVisualizerButton
+                  findingId={findings[0].id}
+                  ruleId={group.rule_id}
+                  category={group.category}
+                  repoUrl={project?.repo_url || undefined}
+                />
+              )}
               {githubUrl && (
                 <a href={githubUrl} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition shadow-sm">
@@ -652,7 +673,6 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column */}
           <div className="lg:col-span-2 space-y-6">
-            {/* What is this issue? */}
             <section className={`bg-white border ${categoryContext.borderColor} rounded-xl shadow-sm overflow-hidden`}>
               <div className={`px-6 py-4 border-b ${categoryContext.borderColor} ${categoryContext.lightBg}`}>
                 <h2 className={`text-lg font-semibold flex items-center gap-2 ${categoryContext.color}`}>
@@ -686,7 +706,6 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
               </div>
             </section>
 
-            {/* Flagged code */}
             <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
@@ -708,7 +727,30 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
               </div>
             </section>
 
-            {/* How to fix */}
+            {(group.category === 'SECURITY' || group.category === 'SECRET') && findings.length > 0 && (
+              <section className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-6 py-5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-indigo-100 border border-indigo-200 flex items-center justify-center">
+                      <Zap className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">Data Flow Analysis</h2>
+                      <p className="text-sm text-slate-600">
+                        Trace how untrusted data flows from source to sink in this vulnerability
+                      </p>
+                    </div>
+                  </div>
+                  <FlowVisualizerButton
+                    findingId={findings[0].id}
+                    ruleId={group.rule_id}
+                    category={group.category}
+                    repoUrl={project?.repo_url || undefined}
+                  />
+                </div>
+              </section>
+            )}
+
             <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
@@ -838,10 +880,26 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
                 )}
               </div>
             </section>
+
+            {orgId && (
+              <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Assignment</h3>
+                <AssignIssue
+                  issueGroupId={group.id}
+                  orgId={orgId}
+                />
+              </section>
+            )}
+
+            {currentUserId && (
+              <IssueComments
+                issueGroupId={group.id}
+                currentUserId={currentUserId}
+              />
+            )}
           </div>
 
           <div className="space-y-6">
-            {/* Quick stats */}
             <div className="grid grid-cols-2 gap-4">
               <StatCard icon={<Eye className="w-4 h-4" />} label="Occurrences" value={group.occurrence_count}
                 subtext={`${group.affected_files?.length || 0} files`} />
@@ -849,7 +907,6 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
                 value={group.status === 'open' ? 'Open' : 'Resolved'} />
             </div>
 
-            {/* Timeline */}
             <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
                 <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
@@ -902,7 +959,6 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
               </div>
             </section>
 
-            {/* File location */}
             <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
                 <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
@@ -916,7 +972,6 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
               </div>
             </section>
 
-            {/* Verification status */}
             {group.verification_status && (
               <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">

@@ -19,6 +19,16 @@ type Scan = {
   quality_gate_passed: boolean;
   is_overridden: boolean;
   override_reason?: string | null;
+  analysis_mode?: "static" | "hybrid" | "agent";
+  ai_code_detected?: boolean;
+  ai_code_stats?: {
+    detected?: boolean;
+    indicators?: { type: string; commit: string; detail: string }[];
+    ai_files?: string[];
+    confidence?: "high" | "medium" | "low";
+    gate_passed?: boolean;
+    ai_findings_count?: number;
+  } | null;
   stats: {
     danger_count?: number;
     new_issues?: number;
@@ -40,7 +50,7 @@ type Scan = {
 
 type Finding = {
   id: string;
-  category: 'SECURITY' | 'QUALITY' | 'DEAD_CODE' | 'SECRET';
+  category: 'SECURITY' | 'QUALITY' | 'DEAD_CODE' | 'SECRET' | 'DEPENDENCY';
   severity: string;
   message: string;
   file_path: string;
@@ -55,6 +65,28 @@ type Finding = {
   verification_reason?: string | null;
   verification_evidence?: any;
   verified_at?: string | null;
+
+  // Hybrid/agent LLM metadata
+  analysis_source?: "static" | "llm" | "static+llm" | null;
+  analysis_confidence?: "high" | "medium" | "low" | null;
+  llm_verdict?: "TRUE_POSITIVE" | "FALSE_POSITIVE" | "UNCERTAIN" | null;
+  llm_rationale?: string | null;
+  llm_challenged?: boolean;
+  needs_review?: boolean;
+
+  // SCA metadata for DEPENDENCY findings
+  sca_metadata?: {
+    vuln_id?: string;
+    display_id?: string;
+    aliases?: string[];
+    affected_range?: string;
+    fixed_version?: string | null;
+    cvss_score?: number | null;
+    references?: string[];
+    ecosystem?: string;
+    package_name?: string;
+    package_version?: string;
+  } | null;
 };
 
 function generateGitHubUrl(repoUrl: string, sha: string, filePath: string, line: number) {
@@ -75,6 +107,28 @@ function VerifyBadge({ verdict }: { verdict?: string | null }) {
     return <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 text-[9px] font-bold">UNKNOWN</span>;
   }
   return null;
+}
+
+function SourceBadge({ source }: { source?: string | null }) {
+  if (!source || source === "static") return null;
+  if (source === "static+llm") {
+    return <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[9px] font-bold">STATIC+LLM</span>;
+  }
+  if (source === "llm") {
+    return <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 text-[9px] font-bold">LLM</span>;
+  }
+  return null;
+}
+
+function ConfidenceBadge({ confidence }: { confidence?: string | null }) {
+  if (!confidence) return null;
+  const styles: Record<string, string> = {
+    high: "bg-emerald-100 text-emerald-700",
+    medium: "bg-yellow-100 text-yellow-700",
+    low: "bg-red-100 text-red-700",
+  };
+  const style = styles[confidence] || styles.medium;
+  return <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${style}`}>{confidence.toUpperCase()}</span>;
 }
 
 
@@ -323,7 +377,7 @@ export default function ScanDetailsPage() {
   const [loading, setLoading] = useState(true);
 
   const [viewMode, setViewMode] = useState<'NEW' | 'ALL'>('NEW');
-  const [activeTab, setActiveTab] = useState<'ALL' | 'SECURITY' | 'QUALITY' | 'DEAD_CODE'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'SECURITY' | 'QUALITY' | 'DEAD_CODE' | 'DEPENDENCY' | 'REVIEW'>('ALL');
   const [search, setSearch] = useState('');
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   const [expandedFiles, setExpandedFiles] = useState<Record<string, boolean>>({});
@@ -460,7 +514,9 @@ export default function ScanDetailsPage() {
 
   const filteredFindings = useMemo(() => {
     return viewFindings.filter(f => {
-      if (activeTab !== 'ALL') {
+      if (activeTab === 'REVIEW') {
+        if (!f.needs_review) return false;
+      } else if (activeTab !== 'ALL') {
         if (activeTab === 'SECURITY') {
           if (f.category !== 'SECURITY' && f.category !== 'SECRET') return false;
         } else if (f.category !== activeTab) {
@@ -506,7 +562,9 @@ export default function ScanDetailsPage() {
     ALL: viewFindings.length,
     SECURITY: viewFindings.filter(f => f.category === 'SECURITY' || f.category === 'SECRET').length,
     QUALITY: viewFindings.filter(f => f.category === 'QUALITY').length,
-    DEAD_CODE: viewFindings.filter(f => f.category === 'DEAD_CODE').length
+    DEAD_CODE: viewFindings.filter(f => f.category === 'DEAD_CODE').length,
+    DEPENDENCY: viewFindings.filter(f => f.category === 'DEPENDENCY').length,
+    REVIEW: viewFindings.filter(f => f.needs_review).length,
   }), [viewFindings]);
 
   const toggleFile = (filePath: string) => {
@@ -639,6 +697,11 @@ export default function ScanDetailsPage() {
             <ChevronRight className="w-3 h-3 text-slate-300" />
             <span className="font-semibold text-slate-900">{scan.projects?.name}</span>
             <span className="text-xs text-slate-400 font-mono ml-2">{scan.commit_hash?.slice(0, 7)}</span>
+            {scan.analysis_mode && scan.analysis_mode !== "static" && (
+              <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-bold ml-2">
+                {scan.analysis_mode.toUpperCase()} MODE
+              </span>
+            )}
           </div>
         </div>
 
@@ -672,6 +735,43 @@ export default function ScanDetailsPage() {
         onToggle={() => setGatePanelExpanded(!gatePanelExpanded)}
       />
 
+      {/* AI Code Assurance Panel */}
+      {scan.ai_code_detected && scan.ai_code_stats && (
+        <div className="mx-4 mb-2 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-purple-600" />
+              <span className="text-sm font-bold text-purple-900">AI Code Assurance</span>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                scan.ai_code_stats.gate_passed === true
+                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                  : scan.ai_code_stats.gate_passed === false
+                  ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                  : 'bg-purple-100 text-purple-700 border border-purple-200'
+              }`}>
+                {scan.ai_code_stats.gate_passed === true ? 'AI ASSURED' :
+                 scan.ai_code_stats.gate_passed === false ? 'AI ISSUES FOUND' :
+                 'AI CODE DETECTED'}
+              </span>
+            </div>
+            <span className="text-xs text-purple-600">
+              {scan.ai_code_stats.confidence} confidence &middot; {scan.ai_code_stats.ai_files?.length || 0} files &middot; {scan.ai_code_stats.indicators?.length || 0} indicators
+            </span>
+          </div>
+
+          {scan.ai_code_stats.indicators && scan.ai_code_stats.indicators.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {scan.ai_code_stats.indicators.slice(0, 8).map((ind, i) => (
+                <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-purple-200 text-[10px] text-purple-700">
+                  <span className="font-bold">{ind.type}</span>
+                  <span className="font-mono text-purple-500">{ind.commit}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* MAIN CONTENT - Takes remaining space */}
       <div className="flex flex-1 overflow-hidden">
         {/* LEFT: Findings list */}
@@ -703,6 +803,12 @@ export default function ScanDetailsPage() {
               <TabButton label="Security" active={activeTab === 'SECURITY'} onClick={() => setActiveTab('SECURITY')} count={counts.SECURITY} />
               <TabButton label="Quality" active={activeTab === 'QUALITY'} onClick={() => setActiveTab('QUALITY')} count={counts.QUALITY} />
               <TabButton label="Dead" active={activeTab === 'DEAD_CODE'} onClick={() => setActiveTab('DEAD_CODE')} count={counts.DEAD_CODE} />
+              {counts.DEPENDENCY > 0 && (
+                <TabButton label="Deps" active={activeTab === 'DEPENDENCY'} onClick={() => setActiveTab('DEPENDENCY')} count={counts.DEPENDENCY} />
+              )}
+              {counts.REVIEW > 0 && (
+                <TabButton label="Review" active={activeTab === 'REVIEW'} onClick={() => setActiveTab('REVIEW')} count={counts.REVIEW} />
+              )}
             </div>
           </div>
 
@@ -748,6 +854,11 @@ export default function ScanDetailsPage() {
                                     )}
                                     {f.is_suppressed && (
                                       <span className="px-1.5 py-0.5 bg-slate-200 text-slate-500 text-[9px] font-bold rounded">IGNORED</span>
+                                    )}
+                                    {!!f.analysis_source && <SourceBadge source={f.analysis_source} />}
+                                    {!!f.analysis_confidence && <ConfidenceBadge confidence={f.analysis_confidence} />}
+                                    {f.needs_review && (
+                                      <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold rounded">REVIEW</span>
                                     )}
                                   </div>
                                 </div>
@@ -854,6 +965,109 @@ export default function ScanDetailsPage() {
                         .slice(0, 12)
                         .map((x: any) => x.fn)
                         .join(" → ")}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* LLM Analysis (hybrid/agent mode) */}
+              {selectedFinding.llm_verdict && (
+                <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-bold text-slate-900">LLM Analysis</div>
+                    <div className="flex items-center gap-2">
+                      <SourceBadge source={selectedFinding.analysis_source} />
+                      <ConfidenceBadge confidence={selectedFinding.analysis_confidence} />
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="font-semibold text-slate-500">Verdict</span>
+                      <div className="mt-1 font-mono text-slate-700">{selectedFinding.llm_verdict}</div>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500">Source</span>
+                      <div className="mt-1 font-mono text-slate-700">{selectedFinding.analysis_source}</div>
+                    </div>
+                  </div>
+
+                  {selectedFinding.llm_rationale && (
+                    <div className="mt-3 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      {selectedFinding.llm_rationale}
+                    </div>
+                  )}
+
+                  {selectedFinding.llm_challenged && (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-amber-700">
+                      <AlertTriangle className="w-3 h-3" />
+                      LLM challenged this finding (may be a false positive)
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SCA Vulnerability Detail */}
+              {selectedFinding.category === 'DEPENDENCY' && selectedFinding.sca_metadata && (
+                <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-sm font-bold text-slate-900">Vulnerability Detail</div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                      {selectedFinding.sca_metadata.ecosystem || 'Unknown'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+                    <div>
+                      <span className="font-semibold text-slate-500">CVE / ID</span>
+                      <div className="mt-1 font-mono text-slate-900 font-semibold">
+                        {selectedFinding.sca_metadata.display_id || selectedFinding.sca_metadata.vuln_id || '—'}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500">Package</span>
+                      <div className="mt-1 font-mono text-slate-700">
+                        {selectedFinding.sca_metadata.package_name}@{selectedFinding.sca_metadata.package_version}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500">Affected Range</span>
+                      <div className="mt-1 font-mono text-slate-700">
+                        {selectedFinding.sca_metadata.affected_range || '—'}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500">Fix Version</span>
+                      <div className={`mt-1 font-mono ${selectedFinding.sca_metadata.fixed_version ? 'text-emerald-700 font-semibold' : 'text-slate-400'}`}>
+                        {selectedFinding.sca_metadata.fixed_version || 'No fix available'}
+                      </div>
+                    </div>
+                    {selectedFinding.sca_metadata.cvss_score != null && (
+                      <div>
+                        <span className="font-semibold text-slate-500">CVSS Score</span>
+                        <div className="mt-1 font-mono text-slate-700">{selectedFinding.sca_metadata.cvss_score}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedFinding.sca_metadata.aliases && selectedFinding.sca_metadata.aliases.length > 0 && (
+                    <div className="text-xs mb-3">
+                      <span className="font-semibold text-slate-500">Aliases: </span>
+                      <span className="font-mono text-slate-600">{selectedFinding.sca_metadata.aliases.join(', ')}</span>
+                    </div>
+                  )}
+
+                  {selectedFinding.sca_metadata.references && selectedFinding.sca_metadata.references.length > 0 && (
+                    <div className="text-xs">
+                      <span className="font-semibold text-slate-500 block mb-1">References</span>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedFinding.sca_metadata.references.map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 underline">
+                            <ExternalLink className="w-3 h-3" />
+                            {new URL(url).hostname}
+                          </a>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

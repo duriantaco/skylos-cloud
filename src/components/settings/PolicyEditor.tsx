@@ -17,18 +17,12 @@ export default function PolicyEditor({
   
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  
-  // Sections expand/collapse
   const [showThresholds, setShowThresholds] = useState(true);
   const [showGate, setShowGate] = useState(true);
   const [showCategories, setShowCategories] = useState(false);
   const [showExclude, setShowExclude] = useState(false);
   const [showRules, setShowRules] = useState(false);
-
-  // Custom rules
   const [rules, setRules] = useState<string[]>(pc.custom_rules || []);
-
-  // Quality thresholds
   const [complexityEnabled, setComplexityEnabled] = useState(pc.complexity_enabled ?? true);
   const [complexityThreshold, setComplexityThreshold] = useState(pc.complexity_threshold ?? 10);
   const [nestingEnabled, setNestingEnabled] = useState(pc.nesting_enabled ?? true);
@@ -37,17 +31,13 @@ export default function PolicyEditor({
   const [functionLengthThreshold, setFunctionLengthThreshold] = useState(pc.function_length_threshold ?? 50);
   const [argCountEnabled, setArgCountEnabled] = useState(pc.arg_count_enabled ?? true);
   const [argCountThreshold, setArgCountThreshold] = useState(pc.arg_count_threshold ?? 5);
-
-  // Category toggles
   const [securityEnabled, setSecurityEnabled] = useState(pc.security_enabled ?? true);
   const [secretsEnabled, setSecretsEnabled] = useState(pc.secrets_enabled ?? true);
   const [qualityEnabled, setQualityEnabled] = useState(pc.quality_enabled ?? true);
   const [deadCodeEnabled, setDeadCodeEnabled] = useState(pc.dead_code_enabled ?? true);
-
-  // Exclude paths
   const [excludePaths, setExcludePaths] = useState<string[]>(initialExcludePaths || []);
-
-  // Gate config
+  const [showAiAssurance, setShowAiAssurance] = useState(false);
+  const [aiAssuranceEnabled, setAiAssuranceEnabled] = useState(pc.ai_assurance_enabled ?? false);
   const [gateEnabled, setGateEnabled] = useState(pc.gate?.enabled ?? true);
   const [gateMode, setGateMode] = useState<GateMode>(pc.gate?.mode ?? "zero-new");
   const [byCat, setByCat] = useState<Record<string, number>>(pc.gate?.by_category || {
@@ -84,7 +74,6 @@ export default function PolicyEditor({
           projectId,
           custom_rules: rules.filter(r => r.trim()),
           exclude_paths: excludePaths.filter(p => p.trim()),
-          // Thresholds
           complexity_enabled: complexityEnabled,
           complexity_threshold: complexityThreshold,
           nesting_enabled: nestingEnabled,
@@ -93,18 +82,17 @@ export default function PolicyEditor({
           function_length_threshold: functionLengthThreshold,
           arg_count_enabled: argCountEnabled,
           arg_count_threshold: argCountThreshold,
-          // Categories
           security_enabled: securityEnabled,
           secrets_enabled: secretsEnabled,
           quality_enabled: qualityEnabled,
           dead_code_enabled: deadCodeEnabled,
-          // Gate
           gate: {
             enabled: gateEnabled,
             mode: gateMode,
             by_category: byCat,
             by_severity: bySev,
-          }
+          },
+          ai_assurance_enabled: aiAssuranceEnabled,
         }),
       });
       setSaved(true);
@@ -256,7 +244,7 @@ export default function PolicyEditor({
           <div className="mb-4">
             <div className="text-xs font-medium text-slate-700 mb-2">Max new issues by category</div>
             <div className="grid grid-cols-2 gap-2">
-              {["SECURITY", "SECRET", "QUALITY", "DEAD_CODE"].map(cat => (
+              {["SECURITY", "SECRET", "QUALITY", "DEAD_CODE", "DEPENDENCY"].map(cat => (
                 <div key={cat} className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded px-3 py-2">
                   <span className="text-xs font-medium text-slate-700">{cat}</span>
                   <input
@@ -320,6 +308,33 @@ export default function PolicyEditor({
             </label>
           ))}
         </div>
+      </Section>
+
+      {/* AI Code Assurance */}
+      <Section title="AI Code Assurance" open={showAiAssurance} onToggle={() => setShowAiAssurance(!showAiAssurance)}>
+        <p className="text-xs text-slate-500 mb-3">
+          Detect AI-generated code (Copilot, Claude, Cursor) and apply stricter quality gates to AI-touched files.
+        </p>
+        <label className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-lg cursor-pointer hover:bg-slate-50">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+            <div>
+              <div className="text-sm font-medium text-slate-800">Enable AI Assurance</div>
+              <div className="text-xs text-slate-500">Zero tolerance for new issues in AI-generated files</div>
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            checked={aiAssuranceEnabled}
+            onChange={(e) => setAiAssuranceEnabled(e.target.checked)}
+            className="h-4 w-4 rounded"
+          />
+        </label>
+        {aiAssuranceEnabled && (
+          <div className="mt-2 p-3 bg-purple-50 border border-purple-100 rounded-lg text-xs text-purple-700">
+            When enabled, Skylos detects AI-authored commits (via Co-authored-by trailers, bot emails, commit message patterns) and applies a zero-tolerance gate on files touched by AI. Any new issue in an AI-generated file will fail the quality gate.
+          </div>
+        )}
       </Section>
 
       {/* Exclude Paths */}
