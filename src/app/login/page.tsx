@@ -11,11 +11,11 @@ export default function LoginPage() {
   const handleLogin = async () => {
     setLoading(true)
     console.log('[login] starting OAuth, redirectTo:', `${location.origin}/auth/callback`)
-    console.log('[login] SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
         redirectTo: `${location.origin}/auth/callback`,
+        skipBrowserRedirect: false,
       },
     })
     console.log('[login] signInWithOAuth result:', { url: data?.url, error: error?.message ?? null })

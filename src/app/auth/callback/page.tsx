@@ -7,48 +7,49 @@ import { useRouter } from 'next/navigation'
 export default function AuthCallbackPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     const handleCallback = async () => {
-      const params = new URLSearchParams(window.location.search)
-      const code = params.get('code')
-      const hashParams = new URLSearchParams(window.location.hash.substring(1))
-      const accessToken = hashParams.get('access_token')
+      const supabase = createClient()
 
-      console.log('[auth/callback] client-side hit', {
-        code: code?.slice(0, 8) ?? null,
-        hasAccessToken: !!accessToken,
-        url: window.location.href,
+      console.log('[auth/callback] checking session...')
+      console.log('[auth/callback] hash:', window.location.hash ? 'present' : 'empty')
+      console.log('[auth/callback] search:', window.location.search || 'empty')
+
+      // With implicit flow, Supabase JS auto-detects the hash fragment
+      // and sets the session. We just need to wait for it.
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+
+      console.log('[auth/callback] getSession:', {
+        user: session?.user?.email ?? null,
+        error: sessionError?.message ?? null,
       })
 
-      if (code) {
-        console.log('[auth/callback] exchanging code for session...')
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+      if (session) {
+        console.log('[auth/callback] session found, redirecting to dashboard')
+        router.replace('/dashboard')
+        return
+      }
 
-        if (error) {
-          console.error('[auth/callback] exchange FAILED:', error.message)
-          setError(error.message)
-          return
+      // If no session yet, try listening for auth state change
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log('[auth/callback] onAuthStateChange:', event, session?.user?.email)
+        if (event === 'SIGNED_IN' && session) {
+          subscription.unsubscribe()
+          router.replace('/dashboard')
         }
+      })
 
-        console.log('[auth/callback] session OK, user:', data.user?.email)
-        router.replace('/dashboard')
-        return
-      }
-
-      if (accessToken) {
-        console.log('[auth/callback] implicit flow, session should be set')
-        router.replace('/dashboard')
-        return
-      }
-
-      console.error('[auth/callback] no code and no access_token')
-      setError('No authentication code received')
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        subscription.unsubscribe()
+        console.error('[auth/callback] timed out waiting for session')
+        setError('Authentication timed out. Please try again.')
+      }, 5000)
     }
 
     handleCallback()
-  }, [])
+  }, [router])
 
   if (error) {
     return (
