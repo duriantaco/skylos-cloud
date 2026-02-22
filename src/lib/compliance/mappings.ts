@@ -1,10 +1,3 @@
-/**
- * Compliance Framework Mappings
- *
- * Maps Skylos rule IDs to compliance framework requirements.
- * Each rule can map to multiple frameworks and requirements.
- */
-
 export type ComplianceMapping = {
   ruleId: string;
   ruleName: string;
@@ -310,34 +303,22 @@ export const COMPLIANCE_MAPPINGS: ComplianceMapping[] = [
   }
 ];
 
-/**
- * Get all rule IDs for a specific framework
- */
 export function getRulesForFramework(frameworkCode: string): string[] {
   return COMPLIANCE_MAPPINGS
     .filter(mapping => mapping.frameworks[frameworkCode])
     .map(mapping => mapping.ruleId);
 }
 
-/**
- * Get all frameworks that a rule maps to
- */
 export function getFrameworksForRule(ruleId: string): string[] {
   const mapping = COMPLIANCE_MAPPINGS.find(m => m.ruleId === ruleId);
   return mapping ? Object.keys(mapping.frameworks) : [];
 }
 
-/**
- * Get detailed compliance info for a rule
- */
 export function getComplianceInfo(ruleId: string, frameworkCode: string) {
   const mapping = COMPLIANCE_MAPPINGS.find(m => m.ruleId === ruleId);
   return mapping?.frameworks[frameworkCode] || null;
 }
 
-/**
- * Get all requirements for a framework
- */
 export function getAllRequirementsForFramework(frameworkCode: string): string[] {
   const requirements = new Set<string>();
 

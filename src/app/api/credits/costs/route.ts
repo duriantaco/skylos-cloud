@@ -1,8 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-// GET /api/credits/costs - Get all feature costs
-export async function GET(request: NextRequest) {
+export async function GET() {
   const supabase = await createClient();
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -11,7 +10,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Get all enabled feature costs
   const { data: costs, error: costsError } = await supabase
     .from('feature_credit_costs')
     .select('*')

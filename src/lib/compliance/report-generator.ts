@@ -165,7 +165,6 @@ export async function generateComplianceReport(
         req.relatedRules.push(mapping.ruleId);
         req.description = frameworkInfo.description;
 
-        // Check if this rule has findings
         const ruleFindinds = findingsByRule[mapping.ruleId] || [];
         const openFindings = ruleFindinds.filter(f => f.status === 'open');
 
