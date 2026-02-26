@@ -10,18 +10,15 @@ export async function createClient() {
     {
       cookies: {
         getAll() {
-          const all = cookieStore.getAll();
-          console.log('[supabase/server] getAll cookies:', all.map(c => c.name));
-          return all;
+          return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
           try {
-            console.log('[supabase/server] setAll cookies:', cookiesToSet.map(c => c.name));
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
-          } catch (e) {
-            console.log('[supabase/server] setAll FAILED (Server Component):', (e as Error).message);
+          } catch {
+            // Expected in Server Components — cookies can only be set in Route Handlers/Actions
           }
         },
       },

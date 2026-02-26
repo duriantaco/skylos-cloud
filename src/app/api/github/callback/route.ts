@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { verifySignedState } from '@/lib/github-state'
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams
   const installationId = searchParams.get('installation_id')
   const state = searchParams.get('state')
-  
+
   if (!installationId || !state) {
     return NextResponse.redirect(new URL('/dashboard/settings?error=missing_params', req.url))
   }
 
-  const projectId = decodeURIComponent(state)
-  
+  // Verify HMAC-signed state to prevent CSRF
+  const projectId = verifySignedState(decodeURIComponent(state))
+  if (!projectId) {
+    return NextResponse.redirect(new URL('/dashboard/settings?error=invalid_state', req.url))
+  }
+
   const supabase = await createClient()
-  
+
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.redirect(new URL('/login', req.url))
@@ -50,7 +55,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL(`/dashboard/settings?project=${projectId}&error=save_failed`, req.url))
   }
 
-  console.log(`✅ Linked installation ${installationId} to project ${projectId}`)
-  
   return NextResponse.redirect(new URL(`/dashboard/settings?project=${projectId}&success=github_installed`, req.url))
 }

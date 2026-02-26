@@ -10,10 +10,8 @@ type EnsureWorkspaceResult = {
 export async function ensureWorkspace(): Promise<EnsureWorkspaceResult> {
   const supabase = await createClient();
   
-  const { data: { user }, error: authErr } = await supabase.auth.getUser();
-  console.log('[ensureWorkspace] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    console.log('[ensureWorkspace] no user');
     return { user: null, orgId: null, supabase };
   }
 
@@ -29,7 +27,7 @@ export async function ensureWorkspace(): Promise<EnsureWorkspaceResult> {
 export async function getUserProjects(supabase: SupabaseClient, orgId: string) {
   const { data: projects } = await supabase
     .from("projects")
-    .select("id, name, repo_url, api_key, policy_config, created_at")
+    .select("id, name, repo_url, policy_config, created_at")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false });
 
@@ -39,7 +37,7 @@ export async function getUserProjects(supabase: SupabaseClient, orgId: string) {
 export async function getProject(supabase: SupabaseClient, projectId: string, orgId: string) {
   const { data: project } = await supabase
     .from("projects")
-    .select("id, name, repo_url, api_key, policy_config, created_at, strict_mode, github_installation_id")
+    .select("id, name, repo_url, policy_config, created_at, strict_mode, github_installation_id")
     .eq("id", projectId)
     .eq("org_id", orgId)
     .single();

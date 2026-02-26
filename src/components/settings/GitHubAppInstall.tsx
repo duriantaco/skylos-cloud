@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Github, CheckCircle, ExternalLink } from "lucide-react"
+import { getGitHubInstallUrl } from "@/app/dashboard/settings/github-actions"
 
 const GITHUB_APP_NAME = "skylos-gate"
 
@@ -14,14 +15,14 @@ type Props = {
 
 export default function GitHubAppInstall({ currentPlan, githubInstallationId, repoUrl, projectId }: Props) {
   const [installing, setInstalling] = useState(false)
-  
+
   const isPro = currentPlan === "pro" || currentPlan === "enterprise"
   const isInstalled = !!githubInstallationId
-  
-  const handleInstall = () => {
+
+  const handleInstall = async () => {
     setInstalling(true)
-    const state = encodeURIComponent(projectId)
-    window.location.href = `https://github.com/apps/${GITHUB_APP_NAME}/installations/new?state=${state}`
+    const url = await getGitHubInstallUrl(projectId)
+    window.location.href = url
   }
   
   if (!isPro) {

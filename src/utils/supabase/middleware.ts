@@ -10,12 +10,9 @@ export async function updateSession(request: NextRequest) {
     {
       cookies: {
         getAll() {
-          const all = request.cookies.getAll();
-          console.log('[supabase/middleware] getAll cookies:', all.map(c => c.name));
-          return all;
+          return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          console.log('[supabase/middleware] setAll cookies:', cookiesToSet.map(c => c.name));
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
@@ -28,8 +25,17 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const { data: { user }, error } = await supabase.auth.getUser();
-  console.log('[supabase/middleware] getUser:', { user: user?.email ?? null, error: error?.message ?? null });
+  // Refresh session — important for keeping auth cookies alive
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Redirect unauthenticated users away from protected routes
+  const isProtected = request.nextUrl.pathname.startsWith("/dashboard");
+  if (isProtected && !user) {
+    const loginUrl = new URL("/login", request.url);
+    return NextResponse.redirect(loginUrl);
+  }
 
   return supabaseResponse;
 }

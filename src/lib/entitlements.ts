@@ -19,7 +19,7 @@ export const PLAN_CAPABILITIES: Record<Plan, PlanCapabilities> = {
     prDiffEnabled: false,
     suppressionsEnabled: false,
     overridesEnabled: false,
-    checkRunsEnabled: false,
+    checkRunsEnabled: true,
     sarifEnabled: false,
     apiRateLimitPerHour: 20,
     historyRetentionDays: 7,
