@@ -97,7 +97,7 @@ export default function ComplianceReportButton({ frameworkCode }: Props) {
           </span>
         </div>
         <Link
-          href="/dashboard/credits"
+          href="/dashboard/billing"
           className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition"
         >
           <Coins className="w-4 h-4" />

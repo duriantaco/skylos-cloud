@@ -11,6 +11,7 @@ import { groupFindings  } from '@/lib/grouping';
 import crypto from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { serverError } from "@/lib/api-error";
+import { hashApiKey } from "@/lib/api-key";
 
 function getSupabaseAdmin(): SupabaseClient | null {
   const url =
@@ -76,8 +77,6 @@ export async function createOrUpdateIssueGroups(
   const mapping: Record<string, string> = {};
 
   const grouped = groupFindings(findings as any);
-
-  console.log("[grouping] groups:", (grouped as any)?.size ?? "unknown");
 
   const upsertRows: any[] = [];
   const fingerprintToItems: Map<string, InsertedFinding[]> = new Map();
@@ -163,8 +162,6 @@ export async function createOrUpdateIssueGroups(
       }
     }
   }
-
-  console.log("[grouping] mapping:", Object.keys(mapping).length);
 
   return mapping;
 }
@@ -426,7 +423,7 @@ export async function POST(req: Request) {
           github_installation_id, slack_webhook_url, slack_notifications_enabled,
           slack_notify_on, discord_webhook_url, discord_notifications_enabled,
           discord_notify_on, organizations(plan)`)
-        .eq('api_key', token)
+        .eq('api_key_hash', hashApiKey(token))
         .single()
 
       if (projError || !apiKeyProject) {
@@ -442,6 +439,52 @@ export async function POST(req: Request) {
     const plan = String((Array.isArray(orgRef) ? orgRef?.[0]?.plan : orgRef?.plan) || "free") as Plan
     const caps = getCapabilities(plan);
 
+    // --- Credit gate: deduct before any processing ---
+    let creditsWarning = false;
+    let creditsRemaining: number | null = null;
+    if (plan !== "enterprise") {
+      const { data: deducted, error: creditErr } = await supabase.rpc("deduct_credits", {
+        p_org_id: project.org_id,
+        p_amount: 1,
+        p_description: "Scan upload",
+        p_metadata: {
+          feature_key: "scan_upload",
+          project_id: project.id,
+        },
+      });
+
+      if (creditErr) {
+        console.error("Credit deduction failed:", creditErr);
+        return NextResponse.json({
+          error: "Credit check failed. Please try again.",
+          code: "CREDIT_ERROR",
+        }, { status: 500 });
+      }
+
+      if (deducted === false) {
+        return NextResponse.json({
+          error: "No credits remaining. Buy more at skylos.dev/dashboard/billing",
+          code: "NO_CREDITS",
+          credits_remaining: 0,
+          buy_url: "https://skylos.dev/dashboard/billing",
+        }, { status: 402 });
+      }
+
+      // Check remaining balance
+      const { data: updatedOrg } = await supabase
+        .from("organizations")
+        .select("credits")
+        .eq("id", project.org_id)
+        .single();
+
+      if (updatedOrg) {
+        creditsRemaining = updatedOrg.credits;
+        if (updatedOrg.credits < 50) {
+          creditsWarning = true;
+        }
+      }
+    }
+
     const body = await req.json()
     const normalized = normalizeIncomingReport(body)
     const { summary, findings, commit_hash, branch, actor, tool } = normalized
@@ -450,12 +493,7 @@ export async function POST(req: Request) {
     const ai_code = body.ai_code || null;
 
     if (tool === "sarif" && !caps.sarifEnabled) {
-      // return NextResponse.json({
-        // success: true,
-        // warning: "SARIF import is a Pro feature. Scan accepted but SARIF-specific features disabled.",
-        // plan_upgrade_url: "/dashboard/settings?upgrade=true"
-        console.log("SARIF on free plan");
-      // })
+      // SARIF import is a Pro feature — scan accepted but SARIF-specific features disabled
     }
 
     let processedFindings = (findings || []).slice(0, LIMITS.MAX_FINDINGS);
@@ -800,9 +838,6 @@ export async function POST(req: Request) {
 
     if (insSelErr) throw new Error(`Failed to read inserted findings: ${insSelErr.message}`);
 
-    console.log("[grouping] insertedFindings:", insertedFindings?.length || 0);
-
-
     if (insertedFindings && insertedFindings.length > 0) {
       const mapping = await createOrUpdateIssueGroups(supabase, {
         orgId: project.org_id,
@@ -836,44 +871,6 @@ export async function POST(req: Request) {
     }
 
     await cleanupOldScans(supabase, project.id, caps.maxScansStored);
-
-    let creditsWarning = false;
-    if (plan !== "enterprise") {
-      try {
-        const { data: org } = await supabase
-          .from("organizations")
-          .select("credits")
-          .eq("id", project.org_id)
-          .single();
-
-        if (org && org.credits > 0) {
-          await supabase.rpc("deduct_credits", {
-            p_org_id: project.org_id,
-            p_amount: 1,
-            p_description: "Scan upload",
-            p_metadata: {
-              feature_key: "scan_upload",
-              scan_id: scan.id,
-              project_id: project.id,
-            },
-          });
-
-          const { data: updatedOrg } = await supabase
-            .from("organizations")
-            .select("credits")
-            .eq("id", project.org_id)
-            .single();
-
-          if (updatedOrg && updatedOrg.credits < 50) {
-            creditsWarning = true;
-          }
-        } else {
-          creditsWarning = true;
-        }
-      } catch (creditErr) {
-        console.error("Credit deduction for scan upload failed:", creditErr);
-      }
-    }
 
     if (caps.checkRunsEnabled && (project as any).github_installation_id) {
       try {
@@ -994,6 +991,7 @@ export async function POST(req: Request) {
               gatePassed: passedGate,
               reasons,
               statsLine: `**Commit:** \`${sha.slice(0, 7)}\` • **Branch:** \`${branch || "unknown"}\``,
+              projectId: project.id,
             });
 
             await upsertSkylosPrComment({
@@ -1213,6 +1211,10 @@ export async function POST(req: Request) {
         discord: caps.discordEnabled,
       }
     };
+
+    if (creditsRemaining !== null) {
+      response.credits_remaining = creditsRemaining;
+    }
 
     if (creditsWarning) {
       response.credits_warning = true;

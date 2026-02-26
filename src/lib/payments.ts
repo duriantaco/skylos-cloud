@@ -149,17 +149,21 @@ export async function fulfillCreditPurchase(opts: {
 }
 
 export async function handleRefund(orderId: string): Promise<void> {
-  const { data: purchase } = await supabaseAdmin
+  // Idempotent: atomically mark as refunded first, only deduct if status actually changed.
+  // This prevents double-deduction if the webhook fires twice.
+  const { data: updated, error: updateErr } = await supabaseAdmin
     .from("credit_purchases")
-    .select("*")
+    .update({ status: "refunded" })
     .eq("ls_order_id", orderId)
     .eq("status", "completed")
-    .single();
+    .select("org_id, credits");
 
-  if (!purchase) {
-    console.warn("No matching purchase for refund:", orderId);
+  if (updateErr || !updated || updated.length === 0) {
+    console.warn("No matching completed purchase for refund (already refunded or not found):", orderId);
     return;
   }
+
+  const purchase = updated[0];
 
   await supabaseAdmin.rpc("deduct_credits", {
     p_org_id: purchase.org_id,
@@ -167,11 +171,6 @@ export async function handleRefund(orderId: string): Promise<void> {
     p_description: `Refund: ${purchase.credits} credits removed`,
     p_metadata: { ls_order_id: orderId },
   });
-
-  await supabaseAdmin
-    .from("credit_purchases")
-    .update({ status: "refunded" })
-    .eq("id", purchase.id);
 }
 
 export function verifyWebhookSignature(

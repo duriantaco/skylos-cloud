@@ -9,16 +9,25 @@ export function buildSkylosCommentBody(opts: {
   gatePassed: boolean;
   reasons?: string[];
   statsLine?: string;
+  shareToken?: string | null;
+  projectId?: string | null;
 }) {
-  const { title, summaryMd, scanUrl, gatePassed, reasons, statsLine } = opts;
+  const { title, summaryMd, scanUrl, gatePassed, reasons, statsLine, shareToken, projectId } = opts;
 
   const gate = gatePassed ? "✅ **Quality Gate: PASSED**" : "❌ **Quality Gate: FAILED**";
   const linkLine = scanUrl ? `\n\nView full report: ${scanUrl}` : "";
+  const publicLink = shareToken
+    ? `\n\n🔗 [View public scan report](https://skylos.dev/scan/${shareToken})`
+    : "";
   const stats = statsLine ? `\n\n${statsLine}` : "";
   const reasonsMd =
     !gatePassed && reasons?.length
       ? `\n\n**Blocked because:**\n${reasons.map((r) => `- ${r}`).join("\n")}`
       : "";
+
+  const badge = projectId
+    ? `\n\n[![Skylos](https://skylos.dev/api/badge/${projectId})](https://skylos.dev)`
+    : "";
 
   return [
     SKYLOS_MARKER,
@@ -29,6 +38,8 @@ export function buildSkylosCommentBody(opts: {
     "\n---\n",
     summaryMd,
     linkLine,
+    publicLink,
+    badge,
     "\n\n<sub>Skylos updates this single comment on every push to avoid spam.</sub>",
   ].join("\n");
 }

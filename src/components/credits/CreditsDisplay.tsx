@@ -70,7 +70,7 @@ export default function CreditsDisplay({ inline = false }: { inline?: boolean })
   if (inline) {
     return (
       <Link
-        href="/dashboard/credits"
+        href="/dashboard/billing"
         className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
           isVeryLow
             ? 'bg-red-50 text-red-700 hover:bg-red-100'
@@ -163,13 +163,13 @@ export default function CreditsDisplay({ inline = false }: { inline?: boolean })
         {!isUnlimited && (
           <div className="mt-4 flex gap-3">
             <Link
-              href="/dashboard/credits/purchase"
+              href="/dashboard/billing/purchase"
               className="flex-1 px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-800 transition text-center"
             >
               Buy Credits
             </Link>
             <Link
-              href="/dashboard/credits/history"
+              href="/dashboard/billing/history"
               className="px-4 py-2 border border-slate-200 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50 transition"
             >
               View History

@@ -5,12 +5,12 @@ import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Loader2, Sparkles } from 'lucide-react'
 
-export default function CreateWorkspaceModal({ 
-  userEmail, 
-  userId 
-}: { 
+export default function CreateWorkspaceModal({
+  userEmail,
+  userId
+}: {
   userEmail: string
-  userId: string 
+  userId: string
 }) {
   const router = useRouter()
   const [name, setName] = useState(`${userEmail.split('@')[0]}'s Workspace`)
@@ -28,7 +28,8 @@ export default function CreateWorkspaceModal({
 
     try {
       const supabase = createClient()
-      
+
+      // Try RPC first
       const { error: rpcError } = await supabase.rpc('init_workspace', {
         p_user_id: userId,
         p_user_email: userEmail,
@@ -36,29 +37,40 @@ export default function CreateWorkspaceModal({
       })
 
       if (rpcError) {
-        // If RPC doesn't support p_org_name, fall back to basic version
-        if (rpcError.message.includes('p_org_name')) {
-          const { error: fallbackError } = await supabase.rpc('init_workspace', {
-            p_user_id: userId,
-            p_user_email: userEmail,
-          })
-          if (fallbackError) throw fallbackError
-          
-          // Update org name separately
-          const { data: member } = await supabase
-            .from('organization_members')
-            .select('org_id')
-            .eq('user_id', userId)
-            .single()
-          
-          if (member?.org_id) {
-            await supabase
-              .from('organizations')
-              .update({ name: name.trim() })
-              .eq('id', member.org_id)
-          }
+        // RPC failed (possibly tries to create a project with missing api_key_hash).
+        // Fall back: create org + membership manually.
+        const { data: existingMember } = await supabase
+          .from('organization_members')
+          .select('org_id')
+          .eq('user_id', userId)
+          .maybeSingle()
+
+        if (existingMember?.org_id) {
+          // Org already exists from a partial RPC run — just update name
+          await supabase
+            .from('organizations')
+            .update({ name: name.trim() })
+            .eq('id', existingMember.org_id)
         } else {
-          throw rpcError
+          // Create org from scratch
+          const { data: org, error: orgErr } = await supabase
+            .from('organizations')
+            .insert({ name: name.trim(), plan: 'free' })
+            .select('id')
+            .single()
+
+          if (orgErr) throw orgErr
+
+          const { error: memErr } = await supabase
+            .from('organization_members')
+            .insert({
+              org_id: org.id,
+              user_id: userId,
+              email: userEmail,
+              role: 'owner',
+            })
+
+          if (memErr) throw memErr
         }
       }
 
@@ -74,7 +86,7 @@ export default function CreateWorkspaceModal({
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" />
-      
+
       {/* Modal */}
       <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
         {/* Header */}
@@ -83,7 +95,7 @@ export default function CreateWorkspaceModal({
             <Sparkles className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-white">Welcome to Skylos!</h2>
-          <p className="text-indigo-100 mt-2 text-sm">Let's set up your workspace</p>
+          <p className="text-indigo-100 mt-2 text-sm">Let&apos;s set up your workspace</p>
         </div>
 
         {/* Body */}
@@ -102,7 +114,7 @@ export default function CreateWorkspaceModal({
               if (e.key === 'Enter' && !loading) handleCreate()
             }}
           />
-          
+
           {error && (
             <p className="mt-2 text-sm text-red-600">{error}</p>
           )}

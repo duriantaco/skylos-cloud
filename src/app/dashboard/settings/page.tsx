@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { ArrowLeft, Key, Shield, FolderOpen, MessageSquare, Hash } from "lucide-react";
+import { ArrowLeft, Key, Shield, FolderOpen, MessageSquare, Hash, Users } from "lucide-react";
 import { ensureWorkspace, getUserProjects, getProject } from "@/lib/ensureWorkspace";
 import ApiKeySection from "@/components/settings/ApiKeySection";
 import PolicyEditor from "@/components/settings/PolicyEditor";
 import ProjectSwitcher from "@/components/settings/ProjectSwitcher";
 import SlackIntegration from "@/components/settings/SlackIntegration";
 import DiscordIntegration from "@/components/settings/DiscordIntegration";
+import TeamMembers from "@/components/settings/TeamMembers";
 import { createClient } from "@/utils/supabase/server";
 import DevPlanToggle from "@/components/settings/DevPlanToggle";
 import GitHubAppInstall from "@/components/settings/GitHubAppInstall"
@@ -19,8 +20,7 @@ async function updatePlan(formData: FormData) {
   const supabase = await createClient()
   const plan = formData.get('plan') as string
   
-  const { data: { user }, error: authErr } = await supabase.auth.getUser()
-  console.log('[settings/updatePlan] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false }
   
   const { data: membership } = await supabase
@@ -35,8 +35,6 @@ async function updatePlan(formData: FormData) {
     .from('organizations')
     .update({ plan })
     .eq('id', membership.org_id)
-  
-  console.log('✅ Plan updated to:', plan)
   
   revalidatePath('/dashboard/settings', 'layout')
   
@@ -244,7 +242,17 @@ export default async function SettingsPage({
     .single();
 
   const userPlan = org?.plan || 'free';
-  console.log('📊 Current plan from DB:', userPlan);
+
+  // Fetch current user's role for RBAC UI
+  const { data: membership } = await supabase
+    .from('organization_members')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('org_id', orgId)
+    .single();
+
+  const userRole = membership?.role || 'member';
+  const canManageSettings = ['admin', 'owner'].includes(userRole);
 
   const projects = await getUserProjects(supabase, orgId);
 
@@ -328,7 +336,24 @@ export default async function SettingsPage({
         </div>
 
         <div className="space-y-8">
-            
+
+          <section className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
+            <div className="flex items-start gap-4 mb-6">
+              <div className="p-3 bg-orange-50 border border-orange-100 rounded-lg">
+                <Users className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Team</h2>
+                <p className="text-slate-500 text-sm mt-1">
+                  Manage team members and their roles.
+                </p>
+              </div>
+            </div>
+
+            <TeamMembers currentUserId={user.id} currentUserRole={userRole} />
+          </section>
+
+          {canManageSettings && (
           <section className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
             <div className="flex items-start gap-4 mb-6">
               <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
@@ -341,10 +366,12 @@ export default async function SettingsPage({
                 </p>
               </div>
             </div>
-            
-            <ApiKeySection apiKey={project.api_key ?? ""} projectId={project.id} />
-          </section>
 
+            <ApiKeySection projectId={project.id} />
+          </section>
+          )}
+
+          {canManageSettings && (
           <section className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
             <div className="flex items-start gap-4 mb-6">
               <div className="p-3 bg-purple-50 border border-purple-100 rounded-lg">
@@ -357,7 +384,7 @@ export default async function SettingsPage({
                 </p>
               </div>
             </div>
-            
+
             {['pro'].includes(userPlan) ? (
               <SlackIntegration projectId={project.id} />
             ) : (
@@ -374,7 +401,9 @@ export default async function SettingsPage({
               </div>
             )}
           </section>
+          )}
 
+          {canManageSettings && (
           <section className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
             <div className="flex items-start gap-4 mb-6">
               <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
@@ -387,7 +416,7 @@ export default async function SettingsPage({
                 </p>
               </div>
             </div>
-            
+
             {['pro'].includes(userPlan) ? (
               <DiscordIntegration projectId={project.id} />
             ) : (
@@ -404,7 +433,9 @@ export default async function SettingsPage({
               </div>
             )}
           </section>
+          )}
 
+          {canManageSettings && (
           <section className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
             <div className="flex items-start gap-4 mb-6">
               <div className="p-3 bg-teal-50 border border-teal-100 rounded-lg">
@@ -417,13 +448,14 @@ export default async function SettingsPage({
                 </p>
               </div>
             </div>
-            
+
             <PolicyEditor
               initialConfig={pc}
               initialExcludePaths={excludePaths}
               projectId={project.id}
             />
           </section>
+          )}
 
         </div>
       </div>

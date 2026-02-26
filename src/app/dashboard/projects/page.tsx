@@ -10,6 +10,7 @@ import {
   FolderOpen, RefreshCw, Trash2, Square, CheckSquare, X
 } from "lucide-react";
 import CreateProjectButton from "@/components/CreateProjectButton";
+import CreateWorkspaceModal from "@/components/CreateWorkspaceModal";
 import dogImg from "../../../../public/assets/favicon-96x96.png";
 import ConfirmModal from "@/components/ConfirmModal";
 
@@ -398,6 +399,13 @@ export default function ProjectsPage() {
           <span className="text-sm text-slate-500">Loading projects...</span>
         </div>
       </div>
+    );
+  }
+
+  // No workspace yet — prompt creation
+  if (!orgId && user) {
+    return (
+      <CreateWorkspaceModal userEmail={user.email || ""} userId={user.id} />
     );
   }
 

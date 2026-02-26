@@ -3,7 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, Target, FolderOpen, Settings, Shield, TrendingUp, CreditCard } from "lucide-react";
+import { BookOpen, Target, FolderOpen, Settings, Shield, TrendingUp, CreditCard, Zap } from "lucide-react";
 import dogImg from "../../../public/assets/favicon-96x96.png";
 
 export default async function DashboardLayout({
@@ -14,12 +14,26 @@ export default async function DashboardLayout({
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
 
-  console.log('[dashboard/layout] getUser result:', { user: user?.email ?? null, error: error?.message ?? null });
-
   if (!user) {
-    console.log('[dashboard/layout] no user, redirecting to /login');
     return redirect("/login");
   }
+
+  // Fetch credit balance for header
+  let credits: number | null = null;
+  let plan = "free";
+  const { data: member } = await supabase
+    .from("organization_members")
+    .select("org_id, organizations(credits, plan)")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (member?.organizations) {
+    const org = member.organizations as any;
+    credits = org.credits ?? 0;
+    plan = org.plan || "free";
+  }
+
+  const isUnlimited = plan === "enterprise";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -33,7 +47,7 @@ export default async function DashboardLayout({
                 Beta
               </span>
             </Link>
-            
+
             <div className="hidden md:flex items-center gap-1">
               <NavLink href="/dashboard" icon={Target}>Mission Control</NavLink>
               <NavLink href="/dashboard/trends" icon={TrendingUp}>Trends</NavLink>
@@ -43,12 +57,31 @@ export default async function DashboardLayout({
               <NavLink href="/dashboard/settings" icon={Settings}>Settings</NavLink>
             </div>
           </div>
-          
-          <div className="flex items-center gap-6">
-            <Link href="/docs" className="text-sm text-slate-500 hover:text-slate-900 transition flex items-center gap-1.5">
+
+          <div className="flex items-center gap-4">
+            {/* Credit balance badge */}
+            {credits !== null && (
+              <Link
+                href="/dashboard/billing"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
+                  isUnlimited
+                    ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                    : credits < 50
+                    ? "bg-red-50 text-red-700 hover:bg-red-100"
+                    : credits < 200
+                    ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5" />
+                {isUnlimited ? "Unlimited" : credits.toLocaleString()}
+              </Link>
+            )}
+
+            <a href="https://docs.skylos.dev" target="_blank" rel="noopener noreferrer" className="text-sm text-slate-500 hover:text-slate-900 transition flex items-center gap-1.5">
               <BookOpen className="w-4 h-4" />
-              Docs
-            </Link>
+              <span className="hidden md:inline">Docs</span>
+            </a>
             <div className="h-4 w-px bg-slate-200" />
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
