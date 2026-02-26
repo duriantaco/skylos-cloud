@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 
 export async function PATCH(
@@ -10,11 +11,6 @@ export async function PATCH(
   try {
     const supabase = await createClient();
     const { id } = await params;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     const { data: project } = await supabase
       .from("projects")
@@ -26,19 +22,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const { data: member } = await supabase
-      .from("organization_members")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .eq("org_id", project.org_id)
-      .single();
-
-    if (!member) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
-    }
+    const auth = await requirePermission(supabase, "edit:projects", project.org_id);
+    if (isAuthError(auth)) return auth;
 
     const body = await req.json();
-    
+
     const allowedUpdates: Record<string, any> = {};
     if ('repo_url' in body) {
       allowedUpdates.repo_url = body.repo_url || null;
@@ -67,11 +55,6 @@ export async function DELETE(
     const supabase = await createClient();
     const { id } = await params;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { data: project } = await supabase
       .from("projects")
       .select("id, org_id")
@@ -82,16 +65,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const { data: member } = await supabase
-      .from("organization_members")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .eq("org_id", project.org_id)
-      .single();
-
-    if (!member) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
-    }
+    const auth = await requirePermission(supabase, "delete:projects", project.org_id);
+    if (isAuthError(auth)) return auth;
 
     const { data: scans } = await supabase
       .from("scans")

@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 export async function GET(
   request: Request,
@@ -9,8 +10,19 @@ export async function GET(
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // FIX: verify org membership via project lookup
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id, org_id")
+    .eq("id", id)
+    .single();
+
+  if (!project) {
+    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  const auth = await requirePermission(supabase, "view:findings", project.org_id);
+  if (isAuthError(auth)) return auth;
 
   const url = new URL(request.url);
   const includeRevoked = url.searchParams.get("includeRevoked") === "true";
@@ -27,8 +39,8 @@ export async function GET(
 
   const { data, error } = await query;
 
-  if (error) 
+  if (error)
     return serverError(error, "Fetch suppressions");
-  
+
   return NextResponse.json({ rows: data || [] });
 }

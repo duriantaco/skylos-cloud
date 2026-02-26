@@ -4,6 +4,7 @@ import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
 import { serverError } from "@/lib/api-error";
 import { generateFix, generateDiffPreview } from "@/lib/fix-generator";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 
 async function getInstallationOctokit(installationId: number): Promise<Octokit> {
@@ -63,9 +64,6 @@ export async function POST(
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { data: finding } = await supabase
     .from("findings")
     .select(`
@@ -87,6 +85,9 @@ export async function POST(
   if (!finding) return NextResponse.json({ error: "Finding not found" }, { status: 404 });
 
   const project = finding.scans?.projects;
+  const auth = await requirePermission(supabase, "suppress:findings", project?.org_id);
+  if (isAuthError(auth)) return auth;
+
   if (!project?.github_installation_id) {
     return NextResponse.json({ error: "GitHub App not installed for this project." }, { status: 400 });
   }

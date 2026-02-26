@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { serverError } from '@/lib/api-error';
+import { hashApiKey } from '@/lib/api-key';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
   const { data: project, error: projError } = await supabase
     .from('projects')
     .select('id')
-    .eq('api_key', token)
+    .eq('api_key_hash', hashApiKey(token))
     .single()
 
   if (projError || !project) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { hashApiKey } from "@/lib/api-key";
 
 // GET /api/agent/validate — lightweight API key validation for MCP/agent clients
 // Accepts: Authorization: Bearer <project_api_key> or X-API-Key: <agent_key>
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     const { data: project } = await supabaseAdmin
       .from("projects")
       .select("id, org_id, organizations(plan, credits)")
-      .eq("api_key", token)
+      .eq("api_key_hash", hashApiKey(token))
       .maybeSingle();
 
     if (project) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { getInstallationOctokit } from "@/lib/github-app";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 function parseRepo(repoUrl: string) {
   const m = String(repoUrl || "").match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
@@ -15,18 +16,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!path) return NextResponse.json({ error: "Missing path" }, { status: 400 });
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data: scan, error: sErr } = await supabase
     .from("scans")
-    .select("id, commit_hash, project_id, projects(repo_url, github_installation_id)")
+    .select("id, commit_hash, project_id, projects(repo_url, github_installation_id, org_id)")
     .eq("id", id)
     .single();
 
   if (sErr || !scan) return NextResponse.json({ error: "Scan not found" }, { status: 404 });
 
   const proj: any = scan.projects;
+  const auth = await requirePermission(supabase, "view:scans", proj?.org_id);
+  if (isAuthError(auth)) return auth;
+
   const repo = parseRepo(proj?.repo_url);
   if (!repo) return NextResponse.json({ error: "Invalid repo_url" }, { status: 400 });
 

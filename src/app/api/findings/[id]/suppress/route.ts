@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 export async function POST(
   request: Request,
@@ -8,10 +9,6 @@ export async function POST(
 ) {
   const { id } = await params;
   const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) 
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
   const reason: string | null = typeof body.reason === "string" ? body.reason : null;
@@ -29,13 +26,17 @@ export async function POST(
 
   const { data: scan, error: sErr } = await supabase
     .from("scans")
-    .select("id, project_id, commit_hash, quality_gate_passed, is_overridden, stats, projects(repo_url)")
+    .select("id, project_id, commit_hash, quality_gate_passed, is_overridden, stats, projects(repo_url, org_id)")
     .eq("id", finding.scan_id)
     .single();
 
   if (sErr || !scan) {
     return NextResponse.json({ error: "Scan not found" }, { status: 404 });
   }
+
+  const orgId = (scan.projects as any)?.org_id;
+  const auth = await requirePermission(supabase, "suppress:findings", orgId);
+  if (isAuthError(auth)) return auth;
 
   const { error: supErr } = await supabase
     .from("finding_suppressions")
@@ -46,7 +47,7 @@ export async function POST(
         file_path: finding.file_path,
         line_number: finding.line_number || 0,
         reason,
-        created_by: user.id,
+        created_by: auth.user.id,
         expires_at
       },
       { onConflict: "project_id,rule_id,line_number,file_path" }

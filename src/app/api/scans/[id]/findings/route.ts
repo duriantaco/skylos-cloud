@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 
 export async function GET(
@@ -11,10 +12,20 @@ export async function GET(
   const url = new URL(request.url);
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // FIX: verify org membership via scan → project → org
+  const { data: scan } = await supabase
+    .from("scans")
+    .select("id, projects(org_id)")
+    .eq("id", id)
+    .single();
+
+  if (!scan) {
+    return NextResponse.json({ error: "Scan not found" }, { status: 404 });
   }
+
+  const orgId = (scan.projects as any)?.org_id;
+  const auth = await requirePermission(supabase, "view:findings", orgId);
+  if (isAuthError(auth)) return auth;
 
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
   const pageSize = Math.min(500, Math.max(10, parseInt(url.searchParams.get('pageSize') || '100')));

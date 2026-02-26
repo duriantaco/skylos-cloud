@@ -8,10 +8,8 @@ import ActivityFeed from "@/components/ActivityFeed";
 
 export default async function ActivityPage() {
   const supabase = await createClient();
-  const { data: { user }, error: authErr } = await supabase.auth.getUser();
-  console.log('[dashboard/activity] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    console.log('[dashboard/activity] no user, redirecting to /login');
     return redirect("/login");
   }
 

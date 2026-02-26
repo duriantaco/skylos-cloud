@@ -153,10 +153,8 @@ function ScanCard({ scan }: { scan: Scan }) {
 export default async function ScansPage() {
   const supabase = await createClient();
 
-  const { data: { user }, error: authErr } = await supabase.auth.getUser();
-  console.log('[dashboard/scans] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    console.log('[dashboard/scans] no user, redirecting to /login');
     redirect("/login");
   }
 

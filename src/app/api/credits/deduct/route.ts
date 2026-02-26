@@ -1,14 +1,9 @@
 import { createClient } from '@/utils/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission, isAuthError } from '@/lib/permissions';
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
-
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
 
   const body = await request.json();
   const { feature_key, metadata = {} } = body;
@@ -17,18 +12,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'feature_key is required' }, { status: 400 });
   }
 
-  const { data: member, error: memberError } = await supabase
-    .from('organization_members')
-    .select('org_id, organizations(id, name, credits, plan)')
-    .eq('user_id', user.id)
-    .maybeSingle();
+  const auth = await requirePermission(supabase, 'create:scans');
+  if (isAuthError(auth)) return auth;
 
-  if (memberError || !member) {
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('id, name, credits, plan')
+    .eq('id', auth.orgId)
+    .single();
+
+  if (!org) {
     return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
   }
-
-  const org = member.organizations as any;
-  const orgId = org.id;
 
   if (org.plan === 'enterprise') {
     return NextResponse.json({
@@ -61,17 +56,17 @@ export async function POST(request: NextRequest) {
       required: costAmount,
       available: org.credits,
       shortfall: costAmount - org.credits
-    }, { status: 402 }); // 402 Payment Required
+    }, { status: 402 });
   }
 
   const { data: result, error: deductError } = await supabase.rpc('deduct_credits', {
-    p_org_id: orgId,
+    p_org_id: org.id,
     p_amount: costAmount,
     p_description: `Used feature: ${featureCost.description}`,
     p_metadata: {
       ...metadata,
       feature_key,
-      user_id: user.id,
+      user_id: auth.user.id,
       timestamp: new Date().toISOString()
     }
   });
@@ -88,7 +83,7 @@ export async function POST(request: NextRequest) {
   const { data: updatedOrg } = await supabase
     .from('organizations')
     .select('credits')
-    .eq('id', orgId)
+    .eq('id', org.id)
     .single();
 
   return NextResponse.json({

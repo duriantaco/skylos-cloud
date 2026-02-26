@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
-
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 type GateMode = "zero-new" | "category" | "severity" | "both";
 
@@ -12,11 +12,11 @@ function toNonNegInt(v: any, fallback: number) {
 }
 
 function toBool(v: any, fallback: boolean) {
-  if (v === true || v === false) 
+  if (v === true || v === false)
     return v;
-  if (v === "true") 
+  if (v === "true")
     return true;
-  if (v === "false") 
+  if (v === "false")
     return false;
   return fallback;
 }
@@ -24,10 +24,6 @@ function toBool(v: any, fallback: boolean) {
 export async function POST(req: Request) {
   try {
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     const body = await req.json().catch(() => ({}));
 
@@ -35,6 +31,20 @@ export async function POST(req: Request) {
     if (!projectId) {
       return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
     }
+
+    // FIX: verify org membership via project lookup
+    const { data: project } = await supabase
+      .from("projects")
+      .select("id, org_id")
+      .eq("id", projectId)
+      .single();
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    const auth = await requirePermission(supabase, "manage:settings", project.org_id);
+    if (isAuthError(auth)) return auth;
 
     const incomingRules = Array.isArray(body.custom_rules) ? body.custom_rules : [];
     const custom_rules = incomingRules
@@ -65,8 +75,8 @@ export async function POST(req: Request) {
     const g = body.gate || {};
     const gate = {
       enabled: toBool(g.enabled, true),
-      mode: (["zero-new", "category", "severity", "both"].includes(String(g.mode)) 
-        ? String(g.mode) 
+      mode: (["zero-new", "category", "severity", "both"].includes(String(g.mode))
+        ? String(g.mode)
         : "zero-new") as GateMode,
       by_category: {} as Record<string, number>,
       by_severity: {} as Record<string, number>,

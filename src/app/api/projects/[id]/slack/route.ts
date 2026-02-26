@@ -2,6 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { testSlackWebhook } from "@/lib/slack";
 import { serverError } from "@/lib/api-error";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 
 export async function GET(
@@ -11,20 +12,18 @@ export async function GET(
   const supabase = await createClient();
   const { id } = await params;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { data: project, error } = await supabase
     .from("projects")
-    .select("id, name, slack_webhook_url, slack_notifications_enabled, slack_notify_on")
+    .select("id, name, slack_webhook_url, slack_notifications_enabled, slack_notify_on, org_id")
     .eq("id", id)
     .single();
 
   if (error || !project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
+
+  const auth = await requirePermission(supabase, "view:projects", project.org_id);
+  if (isAuthError(auth)) return auth;
 
   const maskedWebhook = project.slack_webhook_url
     ? "••••••••" + project.slack_webhook_url.slice(-8)
@@ -45,11 +44,6 @@ export async function POST(
   const supabase = await createClient();
   const { id } = await params;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { data: project } = await supabase
     .from("projects")
     .select("id, name, org_id")
@@ -60,16 +54,8 @@ export async function POST(
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .eq("org_id", project.org_id)
-    .single();
-
-  if (!member) {
-    return NextResponse.json({ error: "Not authorized" }, { status: 403 });
-  }
+  const auth = await requirePermission(supabase, "manage:integrations", project.org_id);
+  if (isAuthError(auth)) return auth;
 
   const body = await request.json().catch(() => ({}));
   const { webhookUrl, enabled, notifyOn, test } = body;
@@ -98,7 +84,7 @@ export async function POST(
   }
 
   const updates: Record<string, any> = {};
-  
+
   if (webhookUrl !== undefined) {
     updates.slack_webhook_url = webhookUrl || null;
   }
@@ -132,10 +118,18 @@ export async function DELETE(
   const supabase = await createClient();
   const { id } = await params;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id, org_id")
+    .eq("id", id)
+    .single();
+
+  if (!project) {
+    return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
+
+  const auth = await requirePermission(supabase, "manage:integrations", project.org_id);
+  if (isAuthError(auth)) return auth;
 
   const { error } = await supabase
     .from("projects")

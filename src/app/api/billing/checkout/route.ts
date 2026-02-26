@@ -1,7 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { badRequest, serverError, unauthorized } from "@/lib/api-error";
+import { badRequest, serverError } from "@/lib/api-error";
 import { CREDIT_PACKS, createCheckoutUrl, type PackId } from "@/lib/payments";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 // GET /api/billing/checkout — list available credit packs
 export async function GET() {
@@ -22,14 +23,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return unauthorized();
-  }
+  const auth = await requirePermission(supabase, "manage:billing");
+  if (isAuthError(auth)) return auth;
 
   let body: { pack_id?: string };
   try {
@@ -45,24 +40,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Get user's org
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id, organizations(id, name)")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("id, name")
+    .eq("id", auth.orgId)
+    .single();
 
-  if (!member) {
+  if (!org) {
     return badRequest("No organization found for this user");
   }
 
-  const org = member.organizations as any;
   const baseUrl = process.env.APP_BASE_URL || "https://skylos.dev";
 
   try {
     const checkoutUrl = await createCheckoutUrl({
       orgId: org.id,
-      email: user.email || "",
+      email: auth.user.email || "",
       packId: packId as PackId,
       successUrl: `${baseUrl}/dashboard/billing?success=true&pack=${packId}`,
     });

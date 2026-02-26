@@ -108,10 +108,8 @@ function GateBadge({ passed }: { passed: boolean | null }) {
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const { data: { user }, error: authErr } = await supabase.auth.getUser();
-  console.log('[dashboard/page] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    console.log('[dashboard/page] no user, redirecting to /login');
     return redirect("/login");
   }
 

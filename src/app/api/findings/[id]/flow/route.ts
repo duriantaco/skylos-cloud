@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 
 export async function GET(
@@ -8,11 +9,6 @@ export async function GET(
 ) {
   const { id } = await params;
   const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   const { data: finding, error } = await supabase
     .from("findings")
@@ -46,18 +42,9 @@ export async function GET(
   }
 
   const orgId = (finding.scans as any)?.projects?.org_id;
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .eq("org_id", orgId)
-    .single();
+  const auth = await requirePermission(supabase, "view:findings", orgId);
+  if (isAuthError(auth)) return auth;
 
-  if (!member) {
-    return NextResponse.json({ error: "Not authorized" }, { status: 403 });
-  }
-
-  
   const flowData = finding.taint_flow || generateFallbackFlow(finding);
 
   const repoUrl = (finding.scans as any)?.projects?.repo_url || "";
@@ -72,19 +59,19 @@ export async function GET(
     category: finding.category,
     file: finding.file_path,
     line: finding.line_number,
-    
+
     source: flowData?.source || null,
     transforms: flowData?.transforms || [],
     sink: flowData?.sink || null,
-    
+
     attack_example: flowData?.attack_example || null,
     fix_suggestion: flowData?.fix_suggestion || null,
-    
+
     snippet: finding.snippet,
-    
+
     repo_url: repoUrl,
     commit_hash: commitHash,
-    
+
     has_flow_data: !!finding.taint_flow,
   });
 }
@@ -92,7 +79,7 @@ export async function GET(
 function generateFallbackFlow(finding: any) {
   const ruleId = String(finding.rule_id || "").toUpperCase();
   const category = String(finding.category || "").toUpperCase();
-  
+
   const flowTemplates: Record<string, any> = {
     "SKY-D201": {
       confidence: "HIGH",
@@ -119,7 +106,7 @@ function generateFallbackFlow(finding: any) {
         explanation: "Parameterized queries separate SQL code from data, preventing injection."
       }
     },
-    
+
     "SKY-D210": {
       confidence: "HIGH",
       source: {
@@ -145,7 +132,7 @@ function generateFallbackFlow(finding: any) {
         explanation: "Avoid shell=True and pass arguments as a list to prevent injection."
       }
     },
-    
+
     "SKY-D226": {
       confidence: "HIGH",
       source: {
@@ -171,7 +158,7 @@ function generateFallbackFlow(finding: any) {
         explanation: "Always escape user content before marking it safe for HTML rendering."
       }
     },
-    
+
     "SKY-S101": {
       confidence: "HIGH",
       source: {
@@ -215,7 +202,7 @@ function generateFallbackFlow(finding: any) {
         annotation: "Security issue detected at this location"
       },
       sink: {
-        type: "unknown", 
+        type: "unknown",
         label: "Security Sink",
         file: finding.file_path,
         line: finding.line_number,

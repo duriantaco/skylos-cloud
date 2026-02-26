@@ -16,10 +16,8 @@ const RULE_LIMITS: Record<string, number> = {
 
 export default async function RulesPage() {
   const supabase = await createClient();
-  const { data: { user }, error: authErr } = await supabase.auth.getUser();
-  console.log('[dashboard/rules] getUser:', { user: user?.email ?? null, error: authErr?.message ?? null });
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    console.log('[dashboard/rules] no user, redirecting to /login');
     return redirect("/login");
   }
 

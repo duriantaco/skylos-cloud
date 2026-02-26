@@ -1,7 +1,26 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { serverError } from "@/lib/api-error";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
+const ASSIGNMENT_SELECT = `
+  id,
+  issue_group_id,
+  assigned_to,
+  assigned_by,
+  status,
+  notes,
+  assigned_at,
+  updated_at,
+  assignee:assigned_to (
+    id,
+    email
+  ),
+  assigner:assigned_by (
+    id,
+    email
+  )
+`;
 
 export async function GET(
   request: Request,
@@ -10,31 +29,12 @@ export async function GET(
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requirePermission(supabase, "view:findings");
+  if (isAuthError(auth)) return auth;
 
   const { data: assignment, error: assignmentErr } = await supabase
     .from("issue_assignments")
-    .select(`
-      id,
-      issue_group_id,
-      assigned_to,
-      assigned_by,
-      status,
-      notes,
-      assigned_at,
-      updated_at,
-      assignee:assigned_to (
-        id,
-        email
-      ),
-      assigner:assigned_by (
-        id,
-        email
-      )
-    `)
+    .select(ASSIGNMENT_SELECT)
     .eq("issue_group_id", id)
     .maybeSingle();
 
@@ -53,11 +53,6 @@ export async function POST(
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const body = await request.json().catch(() => ({}));
   const { assigned_to, status, notes } = body;
 
@@ -72,20 +67,8 @@ export async function POST(
   }
 
   const orgId = (group.projects as any)?.org_id;
-  if (!orgId) {
-    return NextResponse.json({ error: "Organization not found" }, { status: 404 });
-  }
-
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("id")
-    .eq("org_id", orgId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!member) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
+  const auth = await requirePermission(supabase, "assign:issues", orgId);
+  if (isAuthError(auth)) return auth;
 
   if (assigned_to) {
     const { data: assigneeMember } = await supabase
@@ -106,40 +89,18 @@ export async function POST(
       {
         issue_group_id: id,
         assigned_to: assigned_to || null,
-        assigned_by: user.id,
+        assigned_by: auth.user.id,
         status: status || "assigned",
         notes: notes || null
       },
       { onConflict: "issue_group_id" }
     )
-    .select(`
-      id,
-      issue_group_id,
-      assigned_to,
-      assigned_by,
-      status,
-      notes,
-      assigned_at,
-      updated_at,
-      assignee:assigned_to (
-        id,
-        email
-      ),
-      assigner:assigned_by (
-        id,
-        email
-      )
-    `)
+    .select(ASSIGNMENT_SELECT)
     .single();
 
   if (assignmentErr) {
     return serverError(assignmentErr, "Create/update assignment");
   }
-
-  // TODO: Send notification to assigned user
-  // if (assigned_to) {
-  //   await sendAssignmentNotification(assigned_to, assignment);
-  // }
 
   return NextResponse.json({ assignment });
 }
@@ -152,10 +113,8 @@ export async function PATCH(
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requirePermission(supabase, "assign:issues");
+  if (isAuthError(auth)) return auth;
 
   const body = await request.json().catch(() => ({}));
   const { status, notes } = body;
@@ -172,24 +131,7 @@ export async function PATCH(
     .from("issue_assignments")
     .update(updateData)
     .eq("issue_group_id", id)
-    .select(`
-      id,
-      issue_group_id,
-      assigned_to,
-      assigned_by,
-      status,
-      notes,
-      assigned_at,
-      updated_at,
-      assignee:assigned_to (
-        id,
-        email
-      ),
-      assigner:assigned_by (
-        id,
-        email
-      )
-    `)
+    .select(ASSIGNMENT_SELECT)
     .single();
 
   if (updateErr) {
@@ -210,10 +152,8 @@ export async function DELETE(
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requirePermission(supabase, "assign:issues");
+  if (isAuthError(auth)) return auth;
 
   const { error: deleteErr } = await supabase
     .from("issue_assignments")

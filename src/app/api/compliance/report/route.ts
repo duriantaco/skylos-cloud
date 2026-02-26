@@ -2,15 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { generateComplianceReport } from '@/lib/compliance/report-generator';
 import { serverError } from '@/lib/api-error';
+import { requirePermission, isAuthError } from '@/lib/permissions';
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requirePermission(supabase, 'view:compliance');
+    if (isAuthError(auth)) return auth;
 
     const body = await request.json();
     const { frameworkCode, format = 'json' } = body;
@@ -19,18 +18,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'frameworkCode is required' }, { status: 400 });
     }
 
-    const { data: member } = await supabase
-      .from('organization_members')
-      .select('org_id, organizations(plan, name)')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('plan')
+      .eq('id', auth.orgId)
+      .single();
 
-    if (!member?.org_id) {
-      return NextResponse.json({ error: 'No organization found' }, { status: 404 });
-    }
-
-    const orgId = member.org_id;
-    const plan = (member.organizations as any)?.plan || 'free';
+    const plan = org?.plan || 'free';
 
     if (!['team', 'enterprise'].includes(plan)) {
       return NextResponse.json(
@@ -39,7 +33,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const reportData = await generateComplianceReport(frameworkCode, orgId, supabase);
+    const reportData = await generateComplianceReport(frameworkCode, auth.orgId, supabase);
 
     switch (format) {
       case 'json':
@@ -109,11 +103,11 @@ function generateCSV(reportData: any): string {
 function generateHTML(reportData: any): string {
   const statusColor = (status: string) => {
     switch (status) {
-      case 'passed': 
+      case 'passed':
         return '#10b981';
-      case 'failed': 
+      case 'failed':
         return '#ef4444';
-      default: 
+      default:
         return '#94a3b8';
     }
   };

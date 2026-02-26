@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
-
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 export async function POST(
   request: Request,
@@ -10,8 +10,19 @@ export async function POST(
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // FIX: verify org membership via project lookup
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id, org_id")
+    .eq("id", id)
+    .single();
+
+  if (!project) {
+    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  const auth = await requirePermission(supabase, "suppress:findings", project.org_id);
+  if (isAuthError(auth)) return auth;
 
   const body = await request.json().catch(() => ({}));
   const rule_id = String(body.rule_id || "");
@@ -26,7 +37,7 @@ export async function POST(
     .from("finding_suppressions")
     .update({
       revoked_at: new Date().toISOString(),
-      revoked_by: user.id,
+      revoked_by: auth.user.id,
     })
     .eq("project_id", id)
     .eq("rule_id", rule_id)
@@ -34,7 +45,7 @@ export async function POST(
     .eq("line_number", line_number)
     .is("revoked_at", null);
 
-  if (error) 
+  if (error)
     return serverError(error, "Revoke suppression");
 
   return NextResponse.json({ success: true });

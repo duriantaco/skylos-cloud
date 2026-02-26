@@ -1,6 +1,20 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { serverError } from "@/lib/api-error";
+import { requirePermission, isAuthError } from "@/lib/permissions";
+
+const COMMENT_SELECT = `
+  id,
+  comment_text,
+  mentioned_user_ids,
+  created_at,
+  updated_at,
+  user_id,
+  users:user_id (
+    id,
+    email
+  )
+`;
 
 export async function GET(
   request: Request,
@@ -13,11 +27,6 @@ export async function GET(
   const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
   const offset = parseInt(url.searchParams.get("offset") || "0");
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { data: group, error: groupErr } = await supabase
     .from("issue_groups")
     .select("id, project_id, projects(org_id)")
@@ -29,35 +38,12 @@ export async function GET(
   }
 
   const orgId = (group.projects as any)?.org_id;
-  if (!orgId) {
-    return NextResponse.json({ error: "Organization not found" }, { status: 404 });
-  }
-
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("id")
-    .eq("org_id", orgId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!member) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
+  const auth = await requirePermission(supabase, "view:findings", orgId);
+  if (isAuthError(auth)) return auth;
 
   const { data: comments, error: commentsErr, count } = await supabase
     .from("issue_comments")
-    .select(`
-      id,
-      comment_text,
-      mentioned_user_ids,
-      created_at,
-      updated_at,
-      user_id,
-      users:user_id (
-        id,
-        email
-      )
-    `, { count: 'exact' })
+    .select(COMMENT_SELECT, { count: 'exact' })
     .eq("issue_group_id", id)
     .order("created_at", { ascending: true })
     .range(offset, offset + limit - 1);
@@ -82,11 +68,6 @@ export async function POST(
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const body = await request.json().catch(() => ({}));
   const { comment_text, mentioned_user_ids } = body;
 
@@ -105,51 +86,23 @@ export async function POST(
   }
 
   const orgId = (group.projects as any)?.org_id;
-  if (!orgId) {
-    return NextResponse.json({ error: "Organization not found" }, { status: 404 });
-  }
-
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("id")
-    .eq("org_id", orgId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!member) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
+  const auth = await requirePermission(supabase, "comment:issues", orgId);
+  if (isAuthError(auth)) return auth;
 
   const { data: comment, error: commentErr } = await supabase
     .from("issue_comments")
     .insert({
       issue_group_id: id,
-      user_id: user.id,
+      user_id: auth.user.id,
       comment_text: comment_text.trim(),
       mentioned_user_ids: Array.isArray(mentioned_user_ids) ? mentioned_user_ids : []
     })
-    .select(`
-      id,
-      comment_text,
-      mentioned_user_ids,
-      created_at,
-      updated_at,
-      user_id,
-      users:user_id (
-        id,
-        email
-      )
-    `)
+    .select(COMMENT_SELECT)
     .single();
 
   if (commentErr) {
     return serverError(commentErr, "Create comment");
   }
-
-  // TODO: Send notifications to mentioned users
-  // if (mentioned_user_ids?.length > 0) {
-  //   await sendMentionNotifications(mentioned_user_ids, comment);
-  // }
 
   return NextResponse.json({ comment });
 }

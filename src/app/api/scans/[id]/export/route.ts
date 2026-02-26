@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 
 export async function GET(
@@ -13,11 +14,6 @@ export async function GET(
     const url = new URL(req.url);
     const format = url.searchParams.get("format") || "json";
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { data: scan } = await supabase
       .from("scans")
       .select("*, projects(name, org_id)")
@@ -29,17 +25,8 @@ export async function GET(
     }
 
     const orgId = (scan.projects as any)?.org_id;
-
-    const { data: member } = await supabase
-      .from("organization_members")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .eq("org_id", orgId)
-      .single();
-
-    if (!member) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
-    }
+    const auth = await requirePermission(supabase, "view:scans", orgId);
+    if (isAuthError(auth)) return auth;
 
     const { data: findings } = await supabase
       .from("findings")
@@ -81,7 +68,7 @@ export async function GET(
 
     if (format === "csv") {
       const headers = ["rule_id", "category", "severity", "file_path", "line_number", "message", "is_new", "is_suppressed"];
-      const rows = (findings || []).map(f => 
+      const rows = (findings || []).map(f =>
         headers.map(h => {
           const val = (f as any)[h];
           if (typeof val === "string" && (val.includes(",") || val.includes('"') || val.includes("\n"))) {

@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 
 export async function POST(
@@ -11,38 +12,19 @@ export async function POST(
   const { id } = await params;
   const { reason } = await request.json();
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { data: scanData, error: scanError } = await supabase
     .from("scans")
     .select(`*, projects ( repo_url, org_id )`)
     .eq("id", id)
     .single();
 
-  const orgId = (scanData.projects as any)?.org_id;
-    if (!orgId) {
-      return NextResponse.json({ error: "Scan not found" }, { status: 404 });
-    }
-
-  const { data: member, error: memErr } = await supabase
-    .from("organization_members")
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("org_id", orgId)
-    .single();
-
-  if (memErr || !member) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const orgId = (scanData?.projects as any)?.org_id;
+  if (!orgId) {
+    return NextResponse.json({ error: "Scan not found" }, { status: 404 });
   }
 
-  const role = String(member.role || "").toLowerCase();
-  if (role !== "owner" && role !== "admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+  const auth = await requirePermission(supabase, "override:gates", orgId);
+  if (isAuthError(auth)) return auth;
 
   const { error: updateError } = await supabase
     .from("scans")
@@ -50,7 +32,7 @@ export async function POST(
       is_overridden: true,
       override_reason: reason,
       overridden_at: new Date().toISOString(),
-      overridden_by: user.id,
+      overridden_by: auth.user.id,
       quality_gate_passed: true
     })
     .eq("id", id);
@@ -75,7 +57,7 @@ export async function POST(
             },
             body: JSON.stringify({
               state: "success",
-              description: `Overridden by ${user.email}: ${reason}`,
+              description: `Overridden by ${auth.user.email}: ${reason}`,
               context: "Skylos Quality Gate"
             })
           });

@@ -1,37 +1,23 @@
 import { createClient } from '@/utils/supabase/server';
 import { NextResponse } from 'next/server';
+import { requirePermission, isAuthError } from '@/lib/permissions';
 
 export async function GET() {
   const supabase = await createClient();
 
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  const auth = await requirePermission(supabase, 'view:projects');
+  if (isAuthError(auth)) return auth;
 
-  if (userError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('id, name, credits, credits_updated_at, plan')
+    .eq('id', auth.orgId)
+    .single();
 
-  const { data: member, error: memberError } = await supabase
-    .from('organization_members')
-    .select(`
-      org_id,
-      organizations(
-        id,
-        name,
-        credits,
-        credits_updated_at,
-        plan
-      )
-    `)
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (memberError || !member) {
+  if (!org) {
     return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
   }
 
-  const org = member.organizations as any;
-
-  // Get recent transactions (last 10)
   const { data: transactions, error: txError } = await supabase
     .from('credit_transactions')
     .select('*')

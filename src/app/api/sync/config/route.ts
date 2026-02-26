@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
+import { hashApiKey } from "@/lib/api-key";
 
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
     const { data: project, error: projError } = await supabase
       .from("projects")
       .select("id, name, policy_config, strict_mode, organizations(plan)")
-      .eq("api_key", token)
+      .eq("api_key_hash", hashApiKey(token))
       .single();
 
     if (projError || !project) {

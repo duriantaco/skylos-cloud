@@ -10,8 +10,6 @@ export default function DevPlanToggle({ currentPlan }: { currentPlan: string }) 
   const [message, setMessage] = useState("")
 
   function handleSubmit(formData: FormData) {
-    console.log("client submit plan:", formData.get("plan"))
-
     startTransition(() => {
       devUpdatePlan(formData)
         .then((result) => {

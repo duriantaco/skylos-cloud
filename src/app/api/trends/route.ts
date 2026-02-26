@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
-import { ensureWorkspace } from "@/lib/ensureWorkspace";
+import { createClient } from "@/utils/supabase/server";
 import { unauthorized, badRequest, serverError } from "@/lib/api-error";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 export async function GET(req: Request) {
   try {
-    const { user, orgId, supabase } = await ensureWorkspace();
-    if (!user || !orgId) return unauthorized();
+    const supabase = await createClient();
+    const auth = await requirePermission(supabase, "view:trends");
+    if (isAuthError(auth)) return auth;
 
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId");
-    const range = searchParams.get("range") || "30"; // days
+    const range = searchParams.get("range") || "30";
     const branch = searchParams.get("branch");
 
-    if (!projectId) 
+    if (!projectId)
         return badRequest("projectId is required");
 
     const days = Math.min(parseInt(range, 10) || 30, 365);
@@ -33,7 +35,7 @@ export async function GET(req: Request) {
     }
 
     const { data: scans, error } = await query;
-    if (error) 
+    if (error)
         throw error;
 
     const rows = scans || [];
@@ -75,13 +77,13 @@ export async function GET(req: Request) {
     );
 
     function avg(arr: typeof dataPoints, key: keyof (typeof dataPoints)[0]) {
-      if (arr.length === 0) 
+      if (arr.length === 0)
         return 0;
       return arr.reduce((sum, d) => sum + (Number(d[key]) || 0), 0) / arr.length;
     }
 
     function pctChange(curr: number, prev: number): number | null {
-      if (prev === 0) 
+      if (prev === 0)
         return curr > 0 ? 100 : null;
       return Math.round(((curr - prev) / prev) * 100);
     }
