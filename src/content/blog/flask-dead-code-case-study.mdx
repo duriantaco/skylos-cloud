@@ -1,0 +1,164 @@
+---
+title: "Case study: Finding dead code in Flask (69k stars)"
+excerpt: "We ran Skylos and Vulture on the Flask repository. Skylos found all 7 dead items with 12 false positives. Vulture found 6 but produced 260 false positives. Here's the full breakdown."
+publishedAt: "2026-02-27"
+tags: ["case study", "flask", "dead code", "python", "benchmarks"]
+keywords:
+  - flask dead code
+  - python dead code detection
+  - vulture vs skylos
+  - vulture alternative
+  - flask static analysis
+  - find unused code python
+  - dead code detection benchmark
+  - python SAST comparison
+  - framework aware static analysis
+  - flask code cleanup
+canonicalUrl: "/blog/flask-dead-code-case-study"
+---
+
+# Case study: Finding dead code in Flask (69k stars)
+
+Flask is one of the most popular Python web frameworks — 69,000+ stars, used everywhere from startups to Fortune 500s. It's also a great test case for dead code detection because it uses every pattern that trips up static analyzers: decorators, fixtures, class attribute overrides, dynamic registration, and callback functions that are never "called" in the traditional sense.
+
+We ran both [Skylos](https://skylos.dev) and [Vulture](https://github.com/jendrikseipp/vulture) against the Flask repository to see how they handle a real-world, framework-heavy codebase.
+
+## TL;DR
+
+| Metric | Skylos | Vulture |
+|:---|:---|:---|
+| **Dead code found** | **7/7 (100%)** | 6/7 (85.7%) |
+| **False positives** | **12** | **260** |
+| **Precision** | 36.8% | 2.3% |
+| **F1 Score** | 53.8% | 4.4% |
+
+Skylos found every dead item. Vulture missed one and produced **21x more false positives**.
+
+---
+
+## Setup
+
+We cloned the Flask repository and ran both tools at confidence level 20 (aggressive mode — catches more but also flags more). Every finding was **manually verified** against the source code. No automated labelling.
+
+```bash
+# Clone Flask
+git clone https://github.com/pallets/flask
+cd flask
+
+# Run Skylos
+skylos src/flask/ tests/ --json --confidence 20
+
+# Run Vulture
+vulture src/flask/ tests/ --min-confidence 20
+```
+
+Ground truth: **7 genuinely dead items** and **261 confirmed-alive items** that a tool might mistakenly flag.
+
+## What's actually dead in Flask?
+
+After manual verification, we found 7 items with zero callers or importers anywhere in the repository:
+
+| Item | Type | What it is |
+|:---|:---|:---|
+| `cli.py:_path_is_ancestor` | Function | Internal utility, never called |
+| `templating.py:_srcobj` | Variable | Unused loop variable |
+| `typing.py:BeforeFirstRequestCallable` | Variable | Type alias defined but never referenced |
+| `debughelpers.py:UnexpectedUnicodeError` | Class | Exception never raised or caught |
+| `test_helpers.py:PyBytesIO` | Class | Test helper never instantiated |
+| `multiapp.py:app1` | Variable | Test app variable never imported |
+| `multiapp.py:app2` | Variable | Test app variable never imported |
+
+Both tools found most of these. But only Skylos found all 7 — Vulture missed `_srcobj`, the unused loop variable in `templating.py`.
+
+## Where Vulture falls apart: false positives
+
+This is where the gap becomes dramatic.
+
+Vulture flagged **260 items** that are actually used. Skylos flagged **12**. That's a 21x difference.
+
+### Why does Vulture produce so many false positives?
+
+**Flask decorator callbacks.** Flask registers route handlers and error handlers via decorators like `@app.route()`, `@app.errorhandler()`, and `@app.before_request`. The decorated function is never "called" directly — Flask's internal dispatch system invokes it. Vulture doesn't understand this pattern and flags every single one as unused.
+
+```python
+# Vulture says this is unused. It's not — Flask calls it on every request.
+@app.before_request
+def before_request1():
+    ...
+```
+
+Skylos recognizes Flask decorator patterns and correctly marks these as used.
+
+**Pytest fixtures.** Flask's test suite uses `@pytest.fixture` extensively. Fixtures are injected by name, not by direct call. Vulture flags all of them.
+
+```python
+# Vulture says this is unused. pytest injects it by argument name.
+@pytest.fixture
+def leak_detector():
+    ...
+```
+
+Skylos recognizes pytest fixture patterns and skips them.
+
+**Class attribute overrides.** Flask subclasses Werkzeug classes and overrides attributes like `default_mimetype`, `json_module`, etc. These are read by the parent class, never referenced directly in Flask's own code. Vulture flags them. Skylos flags some but not all — still a gap, but far fewer.
+
+**Type checking test files.** Flask has test files specifically for mypy/pyright type validation. The functions in these files exist to be type-checked, not called. Vulture flags all of them. Skylos skips them.
+
+### The false positive breakdown
+
+| Category | Skylos FP | Vulture FP |
+|:---|:---|:---|
+| Flask decorator callbacks (routes, error handlers, hooks) | 0 | 183 |
+| Pytest fixtures | 0 | 8 |
+| Public API / class attributes | 8 | 21 |
+| Config variables (loaded via `from_object`) | 4 | 4 |
+| Type checking test files | 0 | 25 |
+| CLI / blueprint registration | 0 | 4 |
+| Other test patterns | 0 | 15 |
+| **Total** | **12** | **260** |
+
+The biggest category — Flask decorator callbacks — accounts for 183 of Vulture's 260 false positives. Skylos produces zero false positives in that category because it understands Flask's decorator registration model.
+
+## What this means in practice
+
+If you ran Vulture on Flask and tried to action the results, you'd spend your time reviewing 260 "unused" items, 97.7% of which are false positives. After the first 20 or so, you'd stop trusting the tool and ignore everything — including the 6 real findings.
+
+With Skylos, you get 19 total findings. 7 are real dead code, 12 are false positives from class attribute overrides and config variables. You can review all 19 in a few minutes and action the 7 real ones.
+
+## The dead code Skylos found
+
+Here's what you'd clean up:
+
+**`_path_is_ancestor` in `cli.py`** — An internal utility function that was probably used at some point during development but is no longer called. Safe to delete.
+
+**`_srcobj` in `templating.py`** — An unused loop variable. The loop unpacks two values but only uses the second. Can be replaced with `_`.
+
+**`BeforeFirstRequestCallable` in `typing.py`** — A type alias that was defined for the deprecated `before_first_request` feature. The feature was removed but the type alias stayed behind. Classic dead code pattern.
+
+**`UnexpectedUnicodeError` in `debughelpers.py`** — An exception class that is never raised, caught, or imported anywhere. Likely from an earlier version of Flask's debug system.
+
+**`PyBytesIO` in `test_helpers.py`** — A test helper class that was never instantiated in any test.
+
+**`app1` and `app2` in `multiapp.py`** — Test app variables defined for CLI testing but never actually imported by the test suite.
+
+## Reproduce it yourself
+
+```bash
+git clone https://github.com/duriantaco/skylos-demo
+cd skylos-demo/real_life_examples/flask
+python3 ../benchmark_flask.py
+```
+
+The benchmark script runs both tools and compares results against manually verified ground truth. Every finding is documented.
+
+## Takeaway
+
+Dead code detection on framework-heavy Python codebases requires understanding how the framework works. Pattern-matching tools like Vulture will drown you in false positives because they can't distinguish between "this function is never called" and "this function is called by the framework's internal dispatch."
+
+Skylos isn't perfect — it still produces false positives on class attribute overrides. But on Flask, it found **100% of dead code with 21x fewer false positives** than Vulture.
+
+The gap is even wider on codebases that use multiple frameworks (Flask + pytest + Celery, for example). The more "magic" your code uses, the more framework awareness matters.
+
+---
+
+*Want to try it on your own codebase? [Install Skylos](https://docs.skylos.dev/getting-started) — it's free, open source, and runs 100% locally.*
