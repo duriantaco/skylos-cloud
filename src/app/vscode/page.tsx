@@ -1,4 +1,5 @@
 // app/vscode/page.tsx
+import type { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
 import {
@@ -14,6 +15,24 @@ import {
   Cpu,
 } from "lucide-react"
 import dogImg from "../../../public/assets/favicon-96x96.png"
+
+export const metadata: Metadata = {
+  title: "VS Code Extension — Skylos",
+  description:
+    "Real-time AI-powered code analysis in VS Code. Detects bugs as you type with GPT-4 or Claude. One-click fixes with diff preview.",
+  keywords: [
+    "vscode python linter",
+    "ai code review vscode",
+    "python static analysis extension",
+    "dead code detection vscode",
+  ],
+  openGraph: {
+    title: "VS Code Extension — Skylos",
+    description:
+      "Real-time AI-powered code analysis in VS Code. Detects bugs as you type with GPT-4 or Claude.",
+    type: "website",
+  },
+}
 
 const FEATURES = [
   {

@@ -1,4 +1,5 @@
 // app/roadmap/page.tsx
+import type { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
 import {
@@ -12,6 +13,18 @@ import {
   Sparkles,
 } from "lucide-react"
 import dogImg from "../../../public/assets/favicon-96x96.png"
+
+export const metadata: Metadata = {
+  title: "Roadmap — Skylos",
+  description:
+    "See what's shipping now and what's next for Skylos: PR diff scanning, auto-fix suggestions, compliance mapping, and more.",
+  openGraph: {
+    title: "Roadmap — Skylos",
+    description:
+      "See what's shipping now and what's next for Skylos: PR diff scanning, auto-fix suggestions, compliance mapping, and more.",
+    type: "website",
+  },
+}
 
 const ROADMAP = [
   {
