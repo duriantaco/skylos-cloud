@@ -7,6 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Calendar, Clock, ChevronRight } from 'lucide-react';
 import dogImg from "../../../../public/assets/favicon-96x96.png";
+import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeSlug from 'rehype-slug';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
@@ -199,6 +200,7 @@ export default async function BlogPost({ params }: Props) {
                   source={content}
                   options={{
                     mdxOptions: {
+                      remarkPlugins: [remarkGfm],
                       rehypePlugins: [
                         rehypeHighlight,
                         rehypeSlug,

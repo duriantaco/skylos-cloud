@@ -112,3 +112,29 @@
   border-top: 1px solid #e2e8f0;
   margin: 3rem 0;
 }
+
+.blog-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 2rem 0;
+  font-size: 0.9375rem;
+}
+
+.blog-content thead th {
+  text-align: left;
+  font-weight: 600;
+  color: #0f172a;
+  padding: 0.75rem 1rem;
+  border-bottom: 2px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.blog-content tbody td {
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.blog-content tbody tr:hover {
+  background-color: #f8fafc;
+}
