@@ -1,8 +1,64 @@
 import { createClient } from '@/utils/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { requirePermission, isAuthError } from '@/lib/permissions';
+import { hashApiKey } from '@/lib/api-key';
 
-export async function GET() {
+function getSupabaseAdmin() {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createAdminClient(url, key);
+}
+
+export async function GET(req: Request) {
+  const authHeader = req.headers.get('authorization');
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+
+  // API key auth (CLI)
+  if (token?.startsWith('sk_live_')) {
+    const admin = getSupabaseAdmin();
+    if (!admin) {
+      return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+    }
+
+    const { data: project } = await admin
+      .from('projects')
+      .select('org_id, organizations(id, name, credits, credits_updated_at, plan)')
+      .eq('api_key_hash', hashApiKey(token))
+      .limit(1)
+      .maybeSingle();
+
+    if (!project) {
+      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+    }
+
+    const org: any = Array.isArray(project.organizations)
+      ? project.organizations[0]
+      : project.organizations;
+
+    if (!org) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    }
+
+    const { data: transactions } = await admin
+      .from('credit_transactions')
+      .select('*')
+      .eq('org_id', org.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    return NextResponse.json({
+      balance: org.credits || 0,
+      org_id: org.id,
+      org_name: org.name,
+      plan: org.plan || 'free',
+      last_updated: org.credits_updated_at,
+      recent_transactions: transactions || [],
+    });
+  }
+
+  // Session auth (dashboard)
   const supabase = await createClient();
 
   const auth = await requirePermission(supabase, 'view:projects');
