@@ -581,50 +581,12 @@ export default async function Home() {
               Simple pricing
             </h2>
             <p className="mt-4 text-lg text-slate-600">
-              Free to start. Upgrade when your team needs dashboards and PR gating.
+              Pay for what you use. If you're not happy, we will refund you.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Free Tier */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 flex flex-col">
-              <h3 className="text-xl font-semibold text-slate-900">Free</h3>
-              <p className="mt-2 text-slate-600 text-sm">For individuals and OSS</p>
-              <div className="mt-6">
-                <span className="text-5xl font-bold text-slate-900">$0</span>
-              </div>
-              <ul className="mt-8 space-y-3 text-sm text-slate-600 flex-1">
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Unlimited local scans
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> All finding categories
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> CLI + JSON + SARIF output
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Auto-fix codemods
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> 1 project on dashboard
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> 30-day scan history
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Community support
-                </li>
-              </ul>
-              <Link
-                href="/login"
-                className="mt-8 block w-full text-center rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-900 hover:bg-slate-50 transition"
-              >
-                Get started
-              </Link>
-            </div>
-
-            {/* Credits Tier */}
+          <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+            {/* Pay as you go */}
             <div className="rounded-2xl border-2 border-slate-900 bg-white p-8 flex flex-col relative">
               <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-900 text-white text-xs font-semibold">
@@ -639,7 +601,16 @@ export default async function Home() {
               </div>
               <ul className="mt-8 space-y-3 text-sm text-slate-600 flex-1">
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Everything in Free
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Unlimited local scans
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> All finding categories
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> CLI + JSON + SARIF output
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Auto-fix codemods
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Trend dashboard & analytics
@@ -666,9 +637,10 @@ export default async function Home() {
               >
                 Get started
               </Link>
+              <p className="mt-3 text-center text-xs text-slate-500">30-day money-back guarantee</p>
             </div>
 
-            {/* Enterprise Tier */}
+            {/* Enterprise */}
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-8 flex flex-col">
               <h3 className="text-xl font-semibold text-slate-900">Enterprise</h3>
               <p className="mt-2 text-slate-600 text-sm">For organizations at scale</p>
@@ -677,7 +649,7 @@ export default async function Home() {
               </div>
               <ul className="mt-8 space-y-3 text-sm text-slate-600 flex-1">
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Everything in Team
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Everything in Pay as you go
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Unlimited repos & history

@@ -673,12 +673,12 @@ export default function ScanReportView({ scan, findings }: { scan: ScanData; fin
               <span className="text-sm font-black text-slate-900">S</span>
             </div>
             <p className="text-white/80 text-sm mb-1">Automated code security for your team</p>
-            <p className="text-white/40 text-xs mb-5">Free to start. No credit card required.</p>
+            <p className="text-white/40 text-xs mb-5">30-day money-back guarantee.</p>
             <Link
               href="https://skylos.dev"
               className="px-6 py-2.5 bg-white text-slate-900 text-sm font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-lg"
             >
-              Try Skylos Free
+              Try Skylos
             </Link>
           </div>
         </div>

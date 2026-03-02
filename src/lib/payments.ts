@@ -145,6 +145,13 @@ export async function fulfillCreditPurchase(opts: {
     status: "completed",
   });
 
+  // Upgrade from free to pro on first purchase
+  await supabaseAdmin
+    .from("organizations")
+    .update({ plan: "pro" })
+    .eq("id", opts.orgId)
+    .eq("plan", "free");
+
   return !!success;
 }
 
