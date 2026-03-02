@@ -552,7 +552,7 @@ export async function POST(req: Request) {
 
    
     let baselineScan: { id: string } | null = null;
-    
+
     const { data: sameBranchScan } = await supabase
       .from('scans')
       .select('id')
@@ -561,10 +561,10 @@ export async function POST(req: Request) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    
+
     if (sameBranchScan?.id) {
       baselineScan = sameBranchScan;
-    } 
+    }
     else if (branch !== 'main') {
       const { data: mainScan } = await supabase
         .from('scans')
@@ -574,29 +574,42 @@ export async function POST(req: Request) {
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      
+
       if (mainScan?.id) {
         baselineScan = mainScan;
       }
     }
-    
+
     const hasBaseline = !!baselineScan?.id;
     const isWhitelisted = !!overriddenScanResult.data
 
+    console.log(`[gate-debug] project=${project.id} branch=${branch} hasBaseline=${hasBaseline} baselineScanId=${baselineScan?.id || 'none'} incomingFindings=${processedFindings.length} diffScope=${!!diffScope} prDiffEnabled=${caps.prDiffEnabled}`)
 
     const baselineCredits = new Map<string, number>()
     if (baselineScan?.id) {
-      const { data: oldFindings } = await supabase
+      const { data: oldFindings, error: oldErr } = await supabase
         .from('findings')
         .select('rule_id, file_path')
         .eq('scan_id', baselineScan.id)
 
+      console.log(`[gate-debug] baseline findings loaded: ${oldFindings?.length ?? 0} error: ${oldErr?.message || 'none'}`)
+
       oldFindings?.forEach((f: any) => {
         const ruleId = String(f.rule_id || "UNKNOWN")
-        const filePath = normPath(String(f.file_path || ""))
+        const filePath = String(f.file_path || "")
         const k = key(ruleId, filePath)
         baselineCredits.set(k, (baselineCredits.get(k) || 0) + 1)
       })
+
+      console.log(`[gate-debug] baseline unique keys: ${baselineCredits.size}`)
+
+      // Show first 5 baseline keys for comparison
+      const bKeys = Array.from(baselineCredits.keys()).slice(0, 5)
+      console.log(`[gate-debug] sample baseline keys: ${JSON.stringify(bKeys)}`)
+
+      // Show first 5 incoming keys for comparison
+      const iKeys = processedFindings.slice(0, 5).map((f: any) => key(f.rule_id, f.file_path))
+      console.log(`[gate-debug] sample incoming keys: ${JSON.stringify(iKeys)}`)
     }
 
     const activeSuppressions = new Set<string>()
@@ -640,12 +653,15 @@ export async function POST(req: Request) {
       else {
         const credits = baselineCredits.get(k) || 0
         isNew = credits <= 0
-        
+
         if (credits > 0) {
           baselineCredits.set(k, credits - 1)
           new_reason = "legacy"
         } else {
           new_reason = "not-in-baseline"
+          if (process.env.SKYLOS_DEBUG) {
+            console.log(`[baseline-miss] key=${k} | baseline has ${baselineCredits.size} keys`)
+          }
         }
       }
 
