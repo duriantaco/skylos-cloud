@@ -7,7 +7,6 @@ type PullFile = {
 
 function parseRepoPath(repoUrl: string): string | null {
   if (!repoUrl) return null;
-  // supports https://github.com/owner/repo or .../repo.git
   const m = String(repoUrl).match(/github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/i);
   return m?.[1] ?? null;
 }
@@ -32,14 +31,12 @@ async function ghJson<T>(url: string, token: string, init?: RequestInit): Promis
 
 async function findAssociatedPrNumber(repoPath: string, sha: string, token: string): Promise<number | null> {
   const url = `https://api.github.com/repos/${repoPath}/commits/${sha}/pulls`;
-  // preview header is still commonly used for this endpoint
   const prs = await ghJson<Pull[]>(url, token, {
     headers: { Accept: "application/vnd.github+json, application/vnd.github.groot-preview+json" },
   });
   return prs?.[0]?.number ?? null;
 }
 
-// PR files (includes "patch" text)
 async function listPrFiles(repoPath: string, prNumber: number, token: string): Promise<PullFile[]> {
   const out: PullFile[] = [];
   let page = 1;
@@ -47,16 +44,17 @@ async function listPrFiles(repoPath: string, prNumber: number, token: string): P
   while (page <= 20) {
     const url = `https://api.github.com/repos/${repoPath}/pulls/${prNumber}/files?per_page=100&page=${page}`;
     const batch = await ghJson<PullFile[]>(url, token);
-    if (!batch?.length) break;
+    if (!batch?.length) 
+      break;
     out.push(...batch);
-    if (batch.length < 100) break;
+    if (batch.length < 100) 
+      break;
     page += 1;
   }
 
   return out;
 }
 
-// parse unified diff "patch" into changed line numbers in the new file
 function changedLinesFromPatch(patch: string): Set<number> {
   const changed = new Set<number>();
   const lines = patch.split("\n");
@@ -72,8 +70,8 @@ function changedLinesFromPatch(patch: string): Set<number> {
     if (newLine === 0) 
         continue; 
 
-    // ignore file headers inside patch
-    if (raw.startsWith("+++ ") || raw.startsWith("--- ")) continue;
+    if (raw.startsWith("+++ ") || raw.startsWith("--- ")) 
+      continue;
 
     if (raw.startsWith("+")) {
       changed.add(newLine);
@@ -82,7 +80,6 @@ function changedLinesFromPatch(patch: string): Set<number> {
       newLine += 1;
     } else if (raw.startsWith("-")) {
     } else if (raw.startsWith("\\ No newline")) {
-      // ignore
     }
   }
 
@@ -172,13 +169,15 @@ export function isNewByDiff(args: {
   lineNumber: number;
   scope: DiffScope | null;
 }): boolean {
-  if (!args.scope) return false;
+  if (!args.scope) 
+    return false;
 
   const file = normPath(args.filePath);
   const line = Number(args.lineNumber || 0) || 0;
 
   const lineSet = args.scope.changedLinesMap.get(file);
-  if (lineSet) return lineSet.has(line);
+  if (lineSet) 
+    return lineSet.has(line);
 
   return args.scope.changedFiles.has(file);
 }

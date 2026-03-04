@@ -1,9 +1,11 @@
 // app/dashboard/layout.tsx
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { getEffectivePlan } from "@/lib/entitlements";
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, Target, FolderOpen, Settings, Shield, TrendingUp, CreditCard, Zap } from "lucide-react";
+import { BookOpen, Target, FolderOpen, TrendingUp, Zap } from "lucide-react";
+import DashboardUserMenu from "@/components/DashboardUserMenu";
 import dogImg from "../../../public/assets/favicon-96x96.png";
 
 export default async function DashboardLayout({
@@ -23,14 +25,14 @@ export default async function DashboardLayout({
   let plan = "free";
   const { data: member } = await supabase
     .from("organization_members")
-    .select("org_id, organizations(credits, plan)")
+    .select("org_id, organizations(credits, plan, pro_expires_at)")
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (member?.organizations) {
     const org = member.organizations as any;
     credits = org.credits ?? 0;
-    plan = org.plan || "free";
+    plan = getEffectivePlan({ plan: org.plan || "free", pro_expires_at: org.pro_expires_at });
   }
 
   const isUnlimited = plan === "enterprise";
@@ -52,9 +54,6 @@ export default async function DashboardLayout({
               <NavLink href="/dashboard" icon={Target}>Mission Control</NavLink>
               <NavLink href="/dashboard/trends" icon={TrendingUp}>Trends</NavLink>
               <NavLink href="/dashboard/projects" icon={FolderOpen}>Projects</NavLink>
-              <NavLink href="/dashboard/rules" icon={Shield}>Rules</NavLink>
-              <NavLink href="/dashboard/billing" icon={CreditCard}>Billing</NavLink>
-              <NavLink href="/dashboard/settings" icon={Settings}>Settings</NavLink>
             </div>
           </div>
 
@@ -83,17 +82,7 @@ export default async function DashboardLayout({
               <span className="hidden md:inline">Docs</span>
             </a>
             <div className="h-4 w-px bg-slate-200" />
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
-                {user.email?.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-sm text-slate-600 hidden md:block">{user.email}</span>
-              <form action="/auth/logout" method="POST">
-                <button type="submit" className="text-sm text-slate-400 hover:text-slate-600 transition">
-                  Logout
-                </button>
-              </form>
-            </div>
+            <DashboardUserMenu email={user.email || ""} logoutAction="/auth/logout" />
           </div>
         </div>
       </nav>

@@ -5,6 +5,8 @@ import { Octokit } from "@octokit/rest";
 import { serverError } from "@/lib/api-error";
 import { generateFix, generateDiffPreview } from "@/lib/fix-generator";
 import { requirePermission, isAuthError } from "@/lib/permissions";
+import { getEffectivePlan } from "@/lib/entitlements";
+import { requirePlan, requireCredits } from "@/lib/require-credits";
 
 
 async function getInstallationOctokit(installationId: number): Promise<Octokit> {
@@ -87,6 +89,20 @@ export async function POST(
   const project = finding.scans?.projects;
   const auth = await requirePermission(supabase, "suppress:findings", project?.org_id);
   if (isAuthError(auth)) return auth;
+
+  // Plan gate: PR auto-fix requires Pro
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", project?.org_id)
+    .single();
+  const effectivePlan = getEffectivePlan({ plan: org?.plan || "free", pro_expires_at: org?.pro_expires_at });
+  const planCheck = requirePlan(effectivePlan, "pro", "PR Auto-Fix");
+  if (!planCheck.ok) return planCheck.response;
+
+  // Credit gate: 3 credits for LLM-powered fix
+  const creditCheck = await requireCredits(supabase, project?.org_id, effectivePlan, "pr_review", { finding_id: id });
+  if (!creditCheck.ok) return creditCheck.response;
 
   if (!project?.github_installation_id) {
     return NextResponse.json({ error: "GitHub App not installed for this project." }, { status: 400 });

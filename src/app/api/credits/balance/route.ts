@@ -3,6 +3,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { requirePermission, isAuthError } from '@/lib/permissions';
 import { hashApiKey } from '@/lib/api-key';
+import { getEffectivePlan } from '@/lib/entitlements';
 
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
 
     const { data: project } = await admin
       .from('projects')
-      .select('org_id, organizations(id, name, credits, credits_updated_at, plan)')
+      .select('org_id, organizations(id, name, credits, credits_updated_at, plan, pro_expires_at)')
       .eq('api_key_hash', hashApiKey(token))
       .limit(1)
       .maybeSingle();
@@ -41,6 +42,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
+    const effectivePlan = getEffectivePlan({ plan: org.plan || 'free', pro_expires_at: org.pro_expires_at });
+
     const { data: transactions } = await admin
       .from('credit_transactions')
       .select('*')
@@ -52,7 +55,8 @@ export async function GET(req: Request) {
       balance: org.credits || 0,
       org_id: org.id,
       org_name: org.name,
-      plan: org.plan || 'free',
+      plan: effectivePlan,
+      pro_expires_at: org.pro_expires_at || null,
       last_updated: org.credits_updated_at,
       recent_transactions: transactions || [],
     });
@@ -66,13 +70,15 @@ export async function GET(req: Request) {
 
   const { data: org } = await supabase
     .from('organizations')
-    .select('id, name, credits, credits_updated_at, plan')
+    .select('id, name, credits, credits_updated_at, plan, pro_expires_at')
     .eq('id', auth.orgId)
     .single();
 
   if (!org) {
     return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
   }
+
+  const effectivePlan = getEffectivePlan({ plan: org.plan || 'free', pro_expires_at: org.pro_expires_at });
 
   const { data: transactions, error: txError } = await supabase
     .from('credit_transactions')
@@ -89,7 +95,8 @@ export async function GET(req: Request) {
     balance: org.credits || 0,
     org_id: org.id,
     org_name: org.name,
-    plan: org.plan || 'free',
+    plan: effectivePlan,
+    pro_expires_at: org.pro_expires_at || null,
     last_updated: org.credits_updated_at,
     recent_transactions: transactions || []
   });

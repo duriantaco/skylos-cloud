@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { hashApiKey } from "@/lib/api-key";
+import { getEffectivePlan } from "@/lib/entitlements";
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   const { data: project, error: projError } = await supabase
     .from('projects')
-    .select('id, name, repo_url, org_id, organizations(id, name, plan)')
+    .select('id, name, repo_url, org_id, organizations(id, name, plan, pro_expires_at)')
     .eq('api_key_hash', tokenHash)
     .single()
 
@@ -40,9 +41,12 @@ export async function GET(request: NextRequest) {
 
   const orgRef = project.organizations as any
   const org = Array.isArray(orgRef) ? orgRef[0] : orgRef
-  const plan = String(org?.plan || 'free').toLowerCase()
+  const effectivePlan = getEffectivePlan({
+    plan: String(org?.plan || 'free').toLowerCase(),
+    pro_expires_at: org?.pro_expires_at || null,
+  })
+  const plan = effectivePlan
   const isPaid = plan === 'pro' || plan === 'enterprise'
-  const isEnterprise = plan === 'enterprise'
 
   const capabilities = {
     pr_diff: true,
@@ -51,7 +55,7 @@ export async function GET(request: NextRequest) {
     verify: true,
 
     overrides: isPaid,
-    sarif_import: isEnterprise,
+    sarif_import: isPaid,
   }
 
   return NextResponse.json({

@@ -1,18 +1,21 @@
 'use client'
 import { useState } from "react";
-import { Plus, Trash2, Save, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, ChevronDown, ChevronRight, Lock } from "lucide-react";
 
 type GateMode = "zero-new" | "category" | "severity" | "both";
 
 export default function PolicyEditor({
   initialConfig,
   initialExcludePaths,
-  projectId
+  projectId,
+  plan = "free",
 }: {
   initialConfig: Record<string, any>,
   initialExcludePaths?: string[],
-  projectId: string
+  projectId: string,
+  plan?: string,
 }) {
+  const canUseAdvancedGates = plan === "pro" || plan === "enterprise";
   const pc = initialConfig || {};
   
   const [saving, setSaving] = useState(false);
@@ -228,16 +231,22 @@ export default function PolicyEditor({
         <div className="mb-4">
           <label className="text-xs text-slate-500 block mb-1">Gate Mode</label>
           <select
-            value={gateMode}
+            value={canUseAdvancedGates ? gateMode : "zero-new"}
             onChange={(e) => setGateMode(e.target.value as GateMode)}
-            disabled={!gateEnabled}
+            disabled={!gateEnabled || !canUseAdvancedGates}
             className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500"
           >
             <option value="zero-new">Zero-new (block any new issue)</option>
-            <option value="category">By category thresholds</option>
-            <option value="severity">By severity thresholds</option>
-            <option value="both">Category + severity</option>
+            <option value="category" disabled={!canUseAdvancedGates}>By category thresholds {!canUseAdvancedGates ? "(Pro)" : ""}</option>
+            <option value="severity" disabled={!canUseAdvancedGates}>By severity thresholds {!canUseAdvancedGates ? "(Pro)" : ""}</option>
+            <option value="both" disabled={!canUseAdvancedGates}>Category + severity {!canUseAdvancedGates ? "(Pro)" : ""}</option>
           </select>
+          {!canUseAdvancedGates && (
+            <p className="mt-1 text-xs text-indigo-600 flex items-center gap-1">
+              <Lock className="w-3 h-3" />
+              <a href="/dashboard/billing" className="underline hover:text-indigo-800">Buy any credit pack</a> to unlock advanced gate modes
+            </p>
+          )}
         </div>
 
         {(gateMode === "category" || gateMode === "both") && gateEnabled && (

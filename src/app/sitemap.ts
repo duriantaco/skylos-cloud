@@ -25,5 +25,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...blogPosts,
     { url: `${siteUrl}/roadmap`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${siteUrl}/vscode`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${siteUrl}/llms.txt`, lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${siteUrl}/llms-full.txt`, lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
   ]
 }

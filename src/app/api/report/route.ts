@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { postSkylosCheckRun } from "@/lib/github-checkrun";
 import { getDiffScopeForCommit, isNewByDiff } from "@/lib/github-pr-diff";
 import { isSarif, sarifToSkylosPayload } from "@/lib/sarif";
+import { isClaudeSecurityReport, claudeSecurityToSkylosPayload } from "@/lib/claude-security";
 import { sendSlackNotification } from "@/lib/slack";
 import { sendDiscordNotification } from "@/lib/discord";
 import { getSiteUrl } from "@/lib/site";
@@ -12,6 +13,7 @@ import crypto from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { serverError } from "@/lib/api-error";
 import { hashApiKey } from "@/lib/api-key";
+import { getEffectivePlan, getCapabilities as getEntitlementCaps } from "@/lib/entitlements";
 
 function getSupabaseAdmin(): SupabaseClient | null {
   const url =
@@ -169,7 +171,7 @@ export async function createOrUpdateIssueGroups(
 
 type Plan = "free" | "pro" | "enterprise";
 
-type PlanCapabilities = {
+type ReportCaps = {
   maxScansStored: number;
   prDiffEnabled: boolean;
   suppressionsEnabled: boolean;
@@ -180,45 +182,18 @@ type PlanCapabilities = {
   discordEnabled: boolean;
 };
 
-const PLAN_CAPABILITIES: Record<Plan, PlanCapabilities> = {
-  free: {
-    maxScansStored: 50,
-    prDiffEnabled: true,
-    suppressionsEnabled: true,
-    overridesEnabled: false,
-    checkRunsEnabled: true,
-    sarifEnabled: false,
-    slackEnabled: false,
-    discordEnabled: false,
-  },
-  pro: {
-    maxScansStored: 500,
-    prDiffEnabled: true,
-    suppressionsEnabled: true,
-    overridesEnabled: true,
-    checkRunsEnabled: true,
-    sarifEnabled: true,
-    slackEnabled: true,
-    discordEnabled: true,
-  },
-  enterprise: {
-    maxScansStored: 10000,
-    prDiffEnabled: true,
-    suppressionsEnabled: true,
-    overridesEnabled: true,
-    checkRunsEnabled: true,
-    sarifEnabled: true,
-    slackEnabled: true,
-    discordEnabled: true,
-  },
-};
-
-function getCapabilities(plan: string): PlanCapabilities {
-  if (plan === "enterprise") 
-    return PLAN_CAPABILITIES.enterprise;
-  if (plan === "pro") 
-    return PLAN_CAPABILITIES.pro;
-  return PLAN_CAPABILITIES.free;
+function getReportCaps(plan: string): ReportCaps {
+  const caps = getEntitlementCaps(plan);
+  return {
+    maxScansStored: caps.maxScansStored,
+    prDiffEnabled: caps.prDiffEnabled,
+    suppressionsEnabled: caps.suppressionsEnabled,
+    overridesEnabled: caps.overridesEnabled,
+    checkRunsEnabled: caps.checkRunsEnabled,
+    sarifEnabled: caps.sarifEnabled,
+    slackEnabled: caps.integrationsEnabled,
+    discordEnabled: caps.integrationsEnabled,
+  };
 }
 
 function key(ruleId: string, filePath: string) {
@@ -261,6 +236,22 @@ function normalizeIncomingReport(body: any) {
       branch: String(body.branch || "main"),
       actor: String(body.actor || "sarif"),
       tool: "sarif" as const,
+      source: "skylos" as string,
+      source_metadata: null as any[] | null,
+    }
+  }
+
+  if (isClaudeSecurityReport(body)) {
+    const norm = claudeSecurityToSkylosPayload(body)
+    return {
+      summary: norm.summary,
+      findings: norm.findings,
+      commit_hash: String(body.commit_hash || "local"),
+      branch: String(body.branch || "main"),
+      actor: String(body.actor || "claude-security"),
+      tool: "claude-code-security" as const,
+      source: "claude-code-security" as string,
+      source_metadata: norm.source_metadata,
     }
   }
 
@@ -272,6 +263,8 @@ function normalizeIncomingReport(body: any) {
     branch: branch || "main",
     actor: actor || "unknown",
     tool: "skylos" as const,
+    source: "skylos" as string,
+    source_metadata: null as any[] | null,
   }
 }
 
@@ -403,7 +396,7 @@ export async function POST(req: Request) {
           id, name, org_id, strict_mode, repo_url, policy_config, ai_assurance_enabled,
           github_installation_id, slack_webhook_url, slack_notifications_enabled,
           slack_notify_on, discord_webhook_url, discord_notifications_enabled,
-          discord_notify_on, organizations(plan)`)
+          discord_notify_on, organizations(plan, pro_expires_at)`)
         .or(`repo_url.eq.${repoUrl},repo_url.eq.${repoUrl}.git`)
         .limit(1)
         .maybeSingle()
@@ -422,7 +415,7 @@ export async function POST(req: Request) {
           id, name, org_id, strict_mode, repo_url, policy_config, ai_assurance_enabled,
           github_installation_id, slack_webhook_url, slack_notifications_enabled,
           slack_notify_on, discord_webhook_url, discord_notifications_enabled,
-          discord_notify_on, organizations(plan)`)
+          discord_notify_on, organizations(plan, pro_expires_at)`)
         .eq('api_key_hash', hashApiKey(token))
         .single()
 
@@ -436,19 +429,28 @@ export async function POST(req: Request) {
     }
 
     const orgRef: any = (project as any).organizations
-    const plan = String((Array.isArray(orgRef) ? orgRef?.[0]?.plan : orgRef?.plan) || "free") as Plan
-    const caps = getCapabilities(plan);
+    const rawPlan = String((Array.isArray(orgRef) ? orgRef?.[0]?.plan : orgRef?.plan) || "free");
+    const proExpiresAt = Array.isArray(orgRef) ? orgRef?.[0]?.pro_expires_at : orgRef?.pro_expires_at;
+    const plan = getEffectivePlan({ plan: rawPlan, pro_expires_at: proExpiresAt });
+    const caps = getReportCaps(plan);
 
     // --- Credit gate: deduct before any processing ---
+    // Peek at analysis_mode to determine credit cost (2 for Claude Security, 1 for native)
+    const bodyForCredits = await req.clone().json().catch(() => ({}));
+    const isClaudeSecurity = String(bodyForCredits.analysis_mode || "").includes("claude-security")
+      || isClaudeSecurityReport(bodyForCredits);
+    const creditCost = isClaudeSecurity ? 2 : 1;
+    const creditFeatureKey = isClaudeSecurity ? "claude_security_ingest" : "scan_upload";
+
     let creditsWarning = false;
     let creditsRemaining: number | null = null;
     if (plan !== "enterprise") {
       const { data: deducted, error: creditErr } = await supabase.rpc("deduct_credits", {
         p_org_id: project.org_id,
-        p_amount: 1,
-        p_description: "Scan upload",
+        p_amount: creditCost,
+        p_description: isClaudeSecurity ? "Claude Security ingestion" : "Scan upload",
         p_metadata: {
-          feature_key: "scan_upload",
+          feature_key: creditFeatureKey,
           project_id: project.id,
         },
       });
@@ -487,7 +489,7 @@ export async function POST(req: Request) {
 
     const body = await req.json()
     const normalized = normalizeIncomingReport(body)
-    const { summary, findings, commit_hash, branch, actor, tool } = normalized
+    const { summary, findings, commit_hash, branch, actor, tool, source, source_metadata } = normalized
     const { is_forced } = body
     const analysis_mode = String(body.analysis_mode || "static");
     const ai_code = body.ai_code || null;
@@ -810,7 +812,7 @@ export async function POST(req: Request) {
     if (scanError) 
       throw new Error(scanError.message)
 
-    const dbRows = finalFindings.map((f: any) => ({
+    const dbRows = finalFindings.map((f: any, idx: number) => ({
       scan_id: scan.id,
       rule_id: f.rule_id || 'UNKNOWN',
       tool_rule_id: f.tool_rule_id || null,
@@ -823,6 +825,8 @@ export async function POST(req: Request) {
       is_new: !!f.is_new,
       new_reason: f.new_reason || null,
       is_suppressed: !!f.is_suppressed,
+      source: source || 'skylos',
+      source_metadata: source_metadata?.[idx] || null,
       analysis_source: f.metadata?.source || null,
       analysis_confidence: f.metadata?.confidence || null,
       llm_verdict: f.metadata?.llm_verdict || null,
@@ -854,8 +858,9 @@ export async function POST(req: Request) {
 
     if (insSelErr) throw new Error(`Failed to read inserted findings: ${insSelErr.message}`);
 
+    let mapping: Record<string, string> = {};
     if (insertedFindings && insertedFindings.length > 0) {
-      const mapping = await createOrUpdateIssueGroups(supabase, {
+      mapping = await createOrUpdateIssueGroups(supabase, {
         orgId: project.org_id,
         projectId: project.id,
         scanId: scan.id,
@@ -884,6 +889,80 @@ export async function POST(req: Request) {
         }
       }
     }
+    }
+
+    // ── Cross-tool auto-verification ──────────────────────────────────────
+    // When a Claude Security finding matches a Skylos finding at the same
+    // (file_path, line_number), promote the issue group to VERIFIED.
+    if (source === "claude-code-security" && insertedFindings && insertedFindings.length > 0) {
+      try {
+        // Find existing Skylos findings in the same project at matching locations
+        const locations = insertedFindings.map((f: any) => ({
+          file_path: f.file_path,
+          line_number: f.line_number,
+        }));
+
+        // Query recent Skylos findings for this project (last scan from skylos source)
+        const { data: recentSkylosScan } = await supabase
+          .from("scans")
+          .select("id")
+          .eq("project_id", project.id)
+          .eq("tool", "skylos")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (recentSkylosScan?.id) {
+          const { data: skylosFindings } = await supabase
+            .from("findings")
+            .select("file_path, line_number, group_id")
+            .eq("scan_id", recentSkylosScan.id)
+            .eq("category", "SECURITY");
+
+          if (skylosFindings && skylosFindings.length > 0) {
+            const skylosLocationSet = new Set(
+              skylosFindings.map((f: any) => `${f.file_path}::${f.line_number}`)
+            );
+
+            // Collect group IDs of Claude findings that overlap with Skylos findings
+            const verifiedGroupIds = new Set<string>();
+            for (const cf of insertedFindings as any[]) {
+              const locKey = `${cf.file_path}::${cf.line_number}`;
+              if (skylosLocationSet.has(locKey)) {
+                // Find the group_id from the mapping
+                const gid = mapping[cf.id];
+                if (gid) verifiedGroupIds.add(gid);
+              }
+            }
+
+            // Also check Skylos-side group IDs
+            for (const sf of skylosFindings as any[]) {
+              const locKey = `${sf.file_path}::${sf.line_number}`;
+              const claudeMatch = locations.some(
+                (l: any) => `${l.file_path}::${l.line_number}` === locKey
+              );
+              if (claudeMatch && sf.group_id) {
+                verifiedGroupIds.add(sf.group_id);
+              }
+            }
+
+            if (verifiedGroupIds.size > 0) {
+              const ids = Array.from(verifiedGroupIds);
+              await supabase
+                .from("issue_groups")
+                .update({ verification_status: "VERIFIED" })
+                .in("id", ids)
+                .eq("verification_status", "UNVERIFIED");
+
+              console.log(
+                `[cross-verify] Auto-verified ${ids.length} issue groups via Claude+Skylos corroboration`
+              );
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Cross-tool verification failed (non-fatal):", e);
+      }
     }
 
     await cleanupOldScans(supabase, project.id, caps.maxScansStored);

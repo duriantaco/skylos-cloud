@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { serverError } from "@/lib/api-error";
 import { hashApiKey } from "@/lib/api-key";
+import { getEffectivePlan } from "@/lib/entitlements";
 
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     const { data: project, error: projError } = await supabase
         .from('projects')
-        .select('id, name, org_id, organizations(id, name, plan)')
+        .select('id, name, org_id, organizations(id, name, plan, pro_expires_at)')
         .eq('api_key_hash', hashApiKey(token))
         .single()
 
@@ -40,10 +41,10 @@ export async function GET(request: NextRequest) {
 
   const orgRef = project.organizations as any
   const org = Array.isArray(orgRef) ? orgRef[0] : orgRef
-  const plan = String(org?.plan || 'free')
+  const plan = getEffectivePlan({ plan: org?.plan || 'free', pro_expires_at: org?.pro_expires_at })
   const orgId = org?.id
 
-  if (!['pro', 'team', 'enterprise'].includes(plan)) {
+  if (!['pro', 'enterprise'].includes(plan)) {
     return NextResponse.json({ 
       rules: [],
       count: 0,
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
   }
 
   const filteredRules = (rules || []).filter(rule => {
-    if (rule.rule_type === 'python' && !['team', 'enterprise'].includes(plan)) {
+    if (rule.rule_type === 'python' && !['pro', 'enterprise'].includes(plan)) {
       return false
     }
     return true

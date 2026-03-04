@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { getEffectivePlan } from "@/lib/entitlements";
 import Link from "next/link";
 import { 
   Code2, FileCode, Shield, Zap
@@ -10,7 +11,6 @@ import { RuleActions } from "@/components/rules/RuleActions";
 const RULE_LIMITS: Record<string, number> = {
   free: 3,
   pro: 50,
-  team: 100,
   enterprise: 999999
 };
 
@@ -23,16 +23,18 @@ export default async function RulesPage() {
 
   const { data: member } = await supabase
     .from("organization_members")
-    .select("org_id, organizations(plan, name)")
+    .select("org_id, organizations(plan, name, pro_expires_at)")
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (!member?.org_id) return redirect("/dashboard");
 
   const orgId = member.org_id;
-  const plan = (member.organizations as any)?.plan || "free";
-  const canUseRules = ["free", "pro", "team", "enterprise"].includes(plan);
-  const canUsePython = ["team", "enterprise"].includes(plan);
+  const rawPlan = (member.organizations as any)?.plan || "free";
+  const proExpiresAt = (member.organizations as any)?.pro_expires_at || null;
+  const plan = getEffectivePlan({ plan: rawPlan, pro_expires_at: proExpiresAt });
+  const canUseRules = ["free", "pro", "enterprise"].includes(plan);
+  const canUsePython = ["pro", "enterprise"].includes(plan);
   const maxRules = RULE_LIMITS[plan] || 0;
 
   const { data: rules } = await supabase

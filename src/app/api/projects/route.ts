@@ -4,7 +4,7 @@ import { generateApiKey } from "@/lib/api-key";
 import { trackEvent } from "@/lib/analytics";
 import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
-import { getCapabilities } from "@/lib/entitlements";
+import { getCapabilities, getEffectivePlan } from "@/lib/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -42,11 +42,12 @@ export async function POST(req: Request) {
     // Enforce project limit based on plan
     const { data: org } = await supabase
       .from("organizations")
-      .select("plan")
+      .select("plan, pro_expires_at")
       .eq("id", org_id)
       .single();
 
-    const caps = getCapabilities(org?.plan || "free");
+    const effectivePlan = getEffectivePlan({ plan: org?.plan || "free", pro_expires_at: org?.pro_expires_at });
+    const caps = getCapabilities(effectivePlan);
 
     const { count } = await supabase
       .from("projects")
@@ -55,8 +56,9 @@ export async function POST(req: Request) {
 
     if ((count ?? 0) >= caps.maxProjectsAllowed) {
       return NextResponse.json({
-        error: `Project limit reached (${caps.maxProjectsAllowed} on ${org?.plan || "free"} plan). Purchase credits to unlock more projects.`,
+        error: `Project limit reached (${caps.maxProjectsAllowed} on ${effectivePlan} plan). Purchase credits to unlock more projects.`,
         code: "PROJECT_LIMIT",
+        buy_url: "/dashboard/billing",
       }, { status: 403 });
     }
 

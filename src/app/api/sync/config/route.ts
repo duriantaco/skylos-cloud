@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
 import { hashApiKey } from "@/lib/api-key";
+import { getEffectivePlan } from "@/lib/entitlements";
 
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
 
     const { data: project, error: projError } = await supabase
       .from("projects")
-      .select("id, name, policy_config, strict_mode, organizations(plan)")
+      .select("id, name, policy_config, strict_mode, organizations(plan, pro_expires_at)")
       .eq("api_key_hash", hashApiKey(token))
       .single();
 
@@ -42,9 +43,11 @@ export async function GET(req: Request) {
     const gate = (pc.gate ?? {}) as Record<string, any>;
 
     const orgRef = (project as any).organizations;
-    const plan = String(
+    const rawPlan = String(
       (Array.isArray(orgRef) ? orgRef?.[0]?.plan : orgRef?.plan) || "free"
     );
+    const proExpiresAt = Array.isArray(orgRef) ? orgRef?.[0]?.pro_expires_at : orgRef?.pro_expires_at;
+    const plan = getEffectivePlan({ plan: rawPlan, pro_expires_at: proExpiresAt });
 
     const config = {
       project_id: project.id,

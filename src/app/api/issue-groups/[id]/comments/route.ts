@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
+import { getEffectivePlan } from "@/lib/entitlements";
+import { requirePlan } from "@/lib/require-credits";
 
 const COMMENT_SELECT = `
   id,
@@ -88,6 +90,16 @@ export async function POST(
   const orgId = (group.projects as any)?.org_id;
   const auth = await requirePermission(supabase, "comment:issues", orgId);
   if (isAuthError(auth)) return auth;
+
+  // Plan gate: team collaboration requires Pro
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", orgId)
+    .single();
+  const effectivePlan = getEffectivePlan({ plan: org?.plan || "free", pro_expires_at: org?.pro_expires_at });
+  const planCheck = requirePlan(effectivePlan, "pro", "Team Comments");
+  if (!planCheck.ok) return planCheck.response;
 
   const { data: comment, error: commentErr } = await supabase
     .from("issue_comments")

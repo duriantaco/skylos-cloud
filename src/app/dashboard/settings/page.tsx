@@ -10,6 +10,7 @@ import SlackIntegration from "@/components/settings/SlackIntegration";
 import DiscordIntegration from "@/components/settings/DiscordIntegration";
 import TeamMembers from "@/components/settings/TeamMembers";
 import { createClient } from "@/utils/supabase/server";
+import { getEffectivePlan } from "@/lib/entitlements";
 import DevPlanToggle from "@/components/settings/DevPlanToggle";
 import GitHubAppInstall from "@/components/settings/GitHubAppInstall"
 import RepoUrlEditor from "@/components/settings/RepoUrlEditor";
@@ -77,7 +78,7 @@ function NoProjectsState({ userPlan }: { userPlan: string }) {
         <p className="text-slate-500 mb-8">Manage your organization plan and project settings.</p>
         
         <div className={`rounded-xl p-6 mb-8 border-2 ${
-          ['pro'].includes(userPlan)
+          ['pro', 'enterprise'].includes(userPlan)
             ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200'
             : 'bg-slate-50 border-slate-200'
         }`}>
@@ -86,21 +87,21 @@ function NoProjectsState({ userPlan }: { userPlan: string }) {
               <h3 className="text-lg font-bold mb-1">
                 Current Plan: 
                 <span className={`ml-2 px-3 py-1 rounded-full text-sm ${
-                  ['pro'].includes(userPlan)
+                  ['pro', 'enterprise'].includes(userPlan)
                     ? 'bg-gray-700 text-white'
                     : 'bg-slate-600 text-white'
                 }`}>
-                  {userPlan === 'pro' ? '⚡ Pro' : 'Free'}
+                  {userPlan === 'enterprise' ? '🏢 Enterprise' : userPlan === 'pro' ? '⚡ Pro' : 'Free'}
                 </span>
               </h3>
               <p className="text-sm text-slate-600">
-                {['pro'].includes(userPlan)
+                {['pro', 'enterprise'].includes(userPlan)
                   ? 'All features unlocked. Quality gates will block bad code.'
                   : 'Get notified about issues but can\'t block commits.'}
               </p>
             </div>
             
-            {!['pro'].includes(userPlan) && (
+            {!['pro', 'enterprise'].includes(userPlan) && (
               <div className="flex items-center gap-3">
                 <a href="mailto:founder@skylos.dev" className="px-4 py-2 border border-slate-200 text-slate-900 rounded-lg font-semibold hover:bg-slate-50 transition text-sm">
                   Book a Demo
@@ -150,7 +151,7 @@ function ProjectPicker({ projects, userPlan }: {
         <p className="text-slate-500 mb-8">Manage your organization plan and project settings.</p>
 
         <div className={`rounded-xl p-6 mb-8 border-2 ${
-          ['pro'].includes(userPlan)
+          ['pro', 'enterprise'].includes(userPlan)
             ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200'
             : 'bg-slate-50 border-slate-200'
         }`}>
@@ -159,21 +160,21 @@ function ProjectPicker({ projects, userPlan }: {
               <h3 className="text-lg font-bold mb-1">
                 Current Plan: 
                 <span className={`ml-2 px-3 py-1 rounded-full text-sm ${
-                  ['pro'].includes(userPlan)
+                  ['pro', 'enterprise'].includes(userPlan)
                     ? 'bg-gray-700 text-white'
                     : 'bg-slate-600 text-white'
                 }`}>
-                  {userPlan === 'pro' ? '⚡ Pro' : 'Free'}
+                  {userPlan === 'enterprise' ? '🏢 Enterprise' : userPlan === 'pro' ? '⚡ Pro' : 'Free'}
                 </span>
               </h3>
               <p className="text-sm text-slate-600">
-                {['pro'].includes(userPlan)
+                {['pro', 'enterprise'].includes(userPlan)
                   ? 'All features unlocked across all projects. Quality gates will block bad code.'
                   : 'Get notified about issues but can\'t block commits.'}
               </p>
             </div>
             
-            {!['pro'].includes(userPlan) && (
+            {!['pro', 'enterprise'].includes(userPlan) && (
               <div className="flex items-center gap-3">
                 <a href="mailto:founder@skylos.dev" className="px-4 py-2 border border-slate-200 text-slate-900 rounded-lg font-semibold hover:bg-slate-50 transition text-sm">
                   Book a Demo
@@ -237,11 +238,11 @@ export default async function SettingsPage({
 
   const { data: org } = await supabase
     .from('organizations')
-    .select('plan')
+    .select('plan, pro_expires_at')
     .eq('id', orgId)
     .single();
 
-  const userPlan = org?.plan || 'free';
+  const userPlan = getEffectivePlan({ plan: org?.plan || 'free', pro_expires_at: org?.pro_expires_at });
 
   // Fetch current user's role for RBAC UI
   const { data: membership } = await supabase
@@ -299,7 +300,7 @@ export default async function SettingsPage({
         />
 
         <div className={`rounded-xl p-6 mb-8 border-2 ${
-          ['pro'].includes(userPlan)
+          ['pro', 'enterprise'].includes(userPlan)
             ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200'
             : 'bg-slate-50 border-slate-200'
         }`}>
@@ -308,21 +309,21 @@ export default async function SettingsPage({
               <h3 className="text-lg font-bold mb-1">
                 Organization Plan: 
                 <span className={`ml-2 px-3 py-1 rounded-full text-sm ${
-                  ['pro'].includes(userPlan)
+                  ['pro', 'enterprise'].includes(userPlan)
                     ? 'bg-gray-700 text-white'
                     : 'bg-slate-600 text-white'
                 }`}>
-                  {userPlan === 'pro' ? '⚡ Pro' : 'Free'}
+                  {userPlan === 'enterprise' ? '🏢 Enterprise' : userPlan === 'pro' ? '⚡ Pro' : 'Free'}
                 </span>
               </h3>
               <p className="text-sm text-slate-600">
-                {['pro'].includes(userPlan)
+                {['pro', 'enterprise'].includes(userPlan)
                   ? 'All features unlocked for all projects. Quality gates will block bad code.'
                   : 'Get notified about issues but can\'t block commits.'}
               </p>
             </div>
             
-            {!['pro'].includes(userPlan) && (
+            {!['pro', 'enterprise'].includes(userPlan) && (
               <div className="flex items-center gap-3">
                 <a href="mailto:founder@skylos.dev" className="px-4 py-2 border border-slate-200 text-slate-900 rounded-lg font-semibold hover:bg-slate-50 transition text-sm">
                   Book a Demo
@@ -350,7 +351,7 @@ export default async function SettingsPage({
               </div>
             </div>
 
-            <TeamMembers currentUserId={user.id} currentUserRole={userRole} />
+            <TeamMembers currentUserId={user.id} currentUserRole={userRole} plan={userPlan} />
           </section>
 
           {canManageSettings && (
@@ -385,16 +386,16 @@ export default async function SettingsPage({
               </div>
             </div>
 
-            {['pro'].includes(userPlan) ? (
+            {['pro', 'enterprise'].includes(userPlan) ? (
               <SlackIntegration projectId={project.id} />
             ) : (
               <div className="relative opacity-50 pointer-events-none">
                 <SlackIntegration projectId={project.id} />
                 <div className="absolute inset-0 flex items-center justify-center bg-white/90">
                   <div className="text-center">
-                    <p className="font-semibold mb-2">🔒 Pro Feature</p>
+                    <p className="font-semibold mb-2">Pro Feature</p>
                     <a href="/dashboard/billing" className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">
-                      Buy Credits
+                      Buy any credit pack to unlock Pro
                     </a>
                   </div>
                 </div>
@@ -417,16 +418,16 @@ export default async function SettingsPage({
               </div>
             </div>
 
-            {['pro'].includes(userPlan) ? (
+            {['pro', 'enterprise'].includes(userPlan) ? (
               <DiscordIntegration projectId={project.id} />
             ) : (
               <div className="relative opacity-50 pointer-events-none">
                 <DiscordIntegration projectId={project.id} />
                 <div className="absolute inset-0 flex items-center justify-center bg-white/90">
                   <div className="text-center">
-                    <p className="font-semibold mb-2">🔒 Pro Feature</p>
+                    <p className="font-semibold mb-2">Pro Feature</p>
                     <a href="/dashboard/billing" className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">
-                      Buy Credits
+                      Buy any credit pack to unlock Pro
                     </a>
                   </div>
                 </div>
@@ -453,6 +454,7 @@ export default async function SettingsPage({
               initialConfig={pc}
               initialExcludePaths={excludePaths}
               projectId={project.id}
+              plan={userPlan}
             />
           </section>
           )}

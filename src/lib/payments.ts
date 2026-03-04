@@ -27,6 +27,18 @@ export interface CreditPack {
   priceCents: number;
   variantId: string;
   perCreditCost: string;
+  proDays: number;
+}
+
+const PRO_DURATION_MAP: Record<string, number> = {
+  starter: 30,
+  builder: 90,
+  team: 180,
+  scale: 365,
+};
+
+export function getProDurationDays(packId: string): number {
+  return PRO_DURATION_MAP[packId] || 30;
 }
 
 export const CREDIT_PACKS: Record<PackId, CreditPack> = {
@@ -37,6 +49,7 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     priceCents: 900,
     variantId: process.env.LS_VARIANT_STARTER || "",
     perCreditCost: "$0.018",
+    proDays: 30,
   },
   builder: {
     id: "builder",
@@ -45,6 +58,7 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     priceCents: 3_900,
     variantId: process.env.LS_VARIANT_BUILDER || "",
     perCreditCost: "$0.016",
+    proDays: 90,
   },
   team: {
     id: "team",
@@ -53,6 +67,7 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     priceCents: 12_900,
     variantId: process.env.LS_VARIANT_TEAM || "",
     perCreditCost: "$0.013",
+    proDays: 180,
   },
   scale: {
     id: "scale",
@@ -61,6 +76,7 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     priceCents: 49_900,
     variantId: process.env.LS_VARIANT_SCALE || "",
     perCreditCost: "$0.010",
+    proDays: 365,
   },
 };
 
@@ -145,19 +161,31 @@ export async function fulfillCreditPurchase(opts: {
     status: "completed",
   });
 
-  // Upgrade from free to pro on first purchase
-  await supabaseAdmin
-    .from("organizations")
-    .update({ plan: "pro" })
-    .eq("id", opts.orgId)
-    .eq("plan", "free");
+  const proDurationDays = getProDurationDays(opts.packId);
 
-  return !!success;
+  const { data: currentOrg } = await supabaseAdmin
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", opts.orgId)
+    .single();
+
+  if (currentOrg?.plan !== "enterprise") {
+    const now = new Date();
+    const currentExpiry = currentOrg?.pro_expires_at ? new Date(currentOrg.pro_expires_at) : null;
+
+    const baseDate = currentExpiry && currentExpiry > now ? currentExpiry : now;
+    const newExpiry = new Date(baseDate.getTime() + proDurationDays * 24 * 60 * 60 * 1000);
+
+    await supabaseAdmin
+      .from("organizations")
+      .update({ plan: "pro", pro_expires_at: newExpiry.toISOString() })
+      .eq("id", opts.orgId);
+  }
+
+  return !error;
 }
 
 export async function handleRefund(orderId: string): Promise<void> {
-  // Idempotent: atomically mark as refunded first, only deduct if status actually changed.
-  // This prevents double-deduction if the webhook fires twice.
   const { data: updated, error: updateErr } = await supabaseAdmin
     .from("credit_purchases")
     .update({ status: "refunded" })

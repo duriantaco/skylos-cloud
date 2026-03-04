@@ -5,7 +5,6 @@ import { unauthorized, forbidden } from "@/lib/api-error";
 export type OrgRole = "owner" | "admin" | "member" | "viewer";
 
 export type Permission =
-  // Read
   | "view:scans"
   | "view:findings"
   | "view:projects"
@@ -13,14 +12,12 @@ export type Permission =
   | "view:compliance"
   | "view:activity"
   | "view:members"
-  // Write
   | "create:projects"
   | "edit:projects"
   | "suppress:findings"
   | "assign:issues"
   | "comment:issues"
   | "create:scans"
-  // Admin
   | "delete:projects"
   | "manage:settings"
   | "manage:integrations"
@@ -29,7 +26,6 @@ export type Permission =
   | "manage:rules"
   | "manage:members"
   | "bulk:delete"
-  // Owner
   | "manage:billing"
   | "manage:org";
 
@@ -88,12 +84,6 @@ type AuthSuccess = {
   orgId: string;
 };
 
-/**
- * Checks auth + org membership + permission in one call.
- * Returns auth data on success, or a NextResponse error.
- *
- * If orgId is not provided, uses the user's first org membership.
- */
 export async function requirePermission(
   supabase: SupabaseClient,
   permission: Permission,
@@ -135,9 +125,6 @@ export async function requirePermission(
   };
 }
 
-/**
- * Helper to check if requirePermission returned an error response.
- */
 export function isAuthError(
   result: AuthSuccess | NextResponse
 ): result is NextResponse {

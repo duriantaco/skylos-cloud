@@ -1,13 +1,9 @@
 export const FEATURE_KEYS = {
-  DASHBOARD_ACCESS: 'dashboard_access',
-  TEAM_COLLABORATION: 'team_collaboration',
   COMPLIANCE_REPORT: 'compliance_report',
-  HISTORICAL_TRACKING: 'historical_tracking',
-  SLACK_INTEGRATION: 'slack_integration',
-  DISCORD_INTEGRATION: 'discord_integration',
-  TREND_ANALYTICS: 'trend_analytics',
   SCAN_UPLOAD: 'scan_upload',
   PR_REVIEW: 'pr_review',
+  AI_TRIAGE: 'ai_triage',
+  SCAN_DIFF: 'scan_diff',
   MCP_ANALYZE: 'mcp_analyze',
   MCP_SECURITY_SCAN: 'mcp_security_scan',
   MCP_QUALITY_CHECK: 'mcp_quality_check',
@@ -107,42 +103,26 @@ export function getFeatureInfo(featureKey: FeatureKey): {
   name: string;
   description: string;
 } {
-  const info: Record<FeatureKey, { name: string; description: string }> = {
-    dashboard_access: {
-      name: 'Cloud Dashboard',
-      description: 'Access the cloud dashboard with historical data and analytics'
-    },
-    team_collaboration: {
-      name: 'Team Collaboration',
-      description: 'Enable comments, assignments, and team features'
-    },
+  const info: Record<string, { name: string; description: string }> = {
     compliance_report: {
       name: 'Compliance Report',
-      description: 'Generate compliance reports for PCI DSS, SOC2, HIPAA'
-    },
-    historical_tracking: {
-      name: 'Historical Tracking',
-      description: 'Track scan history and trends over time'
-    },
-    slack_integration: {
-      name: 'Slack Integration',
-      description: 'Send notifications to Slack'
-    },
-    discord_integration: {
-      name: 'Discord Integration',
-      description: 'Send notifications to Discord'
-    },
-    trend_analytics: {
-      name: 'Trend Analytics',
-      description: 'Advanced trend charts and analytics'
+      description: 'Generate compliance reports for PCI DSS, SOC2, HIPAA (500 credits)'
     },
     scan_upload: {
       name: 'Scan Upload',
-      description: 'Upload scan results to the cloud'
+      description: 'Upload scan results to the cloud (1 credit)'
     },
     pr_review: {
-      name: 'PR Review',
-      description: 'Post inline review comments on pull requests'
+      name: 'PR Auto-Fix',
+      description: 'LLM generates a code fix and opens a PR (3 credits)'
+    },
+    ai_triage: {
+      name: 'AI Issue Triage',
+      description: 'LLM analyzes severity, impact, and remediation (5 credits)'
+    },
+    scan_diff: {
+      name: 'Scan Comparison',
+      description: 'Compare two scans to see new and resolved findings (2 credits)'
     },
     mcp_analyze: {
       name: 'MCP Analysis',
@@ -162,7 +142,7 @@ export function getFeatureInfo(featureKey: FeatureKey): {
     },
     mcp_remediate: {
       name: 'MCP Remediation',
-      description: 'AI-powered code remediation via MCP server'
+      description: 'AI-powered code remediation via MCP server (10 credits)'
     }
   };
 

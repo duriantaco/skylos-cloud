@@ -21,6 +21,7 @@ type Scan = {
   is_overridden: boolean;
   override_reason?: string | null;
   analysis_mode?: "static" | "hybrid" | "agent";
+  tool?: string | null;
   ai_code_detected?: boolean;
   ai_code_stats?: {
     detected?: boolean;
@@ -76,6 +77,15 @@ type Finding = {
   llm_rationale?: string | null;
   llm_challenged?: boolean;
   needs_review?: boolean;
+
+  // Source tracking
+  source?: string | null;
+  source_metadata?: {
+    confidence_score?: number;
+    exploit_scenario?: string;
+    suggested_fix?: string;
+    cwe?: string;
+  } | null;
 
   // SCA metadata for DEPENDENCY findings
   sca_metadata?: {
@@ -378,6 +388,7 @@ export default function ScanDetailsPage() {
   const [scan, setScan] = useState<Scan | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userPlan, setUserPlan] = useState<string>('free');
 
   const [viewMode, setViewMode] = useState<'NEW' | 'ALL'>('NEW');
   const [activeTab, setActiveTab] = useState<'ALL' | 'SECURITY' | 'QUALITY' | 'DEAD_CODE' | 'DEPENDENCY' | 'REVIEW'>('ALL');
@@ -480,6 +491,15 @@ export default function ScanDetailsPage() {
     if (findingsData) {
       setFindings(findingsData as Finding[]);
     }
+
+    // Fetch plan for gating
+    try {
+      const balanceRes = await fetch('/api/credits/balance');
+      if (balanceRes.ok) {
+        const balanceData = await balanceRes.json();
+        setUserPlan(balanceData.plan || 'free');
+      }
+    } catch {}
 
     setLoading(false);
   };
@@ -755,6 +775,15 @@ export default function ScanDetailsPage() {
                 {scan.analysis_mode.toUpperCase()} MODE
               </span>
             )}
+            {scan.tool && scan.tool !== "skylos" && (
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ml-2 ${
+                scan.tool === "claude-code-security"
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-slate-100 text-slate-600"
+              }`}>
+                {scan.tool === "claude-code-security" ? "Claude Security" : scan.tool.toUpperCase()}
+              </span>
+            )}
           </div>
         </div>
 
@@ -802,7 +831,7 @@ export default function ScanDetailsPage() {
             )}
           </div>
 
-          {gateFailed && (
+          {gateFailed && (userPlan === "pro" || userPlan === "enterprise") && (
             <button
               onClick={handleOverride}
               disabled={isOverriding}
@@ -1016,7 +1045,7 @@ export default function ScanDetailsPage() {
 
                 {/* Action buttons - Flow + Suppress */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <FixPrButton findingId={selectedFinding.id} />
+                  <FixPrButton findingId={selectedFinding.id} plan={userPlan} />
                   <FlowVisualizerButton
                     findingId={selectedFinding.id}
                     ruleId={selectedFinding.rule_id}
@@ -1163,6 +1192,55 @@ export default function ScanDetailsPage() {
                             {new URL(url).hostname}
                           </a>
                         ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Claude Code Security Detail */}
+              {selectedFinding.source === 'claude-code-security' && selectedFinding.source_metadata && (
+                <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-sm font-bold text-slate-900">Claude Security Analysis</div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                      Claude Code Security
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+                    {selectedFinding.source_metadata.confidence_score != null && (
+                      <div>
+                        <span className="font-semibold text-slate-500">Confidence Score</span>
+                        <div className="mt-1 font-mono text-slate-900 font-semibold">
+                          {(selectedFinding.source_metadata.confidence_score * 100).toFixed(0)}%
+                        </div>
+                      </div>
+                    )}
+                    {selectedFinding.source_metadata.cwe && (
+                      <div>
+                        <span className="font-semibold text-slate-500">CWE</span>
+                        <div className="mt-1 font-mono text-slate-700">
+                          {selectedFinding.source_metadata.cwe}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedFinding.source_metadata.exploit_scenario && (
+                    <div className="text-xs mb-3">
+                      <span className="font-semibold text-slate-500 block mb-1">Exploit Scenario</span>
+                      <div className="text-slate-700 bg-white/50 rounded-lg p-3 border border-blue-100">
+                        {selectedFinding.source_metadata.exploit_scenario}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedFinding.source_metadata.suggested_fix && (
+                    <div className="text-xs">
+                      <span className="font-semibold text-slate-500 block mb-1">Suggested Fix</span>
+                      <div className="text-slate-700 bg-white/50 rounded-lg p-3 border border-blue-100 font-mono">
+                        {selectedFinding.source_metadata.suggested_fix}
                       </div>
                     </div>
                   )}

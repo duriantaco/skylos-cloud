@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError, type OrgRole } from "@/lib/permissions";
+import { getEffectivePlan } from "@/lib/entitlements";
+import { requirePlan } from "@/lib/require-credits";
 
 // POST /api/team/invite — add a user to the org by email
 export async function POST(request: Request) {
@@ -9,6 +11,16 @@ export async function POST(request: Request) {
 
   const auth = await requirePermission(supabase, "manage:members");
   if (isAuthError(auth)) return auth;
+
+  // Team collaboration is a Pro-only feature
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", auth.orgId)
+    .single();
+  const effectivePlan = getEffectivePlan({ plan: org?.plan || "free", pro_expires_at: org?.pro_expires_at });
+  const planCheck = requirePlan(effectivePlan, "pro", "Team Collaboration");
+  if (!planCheck.ok) return planCheck.response;
 
   const body = await request.json().catch(() => ({}));
   const { email, role } = body;

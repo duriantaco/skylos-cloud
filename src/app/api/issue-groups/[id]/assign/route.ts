@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
+import { getEffectivePlan } from "@/lib/entitlements";
+import { requirePlan } from "@/lib/require-credits";
 
 const ASSIGNMENT_SELECT = `
   id,
@@ -70,6 +72,16 @@ export async function POST(
   const auth = await requirePermission(supabase, "assign:issues", orgId);
   if (isAuthError(auth)) return auth;
 
+  // Plan gate: issue assignment requires Pro
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", orgId)
+    .single();
+  const effectivePlan = getEffectivePlan({ plan: org?.plan || "free", pro_expires_at: org?.pro_expires_at });
+  const planCheck = requirePlan(effectivePlan, "pro", "Issue Assignment");
+  if (!planCheck.ok) return planCheck.response;
+
   if (assigned_to) {
     const { data: assigneeMember } = await supabase
       .from("organization_members")
@@ -116,6 +128,24 @@ export async function PATCH(
   const auth = await requirePermission(supabase, "assign:issues");
   if (isAuthError(auth)) return auth;
 
+  // Plan gate: assignment management requires Pro
+  const { data: group } = await supabase
+    .from("issue_groups")
+    .select("project_id, projects(org_id)")
+    .eq("id", id)
+    .single();
+  if (group) {
+    const patchOrgId = (group.projects as any)?.org_id;
+    const { data: patchOrg } = await supabase
+      .from("organizations")
+      .select("plan, pro_expires_at")
+      .eq("id", patchOrgId)
+      .single();
+    const patchPlan = getEffectivePlan({ plan: patchOrg?.plan || "free", pro_expires_at: patchOrg?.pro_expires_at });
+    const patchPlanCheck = requirePlan(patchPlan, "pro", "Issue Assignment");
+    if (!patchPlanCheck.ok) return patchPlanCheck.response;
+  }
+
   const body = await request.json().catch(() => ({}));
   const { status, notes } = body;
 
@@ -154,6 +184,24 @@ export async function DELETE(
 
   const auth = await requirePermission(supabase, "assign:issues");
   if (isAuthError(auth)) return auth;
+
+  // Plan gate: assignment management requires Pro
+  const { data: delGroup } = await supabase
+    .from("issue_groups")
+    .select("project_id, projects(org_id)")
+    .eq("id", id)
+    .single();
+  if (delGroup) {
+    const delOrgId = (delGroup.projects as any)?.org_id;
+    const { data: delOrg } = await supabase
+      .from("organizations")
+      .select("plan, pro_expires_at")
+      .eq("id", delOrgId)
+      .single();
+    const delPlan = getEffectivePlan({ plan: delOrg?.plan || "free", pro_expires_at: delOrg?.pro_expires_at });
+    const delPlanCheck = requirePlan(delPlan, "pro", "Issue Assignment");
+    if (!delPlanCheck.ok) return delPlanCheck.response;
+  }
 
   const { error: deleteErr } = await supabase
     .from("issue_assignments")

@@ -13,6 +13,9 @@ import {
 import IssueComments from '@/components/IssueComments';
 import AssignIssue from '@/components/AssignIssue';
 import FlowVisualizerButton from '@/components/FlowVisualizerButton';
+import ProFeatureLock from '@/components/ProFeatureLock';
+import CreditActionButton from '@/components/CreditActionButton';
+import { FEATURE_KEYS } from '@/lib/credits';
 
 
 type IssueGroup = {
@@ -439,7 +442,7 @@ function CodeBlock({ code, highlightLine, filePath }: {
   );
 }
 
-export default function IssueDetailClient({ group }: { group: IssueGroup }) {
+export default function IssueDetailClient({ group, plan = 'free' }: { group: IssueGroup; plan?: string }) {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
@@ -449,6 +452,14 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isCreatingPR, setIsCreatingPR] = useState(false);
   const [prResult, setPrResult] = useState<{ success: boolean; url?: string; error?: string } | null>(null);
+  const [triageResult, setTriageResult] = useState<{
+    priority: string;
+    impact: string;
+    remediation: string[];
+    effort_hours: number | null;
+    reasoning: string;
+  } | null>(null);
+  const [triageError, setTriageError] = useState<string | null>(null);
 
   const ruleInfo = getRuleInfo(group.rule_id, group.category);
   const categoryContext = getCategoryContext(group.category);
@@ -609,6 +620,21 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
     }
   }
 
+  async function handleTriage() {
+    setTriageError(null);
+    try {
+      const res = await fetch(`/api/issue-groups/${group.id}/triage`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.triage) {
+        setTriageResult(data.triage);
+      } else {
+        setTriageError(data.error || 'AI triage failed');
+      }
+    } catch (err: any) {
+      setTriageError(err.message || 'Network error');
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 text-slate-900 font-sans">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
@@ -759,14 +785,14 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
                 </h2>
                 
                 {canCreatePR && (
-                  <button onClick={handleCreateFixPR} disabled={isCreatingPR}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50 shadow-sm">
-                    {isCreatingPR ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" />Creating PR...</>
-                    ) : (
-                      <><GitPullRequest className="w-4 h-4" />Create Fix PR</>
-                    )}
-                  </button>
+                  <CreditActionButton
+                    featureKey={FEATURE_KEYS.PR_REVIEW}
+                    label="Create Fix PR"
+                    icon={<GitPullRequest className="w-4 h-4" />}
+                    onAction={handleCreateFixPR}
+                    plan={plan}
+                    proFeatureName="PR Auto-Fix"
+                  />
                 )}
               </div>
               <div className="p-6">
@@ -884,18 +910,29 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
             {orgId && (
               <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-6">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Assignment</h3>
-                <AssignIssue
-                  issueGroupId={group.id}
-                  orgId={orgId}
-                />
+                {plan === 'free' ? (
+                  <ProFeatureLock feature="Issue Assignment" description="Assign issues to team members for tracking and accountability" />
+                ) : (
+                  <AssignIssue
+                    issueGroupId={group.id}
+                    orgId={orgId}
+                  />
+                )}
               </section>
             )}
 
             {currentUserId && (
-              <IssueComments
-                issueGroupId={group.id}
-                currentUserId={currentUserId}
-              />
+              plan === 'free' ? (
+                <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-6">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Comments</h3>
+                  <ProFeatureLock feature="Team Comments" description="Collaborate on issues with your team" />
+                </section>
+              ) : (
+                <IssueComments
+                  issueGroupId={group.id}
+                  currentUserId={currentUserId}
+                />
+              )
             )}
           </div>
 
@@ -931,6 +968,62 @@ export default function IssueDetailClient({ group }: { group: IssueGroup }) {
                     <div className="text-xs text-slate-400">{timeAgo(group.first_seen_at)}</div>
                   </div>
                 </div>
+              </div>
+            </section>
+
+            {/* AI Triage */}
+            <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  AI Triage
+                </h3>
+              </div>
+              <div className="p-4">
+                {triageResult ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                        triageResult.priority === 'P1' ? 'bg-red-100 text-red-700' :
+                        triageResult.priority === 'P2' ? 'bg-orange-100 text-orange-700' :
+                        triageResult.priority === 'P3' ? 'bg-amber-100 text-amber-700' :
+                        'bg-slate-100 text-slate-600'
+                      }`}>
+                        {triageResult.priority}
+                      </span>
+                      {triageResult.effort_hours != null && (
+                        <span className="text-xs text-slate-500">~{triageResult.effort_hours}h effort</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-slate-700">{triageResult.impact}</p>
+                    {triageResult.remediation.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 uppercase mb-1">Remediation</p>
+                        <ol className="text-sm text-slate-600 space-y-1 list-decimal list-inside">
+                          {triageResult.remediation.map((step, i) => (
+                            <li key={i}>{step}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                    <p className="text-xs text-slate-400 italic">{triageResult.reasoning}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-500">Get AI-powered priority assessment, impact analysis, and remediation steps.</p>
+                    {triageError && (
+                      <p className="text-xs text-red-600">{triageError}</p>
+                    )}
+                    <CreditActionButton
+                      featureKey={FEATURE_KEYS.AI_TRIAGE}
+                      label="Triage with AI"
+                      icon={<Sparkles className="w-4 h-4" />}
+                      onAction={handleTriage}
+                      plan={plan}
+                      proFeatureName="AI Issue Triage"
+                    />
+                  </div>
+                )}
               </div>
             </section>
 

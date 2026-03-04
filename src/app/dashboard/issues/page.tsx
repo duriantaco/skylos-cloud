@@ -11,6 +11,22 @@ function sevRank(sev: string) {
   return 1;
 }
 
+function SourceBadge({ source }: { source?: string | null }) {
+  if (!source || source === "skylos") return null;
+  const isClaudeSecurity = source === "claude-code-security";
+  return (
+    <span
+      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+        isClaudeSecurity
+          ? "bg-blue-50 text-blue-700 border-blue-200"
+          : "bg-slate-50 text-slate-600 border-slate-200"
+      }`}
+    >
+      {isClaudeSecurity ? "Claude Security" : source}
+    </span>
+  );
+}
+
 function SeverityPill({ severity }: { severity: string }) {
   const s = String(severity || "").toUpperCase();
   const cls =
@@ -47,7 +63,7 @@ export default async function IssuesInboxPage() {
   const { data: groups } = await supabase
     .from("issue_groups")
     .select(`
-      id, rule_id, severity, category,
+      id, rule_id, severity, category, source,
       canonical_file, canonical_line,
       occurrence_count, verification_status,
       last_seen_at, last_seen_scan_id,
@@ -111,9 +127,12 @@ export default async function IssuesInboxPage() {
                 <div className="flex items-start gap-4">
                   <div className="mt-1"><SeverityPill severity={g.severity} /></div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs text-slate-500 font-semibold">
-                      {g.projects?.name || "Unknown Project"} • {g.rule_id} • {g.occurrence_count}x
-                      {g.verification_status === "VERIFIED" ? " • VERIFIED" : ""}
+                    <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold">
+                      <span>
+                        {g.projects?.name || "Unknown Project"} • {g.rule_id} • {g.occurrence_count}x
+                        {g.verification_status === "VERIFIED" ? " • VERIFIED" : ""}
+                      </span>
+                      <SourceBadge source={g.source} />
                     </div>
                     <div className="mt-1 text-sm font-bold text-slate-900 truncate">
                       {g.category} • {g.canonical_file}:{g.canonical_line}

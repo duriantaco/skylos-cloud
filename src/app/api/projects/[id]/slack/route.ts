@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { testSlackWebhook } from "@/lib/slack";
 import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
+import { getEffectivePlan } from "@/lib/entitlements";
+import { requirePlan } from "@/lib/require-credits";
 
 
 export async function GET(
@@ -56,6 +58,16 @@ export async function POST(
 
   const auth = await requirePermission(supabase, "manage:integrations", project.org_id);
   if (isAuthError(auth)) return auth;
+
+  // Plan gate: Slack integration requires Pro
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", project.org_id)
+    .single();
+  const effectivePlan = getEffectivePlan({ plan: org?.plan || "free", pro_expires_at: org?.pro_expires_at });
+  const planCheck = requirePlan(effectivePlan, "pro", "Slack Integration");
+  if (!planCheck.ok) return planCheck.response;
 
   const body = await request.json().catch(() => ({}));
   const { webhookUrl, enabled, notifyOn, test } = body;
@@ -130,6 +142,16 @@ export async function DELETE(
 
   const auth = await requirePermission(supabase, "manage:integrations", project.org_id);
   if (isAuthError(auth)) return auth;
+
+  // Plan gate: Slack integration requires Pro
+  const { data: delOrg } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", project.org_id)
+    .single();
+  const delPlan = getEffectivePlan({ plan: delOrg?.plan || "free", pro_expires_at: delOrg?.pro_expires_at });
+  const delPlanCheck = requirePlan(delPlan, "pro", "Slack Integration");
+  if (!delPlanCheck.ok) return delPlanCheck.response;
 
   const { error } = await supabase
     .from("projects")

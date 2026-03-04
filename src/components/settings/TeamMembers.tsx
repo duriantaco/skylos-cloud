@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from "react";
-import { Users, UserPlus, Trash2, Shield, Crown, Eye, UserCog } from "lucide-react";
+import { Users, UserPlus, Trash2, Shield, Crown, Eye, UserCog, Lock } from "lucide-react";
 import type { OrgRole } from "@/lib/permissions";
 
 type Member = {
@@ -21,9 +21,11 @@ const ASSIGNABLE_ROLES: OrgRole[] = ["viewer", "member", "admin", "owner"];
 export default function TeamMembers({
   currentUserId,
   currentUserRole,
+  plan = "free",
 }: {
   currentUserId: string;
   currentUserRole: string;
+  plan?: string;
 }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,8 +188,20 @@ export default function TeamMembers({
         })}
       </div>
 
-      {/* Invite form — admin/owner only */}
-      {canManage && (
+      {/* Invite form — admin/owner only, Pro plan required */}
+      {canManage && plan !== "pro" && plan !== "enterprise" && (
+        <div className="p-4 rounded-lg bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200">
+          <div className="flex items-center gap-2 text-sm font-semibold text-indigo-900 mb-1">
+            <Lock className="w-4 h-4" />
+            Team Collaboration — Pro Feature
+          </div>
+          <p className="text-xs text-indigo-700 mb-2">Invite team members, assign roles, and collaborate on issues.</p>
+          <a href="/dashboard/billing" className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded-lg transition">
+            Buy any credit pack to unlock
+          </a>
+        </div>
+      )}
+      {canManage && (plan === "pro" || plan === "enterprise") && (
         <form onSubmit={handleInvite} className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
             <UserPlus className="w-4 h-4" />

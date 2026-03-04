@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { generateApiKey } from "@/lib/api-key";
+import { getEffectivePlan } from "@/lib/entitlements";
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
 
   const { data: project } = await supabase
     .from("projects")
-    .select("id, name, org_id, organizations(name, plan)")
+    .select("id, name, org_id, organizations(name, plan, pro_expires_at)")
     .eq("id", project_id)
     .eq("org_id", member.org_id)
     .single();
@@ -67,6 +68,6 @@ export async function POST(req: Request) {
     project_id: project.id,
     project_name: project.name,
     org_name: orgData?.name || "My Workspace",
-    plan: orgData?.plan || "free",
+    plan: getEffectivePlan({ plan: orgData?.plan || "free", pro_expires_at: orgData?.pro_expires_at }),
   });
 }

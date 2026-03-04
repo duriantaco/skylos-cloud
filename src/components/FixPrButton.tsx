@@ -2,15 +2,28 @@
 
 import { useState } from "react";
 import { GitPullRequest, Loader2, Sparkles } from "lucide-react";
+import CreditActionButton from "./CreditActionButton";
+import { FEATURE_KEYS } from "@/lib/credits";
 
 type Phase = "idle" | "generating" | "creating" | "done" | "error";
 
-export default function FixPrButton({ findingId }: { findingId: string }) {
+export default function FixPrButton({
+  findingId,
+  plan = "free",
+}: {
+  findingId: string;
+  plan?: string;
+}) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
 
   const handleFix = async () => {
-    if (!confirm("This will create a new branch and open a Pull Request with the fix. Continue?")) return;
+    if (
+      !confirm(
+        "This will create a new branch and open a Pull Request with the fix. Continue?"
+      )
+    )
+      return;
 
     setPhase("generating");
     setError(null);
@@ -31,7 +44,6 @@ export default function FixPrButton({ findingId }: { findingId: string }) {
       setPhase("done");
       window.open(data.pr_url, "_blank");
 
-      // Reset after a moment
       setTimeout(() => setPhase("idle"), 3000);
     } catch (e: any) {
       setError(e.message);
@@ -43,38 +55,35 @@ export default function FixPrButton({ findingId }: { findingId: string }) {
     }
   };
 
-  const isLoading = phase === "generating" || phase === "creating";
-
-  const label = {
-    idle: "Fix in PR",
-    generating: "Generating fix\u2026",
-    creating: "Creating PR\u2026",
-    done: "PR Created!",
-    error: error ? `Failed: ${error.slice(0, 40)}` : "Failed",
-  }[phase];
-
-  const icon = isLoading ? (
-    <Loader2 className="w-3 h-3 animate-spin" />
-  ) : phase === "done" ? (
-    <Sparkles className="w-3 h-3" />
-  ) : (
-    <GitPullRequest className="w-3 h-3" />
-  );
-
   return (
-    <button
-      onClick={handleFix}
-      disabled={isLoading || phase === "done"}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-50 ${
-        phase === "done"
-          ? "bg-emerald-600 text-white"
+    <CreditActionButton
+      featureKey={FEATURE_KEYS.PR_REVIEW}
+      label={
+        phase === "generating"
+          ? "Generating fix\u2026"
+          : phase === "creating"
+          ? "Creating PR\u2026"
+          : phase === "done"
+          ? "PR Created!"
           : phase === "error"
-          ? "bg-rose-600 text-white hover:bg-rose-700"
-          : "bg-gray-700 text-white hover:bg-indigo-700"
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
+          ? `Failed: ${(error || "").slice(0, 40)}`
+          : "Fix in PR"
+      }
+      icon={
+        phase === "generating" || phase === "creating" ? (
+          <Loader2 className="w-3 h-3 animate-spin" />
+        ) : phase === "done" ? (
+          <Sparkles className="w-3 h-3" />
+        ) : (
+          <GitPullRequest className="w-3 h-3" />
+        )
+      }
+      onAction={handleFix}
+      plan={plan}
+      disabled={phase === "generating" || phase === "creating" || phase === "done"}
+      variant={phase === "error" ? "danger" : "primary"}
+      proFeatureName="PR Auto-Fix"
+      proFeatureDescription="LLM generates a code fix and opens a pull request"
+    />
   );
 }

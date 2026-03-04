@@ -2,12 +2,22 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { unauthorized, badRequest, serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
+import { getEffectivePlan } from "@/lib/entitlements";
 
 export async function GET(req: Request) {
   try {
     const supabase = await createClient();
     const auth = await requirePermission(supabase, "view:trends");
     if (isAuthError(auth)) return auth;
+
+    // Get org plan for free-tier limiting
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("plan, pro_expires_at")
+      .eq("id", auth.orgId)
+      .single();
+
+    const effectivePlan = getEffectivePlan({ plan: org?.plan || "free", pro_expires_at: org?.pro_expires_at });
 
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId");
@@ -17,7 +27,9 @@ export async function GET(req: Request) {
     if (!projectId)
         return badRequest("projectId is required");
 
-    const days = Math.min(parseInt(range, 10) || 30, 365);
+    // Free users: max 7 days of data
+    const requestedDays = Math.min(parseInt(range, 10) || 30, 365);
+    const days = effectivePlan === "free" ? Math.min(requestedDays, 7) : requestedDays;
     const since = new Date();
     since.setDate(since.getDate() - days);
 
@@ -122,9 +134,11 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       dataPoints,
-      branches,
+      branches: effectivePlan === "free" ? [] : branches,
       summary,
       totalScans: rows.length,
+      limited: effectivePlan === "free",
+      plan: effectivePlan,
     });
   } catch (err) {
     return serverError(err, "trends");

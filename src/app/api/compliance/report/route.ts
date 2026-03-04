@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server';
 import { generateComplianceReport } from '@/lib/compliance/report-generator';
 import { serverError } from '@/lib/api-error';
 import { requirePermission, isAuthError } from '@/lib/permissions';
+import { getEffectivePlan } from '@/lib/entitlements';
+import { requirePlan, requireCredits } from '@/lib/require-credits';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,18 +22,19 @@ export async function POST(request: NextRequest) {
 
     const { data: org } = await supabase
       .from('organizations')
-      .select('plan')
+      .select('plan, pro_expires_at')
       .eq('id', auth.orgId)
       .single();
 
-    const plan = org?.plan || 'free';
+    const effectivePlan = getEffectivePlan({ plan: org?.plan || 'free', pro_expires_at: org?.pro_expires_at });
 
-    if (!['team', 'enterprise'].includes(plan)) {
-      return NextResponse.json(
-        { error: 'Compliance reports require Team or Enterprise plan' },
-        { status: 403 }
-      );
-    }
+    // Plan gate: compliance requires Pro
+    const planCheck = requirePlan(effectivePlan, 'pro', 'Compliance Reports');
+    if (!planCheck.ok) return planCheck.response;
+
+    // Credit gate: 500 credits for LLM-powered compliance report
+    const creditCheck = await requireCredits(supabase, auth.orgId, effectivePlan, 'compliance_report', { framework: frameworkCode });
+    if (!creditCheck.ok) return creditCheck.response;
 
     const reportData = await generateComplianceReport(frameworkCode, auth.orgId, supabase);
 

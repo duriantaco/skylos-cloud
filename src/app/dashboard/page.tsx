@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { getEffectivePlan } from "@/lib/entitlements";
 import {
   ShieldAlert,
   ArrowUpRight,
@@ -141,6 +142,25 @@ export default async function DashboardPage() {
     );
   }
 
+  // Fetch org data for Pro expiry banner
+  const { data: orgData } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at, credits")
+    .eq("id", orgId)
+    .single();
+
+  const effectivePlan = getEffectivePlan({
+    plan: orgData?.plan || "free",
+    pro_expires_at: orgData?.pro_expires_at || null,
+  });
+  const proExpiresAt = orgData?.pro_expires_at ? new Date(orgData.pro_expires_at) : null;
+  const now = new Date();
+  const proExpired = orgData?.plan === "pro" && (!proExpiresAt || proExpiresAt <= now);
+  const proExpiringSoon = proExpiresAt && proExpiresAt > now && (proExpiresAt.getTime() - now.getTime()) < 7 * 24 * 60 * 60 * 1000;
+  const daysUntilProExpiry = proExpiresAt && proExpiresAt > now ? Math.ceil((proExpiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)) : 0;
+  const daysSinceProExpired = proExpiresAt && proExpiresAt <= now ? Math.floor((now.getTime() - proExpiresAt.getTime()) / (24 * 60 * 60 * 1000)) : 0;
+  const orgCredits = orgData?.credits || 0;
+
   const [
     { count: projectCount },
     { data: recentScansRaw },
@@ -250,6 +270,51 @@ export default async function DashboardPage() {
               </Link>
             </div>
           </header>
+
+          {/* PRO EXPIRY / STALE DATA NUDGES */}
+          {proExpired && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-900">
+                  Your Pro access expired {daysSinceProExpired > 0 ? `${daysSinceProExpired} days ago` : 'today'}. Team features are paused.
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5">Your credits and data are safe. Buy any pack to reactivate Pro.</p>
+              </div>
+              <Link href="/dashboard/billing" className="shrink-0 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition">
+                Buy Credits
+              </Link>
+            </div>
+          )}
+
+          {proExpiringSoon && !proExpired && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-900">
+                  Your Pro access expires in {daysUntilProExpiry} day{daysUntilProExpiry !== 1 ? 's' : ''}. Buy any credit pack to extend.
+                </p>
+              </div>
+              <Link href="/dashboard/billing" className="shrink-0 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition">
+                Extend Pro
+              </Link>
+            </div>
+          )}
+
+          {isStale && orgCredits === 0 && !proExpired && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+              <Clock className="w-5 h-5 text-slate-400 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-900">
+                  Your last scan was {daysSinceLastScan !== null ? `${daysSinceLastScan} days ago` : 'a while ago'}. Your security posture may have changed.
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">Buy credits to upload new scans and keep your dashboard current.</p>
+              </div>
+              <Link href="/dashboard/billing" className="shrink-0 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition">
+                Buy Credits
+              </Link>
+            </div>
+          )}
 
           {/* QUICK STATS */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

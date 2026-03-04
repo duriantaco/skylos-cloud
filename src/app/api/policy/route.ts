@@ -2,6 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
+import { getEffectivePlan, canUseAdvancedGates } from "@/lib/entitlements";
 
 type GateMode = "zero-new" | "category" | "severity" | "both";
 
@@ -46,6 +47,14 @@ export async function POST(req: Request) {
     const auth = await requirePermission(supabase, "manage:settings", project.org_id);
     if (isAuthError(auth)) return auth;
 
+    // Resolve effective plan to enforce gate mode restrictions
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("plan, pro_expires_at")
+      .eq("id", project.org_id)
+      .single();
+    const effectivePlan = getEffectivePlan({ plan: org?.plan || "free", pro_expires_at: org?.pro_expires_at });
+
     const incomingRules = Array.isArray(body.custom_rules) ? body.custom_rules : [];
     const custom_rules = incomingRules
       .map((x: any) => String(x ?? "").trim())
@@ -73,11 +82,18 @@ export async function POST(req: Request) {
     const dead_code_enabled = toBool(body.dead_code_enabled, true);
 
     const g = body.gate || {};
+    let requestedMode = (["zero-new", "category", "severity", "both"].includes(String(g.mode))
+      ? String(g.mode)
+      : "zero-new") as GateMode;
+
+    // Free users can only use zero-new gate mode
+    if (!canUseAdvancedGates(effectivePlan) && requestedMode !== "zero-new") {
+      requestedMode = "zero-new";
+    }
+
     const gate = {
       enabled: toBool(g.enabled, true),
-      mode: (["zero-new", "category", "severity", "both"].includes(String(g.mode))
-        ? String(g.mode)
-        : "zero-new") as GateMode,
+      mode: requestedMode,
       by_category: {} as Record<string, number>,
       by_severity: {} as Record<string, number>,
     };

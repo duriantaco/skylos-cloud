@@ -13,6 +13,7 @@ type Scan = {
   branch: string | null;
   quality_gate_passed: boolean | null;
   analysis_mode?: "static" | "hybrid" | "agent" | null;
+  tool?: string | null;
   stats: {
     total?: number;
     new_issues?: number;
@@ -70,6 +71,22 @@ function GateBadge({ passed }: { passed: boolean | null }) {
   );
 }
 
+function SourceBadge({ tool }: { tool?: string | null }) {
+  if (!tool || tool === "skylos") return null;
+  const isClaudeSecurity = tool === "claude-code-security";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-md border ${
+        isClaudeSecurity
+          ? "bg-blue-50 text-blue-700 border-blue-200"
+          : "bg-slate-50 text-slate-600 border-slate-200"
+      }`}
+    >
+      {isClaudeSecurity ? "Claude Security" : tool.toUpperCase()}
+    </span>
+  );
+}
+
 function ScanCard({ scan }: { scan: Scan }) {
   const stats = scan.stats || {};
   const newIssues = stats.new_issues ?? 0;
@@ -96,6 +113,7 @@ function ScanCard({ scan }: { scan: Scan }) {
                 {scan.analysis_mode.toUpperCase()}
               </span>
             )}
+            <SourceBadge tool={scan.tool} />
           </div>
 
           {/* Branch + Commit */}
@@ -178,7 +196,7 @@ export default async function ScansPage() {
   const { data: scans } = await supabase
     .from("scans")
     .select(`
-      id, created_at, commit_hash, branch, quality_gate_passed, stats, analysis_mode,
+      id, created_at, commit_hash, branch, quality_gate_passed, stats, analysis_mode, tool,
       projects!inner(id, name, repo_url, org_id)
     `)
     .eq("projects.org_id", membership.org_id)

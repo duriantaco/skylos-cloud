@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Trash2, Download, MoreVertical } from 'lucide-react'
+import { Trash2, Download, MoreVertical, Lock } from 'lucide-react'
 import ConfirmModal from './ConfirmModal'
 
 type Props = {
@@ -11,9 +11,11 @@ type Props = {
   scanCommit?: string | null
   onDeleted?: () => void
   showLabels?: boolean
+  plan?: string
 }
 
-export default function ScanActions({ scanId, scanCommit, onDeleted, showLabels = false }: Props) {
+export default function ScanActions({ scanId, scanCommit, onDeleted, showLabels = false, plan = "free" }: Props) {
+  const canExport = plan === "pro" || plan === "enterprise";
   const router = useRouter()
   const btnRef = useRef<HTMLButtonElement | null>(null)
 
@@ -110,6 +112,11 @@ export default function ScanActions({ scanId, scanCommit, onDeleted, showLabels 
   }
 
   const handleExport = (format: 'json' | 'csv') => {
+    if (!canExport) {
+      alert('Findings export is a Pro feature. Buy any credit pack at skylos.dev/dashboard/billing to unlock.')
+      setShowMenu(false)
+      return
+    }
     window.open(`/api/scans/${scanId}/export?format=${format}`, '_blank')
     setShowMenu(false)
   }
@@ -126,17 +133,19 @@ export default function ScanActions({ scanId, scanCommit, onDeleted, showLabels 
       >
         <button
           onClick={() => handleExport('json')}
-          className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+          className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 ${canExport ? 'text-slate-700' : 'text-slate-400'}`}
         >
           <Download className="w-4 h-4" />
           Export JSON
+          {!canExport && <Lock className="w-3 h-3 ml-auto" />}
         </button>
         <button
           onClick={() => handleExport('csv')}
-          className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+          className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 ${canExport ? 'text-slate-700' : 'text-slate-400'}`}
         >
           <Download className="w-4 h-4" />
           Export CSV
+          {!canExport && <Lock className="w-3 h-3 ml-auto" />}
         </button>
         <hr className="my-1 border-slate-100" />
         <button

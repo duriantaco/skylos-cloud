@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Download, FileText, File, FileSpreadsheet, Loader2, Coins, AlertCircle } from 'lucide-react';
-import { checkCredits, useFeature, FEATURE_KEYS } from '@/lib/credits';
+import { checkCredits, FEATURE_KEYS } from '@/lib/credits';
 import Link from 'next/link';
 
 type Props = {
@@ -32,18 +32,7 @@ export default function ComplianceReportButton({ frameworkCode }: Props) {
     setShowMenu(false);
 
     try {
-      // Deduct credits first
-      if (!unlimited) {
-        const deductResult = await useFeature(FEATURE_KEYS.COMPLIANCE_REPORT, {
-          framework: frameworkCode,
-          format
-        });
-
-        if (!deductResult.success) {
-          throw new Error(deductResult.error || 'Insufficient credits');
-        }
-      }
-
+      // Server handles credit deduction now — no client-side deduction
       const response = await fetch('/api/compliance/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

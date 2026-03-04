@@ -25,12 +25,10 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refresh session — important for keeping auth cookies alive
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Redirect unauthenticated users away from protected routes
   const isProtected = request.nextUrl.pathname.startsWith("/dashboard");
   if (isProtected && !user) {
     const loginUrl = new URL("/login", request.url);

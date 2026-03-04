@@ -13,6 +13,7 @@ import {
 import ProjectTrendChart from "@/components/ProjectTrendChart";
 import { FileHotspotChart, TopViolationsChart } from "@/components/AdvanceCharts";
 import ScanActions from "@/components/ScanActions";
+import { getEffectivePlan } from "@/lib/entitlements";
 
 type ScanRow = {
   id: string;
@@ -38,6 +39,15 @@ export default async function ProjectPage({
   if (!user) {
     return redirect("/login");
   }
+
+  // ---- Resolve plan
+  const { data: member } = await supabase
+    .from("organization_members")
+    .select("org_id, organizations(plan, pro_expires_at)")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const orgData = (member?.organizations as any);
+  const effectivePlan = getEffectivePlan({ plan: orgData?.plan || "free", pro_expires_at: orgData?.pro_expires_at });
 
   // ---- Load project
   const { data: project, error: projectErr } = await supabase
@@ -267,7 +277,7 @@ export default async function ProjectPage({
                             >
                               View
                             </Link>
-                            <ScanActions scanId={s.id} scanCommit={s.commit_hash} />
+                            <ScanActions scanId={s.id} scanCommit={s.commit_hash} plan={effectivePlan} />
                           </div>
                         </td>
                       </tr>

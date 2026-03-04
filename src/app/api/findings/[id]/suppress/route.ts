@@ -2,6 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
+import { getEffectivePlan, getCapabilities } from "@/lib/entitlements";
 
 export async function POST(
   request: Request,
@@ -37,6 +38,39 @@ export async function POST(
   const orgId = (scan.projects as any)?.org_id;
   const auth = await requirePermission(supabase, "suppress:findings", orgId);
   if (isAuthError(auth)) return auth;
+
+  // Enforce suppression limits based on plan
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", orgId)
+    .single();
+  const effectivePlan = getEffectivePlan({ plan: org?.plan || "free", pro_expires_at: org?.pro_expires_at });
+  const caps = getCapabilities(effectivePlan);
+
+  // Free users must provide an expiry date
+  if (!caps.suppressionGovernanceEnabled && !expires_at) {
+    return NextResponse.json({
+      error: "Free plan requires an expiry date on suppressions. Upgrade to Pro for permanent suppressions.",
+      code: "PLAN_REQUIRED",
+      buy_url: "/dashboard/billing",
+    }, { status: 403 });
+  }
+
+  // Enforce per-project suppression limit
+  const { count: existingCount } = await supabase
+    .from("finding_suppressions")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", scan.project_id)
+    .is("revoked_at", null);
+
+  if ((existingCount ?? 0) >= caps.maxSuppressionsPerProject) {
+    return NextResponse.json({
+      error: `Suppression limit reached (${caps.maxSuppressionsPerProject} on ${effectivePlan} plan). Upgrade to Pro for unlimited suppressions.`,
+      code: "PLAN_REQUIRED",
+      buy_url: "/dashboard/billing",
+    }, { status: 403 });
+  }
 
   const { error: supErr } = await supabase
     .from("finding_suppressions")

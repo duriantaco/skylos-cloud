@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
 import { hashApiKey } from "@/lib/api-key";
+import { getEffectivePlan } from "@/lib/entitlements";
 
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -150,7 +151,7 @@ export async function POST(req: Request) {
       .from("projects")
       .select(`
         id, name, repo_url, github_token,
-        organizations(id, plan)
+        organizations(id, plan, pro_expires_at)
       `)
       .eq("api_key_hash", hashApiKey(token))
       .single();
@@ -164,9 +165,11 @@ export async function POST(req: Request) {
 
     const orgRef: any = (project as any).organizations;
     const orgId = String(Array.isArray(orgRef) ? orgRef?.[0]?.id : orgRef?.id || "");
-    const plan = String((Array.isArray(orgRef) ? orgRef?.[0]?.plan : orgRef?.plan) || "free").toLowerCase();
+    const rawPlan = String((Array.isArray(orgRef) ? orgRef?.[0]?.plan : orgRef?.plan) || "free");
+    const proExpiresAt = Array.isArray(orgRef) ? orgRef?.[0]?.pro_expires_at : orgRef?.pro_expires_at;
+    const plan = getEffectivePlan({ plan: rawPlan, pro_expires_at: proExpiresAt });
 
-    const p = (plan || "free") as Plan;
+    const p = plan as Plan;
 
     const ownerId = orgId || project.id;
 
@@ -196,7 +199,7 @@ export async function POST(req: Request) {
             code: "RATE_LIMITED",
             plan: p,
             limit_per_day: FREE_DAILY_VERIFY_LIMIT,
-            upgrade_url: "/dashboard/settings?upgrade=true",
+            buy_url: "/dashboard/billing",
           },
           { status: 429 }
         );

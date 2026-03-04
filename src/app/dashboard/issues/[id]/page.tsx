@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import IssueDetailClient from "@/components/mission-control/IssueDetailClient";
+import { getEffectivePlan } from "@/lib/entitlements";
 
 export default async function IssueDetailPage(
   props: { params: Promise<{ id: string }> }
@@ -29,10 +30,23 @@ export default async function IssueDetailPage(
 
   if (error || !group) return notFound();
 
+  // Get effective plan for gating
+  const { data: member } = await supabase
+    .from("organization_members")
+    .select("org_id, organizations(plan, pro_expires_at)")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const org = member?.organizations as any;
+  const effectivePlan = getEffectivePlan({
+    plan: org?.plan || "free",
+    pro_expires_at: org?.pro_expires_at || null,
+  });
+
   return (
     <main className="h-[calc(100vh-0px)]">
         <main className="h-[calc(100vh-0px)]">
-            <IssueDetailClient group={group} />
+            <IssueDetailClient group={group} plan={effectivePlan} />
         </main>
     </main>
   );

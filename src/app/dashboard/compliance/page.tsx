@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Shield, Calendar, Zap, BookOpen, CheckCircle } from "lucide-react";
 import dogImg from "../../../../public/assets/favicon-96x96.png";
 import ComplianceReportButton from "@/components/ComplianceReportButton";
+import { getEffectivePlan } from "@/lib/entitlements";
 
 export default async function CompliancePage() {
   const supabase = await createClient();
@@ -15,7 +16,7 @@ export default async function CompliancePage() {
 
   const { data: member } = await supabase
     .from("organization_members")
-    .select("org_id, organizations(plan, name)")
+    .select("org_id, organizations(plan, name, pro_expires_at)")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -23,8 +24,10 @@ export default async function CompliancePage() {
     return redirect("/dashboard");
 
   const orgId = member.org_id;
-  const plan = (member.organizations as any)?.plan || "free";
-  const canUseCompliance = ["team", "enterprise"].includes(plan);
+  const rawPlan = (member.organizations as any)?.plan || "free";
+  const proExpiresAt = (member.organizations as any)?.pro_expires_at || null;
+  const plan = getEffectivePlan({ plan: rawPlan, pro_expires_at: proExpiresAt });
+  const canUseCompliance = ["pro", "enterprise"].includes(plan);
 
   const { data: enabledFrameworks } = await supabase
     .from("org_compliance_settings")
@@ -108,10 +111,10 @@ export default async function CompliancePage() {
                   </div>
                 </div>
                 <Link
-                  href="/dashboard/settings"
+                  href="/dashboard/billing"
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition"
                 >
-                  Upgrade to Team — $199/mo
+                  Buy Credits to Unlock Pro
                   <Zap className="w-4 h-4" />
                 </Link>
               </div>

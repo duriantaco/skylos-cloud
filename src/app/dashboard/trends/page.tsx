@@ -22,6 +22,7 @@ import {
   GitBranch,
   Loader2,
   BarChart3,
+  Lock,
 } from "lucide-react";
 
 type TrendDataPoint = {
@@ -158,13 +159,15 @@ function CustomTooltip({ active, payload, label }: any) {
 export default function TrendsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
-  const [range, setRange] = useState("30");
+  const [range, setRange] = useState("7");
   const [branch, setBranch] = useState("");
   const [data, setData] = useState<TrendsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [plan, setPlan] = useState<string>("free");
+  const isFreePlan = plan === "free";
 
-  // Load projects
+  // Load projects and plan
   useEffect(() => {
     async function loadProjects() {
       const res = await fetch("/api/projects");
@@ -177,7 +180,19 @@ export default function TrendsPage() {
         }
       }
     }
+    async function loadPlan() {
+      const res = await fetch("/api/credits/balance");
+      if (res.ok) {
+        const json = await res.json();
+        setPlan(json.plan || "free");
+        // If Pro or enterprise, default to 30d range
+        if (json.plan === "pro" || json.plan === "enterprise") {
+          setRange("30");
+        }
+      }
+    }
     loadProjects();
+    loadPlan();
   }, []);
 
   // Load trends data
@@ -255,8 +270,8 @@ export default function TrendsPage() {
               ))}
             </select>
 
-            {/* Branch Picker */}
-            {data && data.branches.length > 0 && (
+            {/* Branch Picker — Pro only */}
+            {data && data.branches.length > 0 && !isFreePlan && (
               <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-2 rounded-lg">
                 <GitBranch className="w-4 h-4 text-slate-500" />
                 <select
@@ -277,22 +292,30 @@ export default function TrendsPage() {
             {/* Date Range */}
             <div className="flex bg-white border border-slate-200 rounded-lg overflow-hidden">
               {[
-                { label: "7d", value: "7" },
-                { label: "30d", value: "30" },
-                { label: "90d", value: "90" },
-              ].map((r) => (
-                <button
-                  key={r.value}
-                  onClick={() => setRange(r.value)}
-                  className={`px-3 py-2 text-sm font-medium transition ${
-                    range === r.value
-                      ? "bg-slate-900 text-white"
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
+                { label: "7d", value: "7", proOnly: false },
+                { label: "30d", value: "30", proOnly: true },
+                { label: "90d", value: "90", proOnly: true },
+              ].map((r) => {
+                const locked = r.proOnly && isFreePlan;
+                return (
+                  <button
+                    key={r.value}
+                    onClick={() => !locked && setRange(r.value)}
+                    disabled={locked}
+                    className={`px-3 py-2 text-sm font-medium transition relative ${
+                      range === r.value
+                        ? "bg-slate-900 text-white"
+                        : locked
+                        ? "text-slate-300 cursor-not-allowed"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                    title={locked ? "Upgrade to Pro for extended history" : undefined}
+                  >
+                    {r.label}
+                    {locked && <Lock className="w-3 h-3 inline ml-0.5 opacity-50" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -320,6 +343,19 @@ export default function TrendsPage() {
           </div>
         ) : (
           <>
+            {/* Free plan limitation banner */}
+            {isFreePlan && (
+              <div className="mb-4 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between">
+                <p className="text-sm text-indigo-800">
+                  <Lock className="w-3.5 h-3.5 inline mr-1" />
+                  Viewing last 7 days. <span className="font-medium">Upgrade to Pro</span> for full history, branch filters, and multi-project comparison.
+                </p>
+                <a href="/dashboard/billing" className="text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded-lg transition shrink-0 ml-4">
+                  Buy Credits
+                </a>
+              </div>
+            )}
+
             {/* Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               <StatCard

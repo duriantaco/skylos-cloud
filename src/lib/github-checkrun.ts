@@ -27,7 +27,8 @@ function normPath(p: string) {
 }
 
 function parseRepoPath(repoUrl: string): string | null {
-  if (!repoUrl) return null;
+  if (!repoUrl) 
+    return null;
   const m = repoUrl.match(/github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/i);
   return m?.[1] ?? null;
 }
@@ -74,11 +75,13 @@ async function listPrFiles(repoPath: string, prNumber: number, token: string): P
   while (page <= 10) {
     const url = `https://api.github.com/repos/${repoPath}/pulls/${prNumber}/files?per_page=100&page=${page}`;
     const batch = await ghJson<any[]>(url, token);
-    if (!batch?.length) break;
+    if (!batch?.length) 
+      break;
     for (const f of batch) {
       if (f?.filename) files.add(String(f.filename));
     }
-    if (batch.length < 100) break;
+    if (batch.length < 100) 
+      break;
     page += 1;
   }
 
@@ -140,7 +143,6 @@ export async function postSkylosCheckRun(args: {
 
   const MAX_ANN = 50;
   const annotations = filtered.slice(0, MAX_ANN).map(f => {
-    // for now keep under limits
     const raw = (f.snippet || "").slice(0, 60000);
     const line = Number(f.line_number || 1) || 1;
     return {

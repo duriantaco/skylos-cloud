@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission, isAuthError } from '@/lib/permissions';
+import { getEffectivePlan } from '@/lib/entitlements';
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
 
   const { data: org } = await supabase
     .from('organizations')
-    .select('id, name, credits, plan')
+    .select('id, name, credits, plan, pro_expires_at')
     .eq('id', auth.orgId)
     .single();
 
@@ -25,7 +26,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
   }
 
-  if (org.plan === 'enterprise') {
+  const effectivePlan = getEffectivePlan({ plan: org.plan, pro_expires_at: org.pro_expires_at });
+
+  if (effectivePlan === 'enterprise') {
     return NextResponse.json({
       success: true,
       unlimited: true,
@@ -55,7 +58,8 @@ export async function POST(request: NextRequest) {
       error: 'Insufficient credits',
       required: costAmount,
       available: org.credits,
-      shortfall: costAmount - org.credits
+      shortfall: costAmount - org.credits,
+      buy_url: '/dashboard/billing',
     }, { status: 402 });
   }
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
+import { getEffectivePlan } from "@/lib/entitlements";
 
 async function getOrgContext() {
   const supabase = await createClient();
@@ -13,7 +14,7 @@ async function getOrgContext() {
 
   const { data: member } = await supabase
     .from("organization_members")
-    .select("org_id, organizations(plan)")
+    .select("org_id, organizations(plan, pro_expires_at)")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -21,15 +22,17 @@ async function getOrgContext() {
     return { error: "No organization found" };
   }
 
-  const plan = (member.organizations as any)?.plan || "free";
-  
-  return { 
-    supabase, 
-    user, 
-    orgId: member.org_id, 
+  const rawPlan = (member.organizations as any)?.plan || "free";
+  const proExpiresAt = (member.organizations as any)?.pro_expires_at || null;
+  const plan = getEffectivePlan({ plan: rawPlan, pro_expires_at: proExpiresAt });
+
+  return {
+    supabase,
+    user,
+    orgId: member.org_id,
     plan,
-    canUseRules: ["free", "pro", "team", "enterprise"].includes(plan),
-    canUsePython: ["team", "enterprise"].includes(plan)
+    canUseRules: ["free", "pro", "enterprise"].includes(plan),
+    canUsePython: ["pro", "enterprise"].includes(plan)
   };
 }
 
@@ -37,7 +40,6 @@ function getRuleLimit(plan: string): number {
   const limits: Record<string, number> = {
     free: 3,
     pro: 50,
-    team: 100,
     enterprise: 999999
   };
   return limits[plan] || 0;
@@ -72,7 +74,7 @@ export async function createRule(formData: FormData) {
   const ruleType = String(formData.get("rule_type") || "yaml");
   
   if (ruleType === "python" && !canUsePython) {
-    return { success: false, error: "Python rules require Team plan or higher" };
+    return { success: false, error: "Python rules require Pro plan or higher" };
   }
 
   let yamlConfig = null;
@@ -124,7 +126,7 @@ export async function updateRule(ruleId: string, formData: FormData) {
   const ruleType = String(formData.get("rule_type") || "yaml");
   
   if (ruleType === "python" && !canUsePython) {
-    return { success: false, error: "Python rules require Team plan or higher" };
+    return { success: false, error: "Python rules require Pro plan or higher" };
   }
 
   let yamlConfig = null;
