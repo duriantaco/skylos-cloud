@@ -496,6 +496,30 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* DEMO VIDEO */}
+      <section className="py-24 bg-slate-50 border-t border-slate-100">
+        <div className="mx-auto max-w-4xl px-6">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
+              See It in Action
+            </h2>
+            <p className="mt-4 text-lg text-slate-600">
+              Watch how Skylos scans your codebase and integrates into your CI/CD pipeline.
+            </p>
+          </div>
+          <div className="relative rounded-2xl overflow-hidden shadow-xl" style={{paddingBottom: '56.25%'}}>
+            <iframe
+              className="absolute top-0 left-0 w-full h-full"
+              src="https://www.youtube.com/embed/dElKFn7cj2Q"
+              title="Skylos Agentic CI/CD Pipeline Demo"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      </section>
+
       {/* SOCIAL PROOF */}
       <section className="py-24 bg-slate-50 border-t border-slate-100">
         <div className="mx-auto max-w-7xl px-6">
