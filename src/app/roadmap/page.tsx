@@ -18,11 +18,26 @@ export const metadata: Metadata = {
   title: "Roadmap — Skylos",
   description:
     "See what's shipping now and what's next for Skylos: PR diff scanning, auto-fix suggestions, compliance mapping, and more.",
+  keywords: [
+    "skylos roadmap",
+    "python SAST roadmap",
+    "static analysis features",
+    "code scanning roadmap",
+  ],
   openGraph: {
     title: "Roadmap — Skylos",
     description:
       "See what's shipping now and what's next for Skylos: PR diff scanning, auto-fix suggestions, compliance mapping, and more.",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Roadmap — Skylos",
+    description:
+      "See what's shipping now and what's next for Skylos: PR diff scanning, auto-fix suggestions, compliance mapping, and more.",
+  },
+  alternates: {
+    canonical: "/roadmap",
   },
 }
 
@@ -133,7 +148,6 @@ export default function RoadmapPage() {
                 width={32}
                 height={32}
                 className="h-8 w-8 object-contain"
-                priority
               />
             </div>
             <span className="text-lg font-semibold text-slate-900">Skylos</span>

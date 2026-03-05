@@ -1252,7 +1252,7 @@ export default function ScanDetailsPage() {
                 <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-slate-200">
                   <span className="text-xs font-semibold text-slate-600">Source</span>
                   {scan.projects?.repo_url && (
-                    <a href={generateGitHubUrl(scan.projects.repo_url, scan.commit_hash, selectedFinding.file_path, selectedFinding.line_number)} target="_blank" className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900 transition">
+                    <a href={generateGitHubUrl(scan.projects.repo_url, scan.commit_hash, selectedFinding.file_path, selectedFinding.line_number)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900 transition">
                       GitHub <ExternalLink className="w-3 h-3" />
                     </a>
                   )}

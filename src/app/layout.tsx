@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from 'next'
+import Script from 'next/script'
 // REMOVED: Unused Inter/JetBrains imports to save load time
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { getSiteUrl } from '@/lib/site'
-import 'highlight.js/styles/github-dark.css';
 import './globals.css'; // kept only one instance
 
 const siteUrl = getSiteUrl()
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     'CI/CD',
   ],
   alternates: {
-    canonical: './', 
+    canonical: siteUrl,
   },
   openGraph: {
     type: 'website',
@@ -67,6 +67,26 @@ export const metadata: Metadata = {
   icons: { icon: '/assets/favicon-96x96.png' },
 }
 
+const organizationJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Skylos',
+  url: siteUrl,
+  logo: `${siteUrl}/assets/favicon-96x96.png`,
+  description: 'Open source static analysis tool for Python. Finds dead code, secrets, and security vulnerabilities.',
+  sameAs: [
+    'https://github.com/duriantaco/skylos',
+    'https://pypi.org/project/skylos/',
+    'https://x.com/realpython/status/1984455367913279547',
+  ],
+  foundingDate: '2025',
+  contactPoint: {
+    '@type': 'ContactPoint',
+    email: 'founder@skylos.dev',
+    contactType: 'sales',
+  },
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -74,7 +94,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <Script
+          id="ld-organization"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

@@ -10,8 +10,8 @@ import dogImg from "../../../../public/assets/favicon-96x96.png";
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeSlug from 'rehype-slug';
-import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import { extractHeadings, estimateReadingTime } from '@/lib/toc';
+import { getSiteUrl } from '@/lib/site';
 import TableOfContents from '@/components/TableOfContents';
 import '../blog.css';
 
@@ -71,7 +71,7 @@ export default async function BlogPost({ params }: Props) {
       name: 'Skylos',
       logo: {
         '@type': 'ImageObject',
-        url: 'https://skylos.dev/assets/favicon-96x96.png',
+        url: `${getSiteUrl()}/assets/favicon-96x96.png`,
       },
     },
   };
@@ -95,7 +95,6 @@ export default async function BlogPost({ params }: Props) {
                 width={32}
                 height={32}
                 className="h-8 w-8 object-contain"
-                priority
               />
               Skylos
               <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-100 text-amber-700 border border-amber-200">
@@ -259,7 +258,7 @@ export async function generateMetadata({ params }: Props) {
     };
   }
 
-  const siteUrl = 'https://skylos.dev';
+  const siteUrl = getSiteUrl();
 
   return {
     title: `${post.frontmatter.title} - Skylos Blog`,

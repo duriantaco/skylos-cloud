@@ -58,7 +58,6 @@ export default function BlogPage() {
               width={32}
               height={32}
               className="h-8 w-8 object-contain"
-              priority
             />
             Skylos
             <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-100 text-amber-700 border border-amber-200">
@@ -103,5 +102,25 @@ export default function BlogPage() {
 
 export const metadata = {
   title: 'Blog - Skylos',
-  description: 'Insights on application security, SAST, and building better developer tools',
+  description: 'Insights on application security, SAST, and building better developer tools.',
+  keywords: [
+    'python security blog',
+    'static analysis insights',
+    'SAST best practices',
+    'dead code detection',
+    'devsecops blog',
+  ],
+  openGraph: {
+    title: 'Blog - Skylos',
+    description: 'Insights on application security, SAST, and building better developer tools.',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Blog - Skylos',
+    description: 'Insights on application security, SAST, and building better developer tools.',
+  },
+  alternates: {
+    canonical: '/blog',
+  },
 };

@@ -32,6 +32,15 @@ export const metadata: Metadata = {
       "Real-time AI-powered code analysis in VS Code. Detects bugs as you type with GPT-4 or Claude.",
     type: "website",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "VS Code Extension — Skylos",
+    description:
+      "Real-time AI-powered code analysis in VS Code. Detects bugs as you type with GPT-4 or Claude.",
+  },
+  alternates: {
+    canonical: "/vscode",
+  },
 }
 
 const FEATURES = [
@@ -113,7 +122,6 @@ export default function VSCodePage() {
                 width={32}
                 height={32}
                 className="h-8 w-8 object-contain"
-                priority
               />
             </div>
             <span className="text-lg font-semibold text-slate-900">Skylos</span>
@@ -185,7 +193,7 @@ export default function VSCodePage() {
               Install on VS Code
             </Link>
             <Link
-              href="https://github.com/oha/skylos"
+              href="https://github.com/duriantaco/skylos"
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
             >
               <Code2 className="h-4 w-4" />
@@ -229,7 +237,7 @@ export default function VSCodePage() {
         alt="Skylos VS Code Extension"
         width={1920}
         height={1080}
-        quality={100}
+        quality={80}
         className="w-full h-auto"
         priority
       />
@@ -424,7 +432,7 @@ export default function VSCodePage() {
             <div className="flex gap-6 text-sm text-slate-500">
               <Link href="/roadmap" className="hover:text-slate-900">Roadmap</Link>
               <Link href="https://docs.skylos.dev/" className="hover:text-slate-900">Docs</Link>
-              <Link href="https://github.com/oha/skylos" className="hover:text-slate-900">GitHub</Link>
+              <Link href="https://github.com/duriantaco/skylos" className="hover:text-slate-900">GitHub</Link>
             </div>
           </div>
         </div>

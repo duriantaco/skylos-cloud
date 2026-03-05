@@ -1,5 +1,14 @@
 // app/docs/page.tsx
+import type { Metadata } from 'next'
 import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: 'Documentation — Skylos',
+  description: 'Get started with Skylos: quickstart guide, CLI setup, and GitHub integration for Python static analysis.',
+  alternates: {
+    canonical: 'https://docs.skylos.dev/',
+  },
+}
 
 export default function DocsPage() {
   return (
