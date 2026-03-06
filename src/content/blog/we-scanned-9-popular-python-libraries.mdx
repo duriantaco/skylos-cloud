@@ -1,0 +1,126 @@
+---
+title: "We Scanned 9 Popular Python Libraries. Here's What We Found."
+excerpt: "We ran Skylos against FastAPI, Flask, Pydantic, Rich, Requests, httpx, Click, Starlette, and tqdm. The results: 1,800+ security findings, 4,195 quality issues, and 750 pieces of dead code across 9 of the most popular Python packages."
+publishedAt: "2026-03-05"
+updatedAt: "2026-03-05"
+tags: ["security", "sast", "appsec", "devtools"]
+keywords:
+  - python security scan
+  - static analysis popular python libraries
+  - FastAPI security vulnerabilities
+  - Pydantic dead code
+  - Flask security scan
+  - python SAST results
+  - dead code detection python
+  - popular python library code quality
+  - requests library security
+  - open source code quality
+---
+
+Every Python developer has `pip install`'d at least one of these libraries. FastAPI, Flask, Requests, Pydantic — they power millions of applications. But how do they actually hold up under static analysis?
+
+We ran [Skylos](https://github.com/duriantaco/skylos) against 9 of the most popular Python libraries to find out. No cherry-picking. No tuning. Just `skylos . --danger --quality --table` on each repo.
+
+Here's what came out.
+
+## The Results at a Glance
+
+| Library | Stars | Danger | Quality | Dead Code |
+|---------|-------|--------|---------|-----------|
+| **FastAPI** | 82k+ | 1,075 | 882 | 38 |
+| **Pydantic** | 22k+ | 355 | 1,856 | 506 |
+| **Rich** | 51k+ | 60 | 443 | 74 |
+| **httpx** | 14k+ | 52 | 212 | 6 |
+| **Requests** | 52k+ | 31 | 176 | 37 |
+| **Click** | 16k+ | 41 | 193 | 16 |
+| **Flask** | 69k+ | 80 | 144 | 23 |
+| **Starlette** | 11k+ | 82 | 152 | 4 |
+| **tqdm** | 29k+ | 24 | 137 | 26 |
+
+**Total: 1,800 security findings. 4,195 quality issues. 730 dead code items.**
+
+Before anyone panics: most of these are not exploitable in the way they're used. These are well-maintained, peer-reviewed projects. But the patterns are real, and they show up in your application code too — where they *are* exploitable.
+
+## The Interesting Findings
+
+### FastAPI: 321 SSRF Patterns and 94 Hallucinated Dependencies
+
+FastAPI had the highest raw finding count, largely driven by:
+
+- **321 SSRF patterns (SKY-D216)** — URL construction from user-controlled inputs. In a framework, this is intentional (it's routing user requests). In your app code, it's a vulnerability.
+- **94 hallucinated dependency imports (SKY-D222)** — imports referencing packages not declared in `requirements.txt` or `pyproject.toml`. This is common in large projects with complex optional dependency trees, but in AI-generated code, it often means the LLM invented a package that doesn't exist.
+- **8 hardcoded credentials (SKY-L014)** — test fixtures and example code with hardcoded passwords. Harmless here, dangerous when this pattern leaks into production code.
+
+### Pydantic: 506 Dead Code Items and 14 Security TODOs
+
+Pydantic was the most interesting scan:
+
+- **506 dead code items** — the highest of any library we tested. Pydantic v2 was a massive rewrite, and remnants of v1 patterns are still scattered across the codebase. This is normal for major version transitions.
+- **621 high-coupling findings (SKY-Q701)** — Pydantic's core validation engine has deep interdependencies. This is a deliberate architectural choice for performance, not a bug.
+- **14 security TODO markers (SKY-L010)** — comments like `# TODO: validate auth` or `# FIXME: add CSRF protection` left in code. In a library, these are tracked. In your app, they're forgotten promises.
+- **39 pickle.loads calls (SKY-D205)** — used in serialization internals. Pickle deserialization is a known attack vector (arbitrary code execution), but Pydantic controls the input. Your code probably doesn't.
+
+### Rich: 54 Debug Leftovers and 13 God Classes
+
+Rich is a rendering library, so its findings are quality-focused:
+
+- **54 debug leftovers (SKY-L009)** — `print()` calls throughout the codebase. For a library that *is* a print replacement, this makes sense. In your codebase, these are the `console.log`s you forgot to remove before shipping.
+- **13 god classes (SKY-Q501)** — classes with 20+ methods. Rich's `Console` class is designed to be a kitchen-sink API. Your `UserService` with 30 methods probably isn't.
+- **58 high-complexity functions (SKY-Q301)** — Rich handles complex terminal rendering with deep conditional logic. Cyclomatic complexity above 10 is a code smell in business logic.
+
+### Requests: 49 Missing Resource Cleanups
+
+The most widely-used HTTP library in Python:
+
+- **49 missing resource cleanups (SKY-L008)** — file handles and connections opened without context managers (`with` statements). Requests manages its own connection pooling, but this pattern in your code causes resource leaks.
+- **7 pickle.loads calls (SKY-D205)** — in the caching layer. Same risk as Pydantic's: safe here, dangerous in your code.
+- **20 low-cohesion findings (SKY-Q702)** — classes doing too many unrelated things. In a mature library, some classes grow organically. In your code, it means your class needs to be split.
+
+### Starlette: 51 Path Traversal Patterns
+
+- **51 path traversal patterns (SKY-D215)** — Starlette serves static files and handles routing, so file path construction from user input is core functionality. In your app, `os.path.join(base_dir, user_input)` without sanitization is a directory traversal vulnerability (CWE-22).
+
+### Click: 30 Critical-Complexity Functions
+
+- **30 functions with critical cyclomatic complexity (SKY-Q301)** — Click's argument parsing involves deeply nested conditional logic. Some functions exceed complexity of 25+. This is the tradeoff of a flexible CLI framework.
+
+## What Does This Actually Mean?
+
+These findings are **not bugs in these libraries**. They're patterns that are safe *in context* — a framework that constructs URLs from parameters, a serialization library that uses pickle internally, a CLI tool with complex parsing logic.
+
+The problem is when these same patterns appear in *your* application code:
+
+- A framework using `pickle.loads` on controlled internal data is fine. Your API endpoint deserializing user-submitted pickle data is remote code execution.
+- A routing framework constructing URLs from parameters is fine. Your code building URLs from `request.args` without validation is SSRF.
+- A library with `# TODO: add auth check` is tracked in a backlog. Your production handler with the same comment is an open door.
+
+## The Dead Code Problem
+
+Across all 9 libraries, we found **730 pieces of dead code** — unused functions, imports, classes, and variables. Pydantic alone had 506.
+
+Dead code isn't just clutter. It's:
+
+- **Attack surface** — unused code can still be imported and called by an attacker.
+- **Maintenance burden** — developers read and work around code that does nothing.
+- **Dependency bloat** — unused imports pull in packages you don't need.
+
+## Try It on Your Own Code
+
+```bash
+pip install skylos
+skylos . --danger --quality --table
+```
+
+Every finding includes a rule ID (like `SKY-D216` for SSRF or `SKY-L014` for hardcoded credentials), severity level, file path, and line number. You can ignore rules that don't apply to your project with the `ignore` config:
+
+```toml
+# pyproject.toml
+[tool.skylos]
+ignore = ["SKY-L009"]  # allow print statements
+```
+
+The point isn't to hit zero findings. It's to know what's in your code before your users find out.
+
+---
+
+*Skylos is an open-source static analysis tool for Python, TypeScript, and Go. It detects dead code, security vulnerabilities, and quality issues in a single scan. [GitHub](https://github.com/duriantaco/skylos) | [Docs](https://docs.skylos.dev) | [PyPI](https://pypi.org/project/skylos/)*

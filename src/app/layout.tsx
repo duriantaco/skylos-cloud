@@ -36,6 +36,9 @@ export const metadata: Metadata = {
   ],
   alternates: {
     canonical: siteUrl,
+    types: {
+      'application/rss+xml': `${siteUrl}/blog/feed.xml`,
+    },
   },
   openGraph: {
     type: 'website',
@@ -65,6 +68,10 @@ export const metadata: Metadata = {
     },
   },
   icons: { icon: '/assets/favicon-96x96.png' },
+  // TODO: Add your Google Search Console verification code here
+  // verification: {
+  //   google: 'YOUR_GSC_VERIFICATION_CODE',
+  // },
 }
 
 const organizationJsonLd = {

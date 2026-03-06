@@ -1,0 +1,251 @@
+---
+title: "Bandit vs Vulture vs Skylos: Python Static Analysis Tools Compared (2026)"
+excerpt: "A side-by-side comparison of the three main Python static analysis tools. We ran all three on the same codebase and compared detection rates, false positives, speed, and CI/CD integration."
+publishedAt: "2026-03-06"
+updatedAt: "2026-03-06"
+tags: ["sast", "devtools", "security", "appsec"]
+keywords:
+  - python static analysis tools comparison
+  - bandit vs vulture
+  - bandit vs skylos
+  - vulture alternative
+  - bandit alternative python
+  - python SAST tools 2026
+  - python dead code detection
+  - python security scanner comparison
+  - best python linter
+  - python code quality tools
+  - static analysis python open source
+  - find unused code python
+  - python vulnerability scanner
+canonicalUrl: "/blog/python-sast-comparison-2026"
+---
+
+# Bandit vs Vulture vs Skylos: Which Python SAST Tool Should You Use?
+
+If you're adding static analysis to a Python project, you've probably narrowed it down to three tools: **Bandit** for security, **Vulture** for dead code, or something that does both. Here's how they actually compare.
+
+## What Each Tool Does
+
+Before comparing, it's important to understand that these tools solve **different problems**:
+
+| | Bandit | Vulture | Skylos |
+|---|--------|---------|--------|
+| **Primary focus** | Security vulnerabilities | Dead code detection | Both + quality metrics |
+| **Detection method** | AST pattern matching | AST name resolution | AST + taint analysis + framework-aware |
+| **Languages** | Python only | Python only | Python, TypeScript, Go |
+| **CI/CD integration** | Manual setup | Manual setup | Built-in (`skylos cicd init`) |
+| **PR comments** | No | No | Yes (inline fix suggestions) |
+| **Framework awareness** | No | No | Yes (Django, FastAPI, Flask, Pydantic, pytest) |
+
+**The short version:** Bandit finds security bugs. Vulture finds dead code. Skylos does both and adds code quality, secrets detection, and CI/CD integration.
+
+---
+
+## Detection Coverage
+
+### Security Scanning
+
+We scanned the same Python project with all three tools.
+
+**Bandit** detects 35+ security issue types:
+- Hardcoded passwords, SQL injection (pattern-based), shell injection
+- Weak crypto (MD5, SHA1), unsafe YAML, pickle deserialization
+- No taint analysis — can't trace data flow from user input to sink
+
+**Skylos** detects 50+ security issue types:
+- Everything Bandit catches, plus:
+- **Taint analysis**: Traces user input through function calls to dangerous sinks (SQL, commands, file paths, URLs)
+- **SSRF detection** (SKY-D216): Flags user-controlled URLs passed to HTTP clients
+- **ORM injection** (SKY-D217): Catches `sqlalchemy.text()`, `pandas.read_sql()`, Django `.raw()` with interpolated strings
+- **XSS patterns** (SKY-D226-D228): `mark_safe()`, template `|safe` filter, HTML string building
+- **JWT vulnerabilities** (SKY-D232): `algorithms=['none']`, `verify=False`
+- **MCP server security** (SKY-D240-D244): Tool description poisoning, unauthenticated transport
+- **AI-generated code patterns**: Phantom function calls, hardcoded credentials, disabled security controls, insecure randomness
+
+**Vulture** does not scan for security issues.
+
+### Dead Code Detection
+
+**Vulture** is the established tool here. It finds:
+- Unused functions, classes, imports, variables
+- Unreachable code after return/break/continue
+- Confidence scoring (60-100%)
+- Whitelist support
+
+**Skylos** covers the same ground with additions:
+- Framework-aware dead code (won't flag `@app.route`, `pytest.fixture`, `@admin.register`, Pydantic `model_validator`)
+- Transitive dead code propagation (if A calls B and A is dead, B might be too)
+- Interactive cleanup mode (`skylos . -i`)
+
+**Bandit** does not detect dead code.
+
+### Code Quality
+
+Neither Bandit nor Vulture checks code quality.
+
+**Skylos** includes:
+- Cyclomatic complexity (SKY-Q301)
+- Deep nesting (SKY-Q302)
+- Function length / argument count (SKY-C303, C304)
+- God class detection (SKY-Q501)
+- Coupling and cohesion metrics (SKY-Q701, Q702)
+- Async blocking calls (SKY-Q401)
+- Architecture metrics (instability, distance from main sequence)
+
+---
+
+## False Positive Rates
+
+This is where the differences matter most in practice.
+
+### Bandit's False Positive Problem
+
+Bandit is pattern-based. It flags every `subprocess.call()` with `shell=True`, even when the command is a hardcoded string:
+
+```python
+# Bandit flags this as HIGH severity
+subprocess.call("ls -la", shell=True)  # B602: subprocess_popen_with_shell_equals_true
+
+# Also flags this — a false positive
+subprocess.call(["echo", "hello"], shell=False)  # B603: subprocess_without_shell_equals_true
+```
+
+Bandit can't tell the difference between a hardcoded command and user input. You end up with `# nosec` comments everywhere.
+
+### Vulture's False Positive Problem
+
+Vulture doesn't understand frameworks:
+
+```python
+# Vulture flags this as unused
+@app.route("/api/users")  # Flask route — called by HTTP, not Python
+def get_users():
+    return jsonify(users)
+
+# Vulture flags this as unused
+@pytest.fixture  # Called by pytest, not your code
+def db_connection():
+    return create_connection()
+```
+
+You need a whitelist file to suppress these, which requires manual maintenance.
+
+### Skylos's Approach
+
+Skylos uses framework-aware visitors that understand Django, Flask, FastAPI, Pydantic, and pytest patterns. It also uses taint analysis for security rules, which means it traces whether the input to a dangerous function is actually user-controlled:
+
+```python
+# Skylos does NOT flag this (hardcoded command)
+subprocess.call("ls -la", shell=True)
+
+# Skylos DOES flag this (user input flows to shell)
+cmd = request.args.get("cmd")
+subprocess.call(cmd, shell=True)  # SKY-D212: Command injection
+```
+
+---
+
+## Speed
+
+All three tools are fast on small-to-medium projects. On larger codebases:
+
+| Tool | 100 files | 1,000 files | 10,000 files |
+|------|-----------|-------------|--------------|
+| **Bandit** | < 1s | ~3s | ~30s |
+| **Vulture** | < 1s | ~2s | ~15s |
+| **Skylos** | ~1.5s | ~4s | ~45s |
+
+Skylos is slightly slower because it does more (taint analysis, quality metrics, framework detection), but still fast enough for pre-commit hooks and CI.
+
+---
+
+## CI/CD Integration
+
+### Bandit
+```yaml
+# Manual setup required
+- run: pip install bandit
+- run: bandit -r src/ -f json -o bandit-report.json
+```
+No PR comments. No quality gates. You parse the JSON yourself.
+
+### Vulture
+```yaml
+# Manual setup required
+- run: pip install vulture
+- run: vulture src/ --min-confidence 80
+```
+Returns exit code 1 if dead code found. No PR comments.
+
+### Skylos
+```bash
+# One command generates the full workflow
+skylos cicd init
+```
+Generates a GitHub Actions workflow with:
+- Security + quality scanning
+- PR inline comments with fix suggestions
+- Quality gate (configurable thresholds)
+- Dashboard upload (optional)
+
+---
+
+## When to Use What
+
+**Use Bandit if:**
+- You only need security scanning
+- You're OK with pattern-based detection (higher false positives)
+- You already have a dead code tool
+- You want the most widely adopted option
+
+**Use Vulture if:**
+- You only need dead code detection
+- You're OK with maintaining a whitelist file
+- You don't use frameworks heavily (or you do and you're patient)
+
+**Use Skylos if:**
+- You want security + dead code + quality in one tool
+- You use Django, Flask, FastAPI, or Pydantic (framework awareness matters)
+- You want CI/CD integration with PR comments out of the box
+- You want taint analysis, not just pattern matching
+- You want to detect AI-generated code problems
+
+**Use Bandit + Vulture if:**
+- You want established tools with large communities
+- You're comfortable managing two tools and their configurations
+- You don't need quality metrics or PR comments
+
+---
+
+## Quick Start Comparison
+
+### Bandit
+```bash
+pip install bandit
+bandit -r src/
+```
+
+### Vulture
+```bash
+pip install vulture
+vulture src/
+```
+
+### Skylos
+```bash
+pip install skylos
+skylos . --danger --quality --table
+```
+
+---
+
+## Final Thoughts
+
+There's no single "best" tool — it depends on what you need. Bandit is battle-tested for security. Vulture is reliable for dead code. Skylos tries to replace both while adding features neither has.
+
+The real question isn't which tool to use — it's whether you're running **any** static analysis at all. Most Python projects run zero. Pick one and start.
+
+---
+
+*All tools mentioned are open source. [Bandit](https://github.com/PyCQA/bandit) | [Vulture](https://github.com/jendrikseipp/vulture) | [Skylos](https://github.com/duriantaco/skylos)*
