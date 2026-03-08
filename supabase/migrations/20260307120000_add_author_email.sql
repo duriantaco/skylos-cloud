@@ -1,0 +1,2 @@
+ALTER TABLE findings ADD COLUMN IF NOT EXISTS author_email TEXT;
+ALTER TABLE issue_groups ADD COLUMN IF NOT EXISTS author_email TEXT;

@@ -6,8 +6,8 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, CheckCircle, XCircle, FileText, ChevronRight, ChevronDown,
-  Search, ExternalLink, AlertTriangle, Lock, Unlock, Ban, AlertOctagon, Shield, Terminal, X, ChevronUp,
-  Share2, Link2, Check, LinkIcon,
+  Search, ExternalLink, AlertTriangle, Lock, Unlock, Ban, Shield, Terminal, X, ChevronUp,
+  Share2, Link2, Check,
 } from "lucide-react";
 import FlowVisualizerButton from "@/components/FlowVisualizerButton";
 import FixPrButton from "@/components/FixPrButton";
@@ -70,7 +70,6 @@ type Finding = {
   verification_evidence?: any;
   verified_at?: string | null;
 
-  // Hybrid/agent LLM metadata
   analysis_source?: "static" | "llm" | "static+llm" | null;
   analysis_confidence?: "high" | "medium" | "low" | null;
   llm_verdict?: "TRUE_POSITIVE" | "FALSE_POSITIVE" | "UNCERTAIN" | null;
@@ -78,7 +77,6 @@ type Finding = {
   llm_challenged?: boolean;
   needs_review?: boolean;
 
-  // Source tracking
   source?: string | null;
   source_metadata?: {
     confidence_score?: number;
@@ -87,7 +85,6 @@ type Finding = {
     cwe?: string;
   } | null;
 
-  // SCA metadata for DEPENDENCY findings
   sca_metadata?: {
     vuln_id?: string;
     display_id?: string;
@@ -100,6 +97,8 @@ type Finding = {
     package_name?: string;
     package_version?: string;
   } | null;
+
+  author_email?: string | null;
 };
 
 function generateGitHubUrl(repoUrl: string, sha: string, filePath: string, line: number) {
@@ -123,7 +122,8 @@ function VerifyBadge({ verdict }: { verdict?: string | null }) {
 }
 
 function SourceBadge({ source }: { source?: string | null }) {
-  if (!source || source === "static") return null;
+  if (!source || source === "static") 
+    return null;
   if (source === "static+llm") {
     return <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[9px] font-bold">STATIC+LLM</span>;
   }
@@ -188,9 +188,12 @@ type GateStatus = "PASS" | "FAIL" | "OVERRIDDEN";
 
 function rankSeverity(sev: string) {
   const s = String(sev || "").toUpperCase();
-  if (s === "CRITICAL") return 0;
-  if (s === "HIGH") return 1;
-  if (s === "MEDIUM") return 2;
+  if (s === "CRITICAL") 
+    return 0;
+  if (s === "HIGH") 
+    return 1;
+  if (s === "MEDIUM") 
+    return 2;
   return 3;
 }
 
@@ -204,7 +207,6 @@ function safeNum(x: any, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-// Compact collapsible gate panel
 function GatePanel({
   scan,
   findings,
@@ -264,7 +266,6 @@ function GatePanel({
 
   return (
     <div className={`border-b border-slate-200 bg-white transition-all ${statusColors[status]}`}>
-      {/* Collapsed header - always visible */}
       <button
         onClick={onToggle}
         className="w-full px-6 py-3 flex items-center justify-between hover:bg-black/5 transition-colors"
@@ -989,7 +990,10 @@ export default function ScanDetailsPage() {
                                 </div>
 
                                 <p className={`text-xs line-clamp-2 ${active ? 'text-white' : 'text-slate-700'}`}>{f.message}</p>
-                                <div className={`mt-1.5 text-[10px] font-mono ${active ? 'text-slate-500' : 'text-slate-400'}`}>L{f.line_number}</div>
+                                <div className={`mt-1.5 text-[10px] font-mono ${active ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  L{f.line_number}
+                                  {f.author_email && <span className="ml-2">{f.author_email}</span>}
+                                </div>
                               </button>
                             );
                           })}
@@ -1033,7 +1037,6 @@ export default function ScanDetailsPage() {
                 </div>
               )}
 
-              {/* Header with FlowVisualizerButton */}
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div>
                   <div className="flex items-center gap-2 mb-2">

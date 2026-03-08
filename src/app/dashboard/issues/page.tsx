@@ -5,14 +5,18 @@ import { ShieldAlert, Search } from "lucide-react";
 
 function sevRank(sev: string) {
   const s = String(sev || "").toUpperCase();
-  if (s === "CRITICAL") return 4;
-  if (s === "HIGH") return 3;
-  if (s === "MEDIUM") return 2;
+  if (s === "CRITICAL") 
+    return 4;
+  if (s === "HIGH") 
+    return 3;
+  if (s === "MEDIUM") 
+    return 2;
   return 1;
 }
 
 function SourceBadge({ source }: { source?: string | null }) {
-  if (!source || source === "skylos") return null;
+  if (!source || source === "skylos") 
+    return null;
   const isClaudeSecurity = source === "claude-code-security";
   return (
     <span
@@ -58,7 +62,8 @@ export default async function IssuesInboxPage() {
     .maybeSingle();
 
   const orgId = anyProject?.org_id;
-  if (!orgId) return redirect("/dashboard/projects");
+  if (!orgId) 
+    return redirect("/dashboard/projects");
 
   const { data: groups } = await supabase
     .from("issue_groups")
@@ -67,6 +72,7 @@ export default async function IssuesInboxPage() {
       canonical_file, canonical_line,
       occurrence_count, verification_status,
       last_seen_at, last_seen_scan_id,
+      author_email,
       projects!inner(name, repo_url)
     `)
     .eq("org_id", orgId)
@@ -76,7 +82,8 @@ export default async function IssuesInboxPage() {
 
   const sorted = (groups || []).slice().sort((a: any, b: any) => {
     const d = sevRank(b.severity) - sevRank(a.severity);
-    if (d !== 0) return d;
+    if (d !== 0) 
+      return d;
     return new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime();
   });
 
@@ -131,6 +138,7 @@ export default async function IssuesInboxPage() {
                       <span>
                         {g.projects?.name || "Unknown Project"} • {g.rule_id} • {g.occurrence_count}x
                         {g.verification_status === "VERIFIED" ? " • VERIFIED" : ""}
+                        {g.author_email ? ` • ${g.author_email}` : ""}
                       </span>
                       <SourceBadge source={g.source} />
                     </div>

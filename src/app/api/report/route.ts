@@ -38,6 +38,7 @@ type InsertedFinding = {
   file_path: string;
   line_number: number | null;
   snippet: string | null;
+  author_email?: string | null;
 };
 
 
@@ -116,6 +117,7 @@ export async function createOrUpdateIssueGroups(
       last_seen_at: scanCreatedAtIso,
       last_seen_scan_id: scanId,
       status: "open",
+      author_email: canonical.author_email || null,
     });
 
     fingerprintToItems.set(fingerprint, items);
@@ -845,6 +847,7 @@ export async function POST(req: Request) {
         package_name: f.metadata.package_name || null,
         package_version: f.metadata.package_version || null,
       } : null,
+      author_email: f.metadata?.blame_email || null,
     }))
 
     if (dbRows.length > 0) {
@@ -853,7 +856,7 @@ export async function POST(req: Request) {
 
     const { data: insertedFindings, error: insSelErr } = await supabase
       .from("findings")
-      .select("id, rule_id, category, severity, file_path, line_number, snippet, message")
+      .select("id, rule_id, category, severity, file_path, line_number, snippet, message, author_email")
       .eq("scan_id", scan.id);
 
     if (insSelErr) throw new Error(`Failed to read inserted findings: ${insSelErr.message}`);
