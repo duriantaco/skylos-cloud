@@ -5,13 +5,18 @@ import Link from 'next/link';
 import Image from 'next/image';
 import dogImg from "../../../public/assets/favicon-96x96.png";
 import BlogList from '@/components/BlogList';
+import { estimateReadingTime } from '@/lib/toc';
+import { getAuthorMeta, getUpdatedAt } from '@/lib/content-meta';
 
 interface Post {
   slug: string;
   title: string;
   excerpt: string;
   publishedAt: string;
+  updatedAt?: string;
+  authorName: string;
   tags: string[];
+  readingTime: number;
 }
 
 function getPosts(): Post[] {
@@ -28,14 +33,19 @@ function getPosts(): Post[] {
     .map(filename => {
       const filePath = path.join(postsDirectory, filename);
       const fileContents = fs.readFileSync(filePath, 'utf8');
-      const { data } = matter(fileContents);
+      const { data, content } = matter(fileContents);
+      const frontmatterRecord = data as Record<string, unknown>;
+      const author = getAuthorMeta(frontmatterRecord);
 
       return {
         slug: filename.replace('.mdx', ''),
         title: data.title,
         excerpt: data.excerpt,
         publishedAt: data.publishedAt,
+        updatedAt: getUpdatedAt(frontmatterRecord),
+        authorName: author.name,
         tags: data.tags || [],
+        readingTime: estimateReadingTime(content),
       };
     })
     .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
@@ -69,6 +79,12 @@ export default function BlogPage() {
             <Link href="/blog" className="text-sm text-slate-900 font-medium">
               Blog
             </Link>
+            <Link href="/compare" className="text-sm text-slate-500 hover:text-slate-900 transition">
+              Compare
+            </Link>
+            <Link href="/use-cases" className="text-sm text-slate-500 hover:text-slate-900 transition">
+              Use Cases
+            </Link>
             <Link href="/docs" className="text-sm text-slate-500 hover:text-slate-900 transition">
               Docs
             </Link>
@@ -101,24 +117,26 @@ export default function BlogPage() {
 }
 
 export const metadata = {
-  title: 'Blog - Skylos',
-  description: 'Insights on application security, SAST, and building better developer tools.',
+  title: 'Python Security & Static Analysis Blog - Skylos',
+  description: 'Practical guides on Python security scanning, dead code detection, SAST tool comparisons, and securing AI-generated code. Real benchmarks, real code examples.',
   keywords: [
     'python security blog',
-    'static analysis insights',
-    'SAST best practices',
-    'dead code detection',
-    'devsecops blog',
+    'python static analysis guide',
+    'SAST best practices python',
+    'dead code detection python',
+    'AI generated code security',
+    'python vulnerability scanner',
+    'semgrep bandit comparison',
   ],
   openGraph: {
-    title: 'Blog - Skylos',
-    description: 'Insights on application security, SAST, and building better developer tools.',
+    title: 'Python Security & Static Analysis Blog - Skylos',
+    description: 'Practical guides on Python security, dead code detection, and AI code scanning.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Blog - Skylos',
-    description: 'Insights on application security, SAST, and building better developer tools.',
+    title: 'Python Security & Static Analysis Blog - Skylos',
+    description: 'Practical guides on Python security, dead code detection, and AI code scanning.',
   },
   alternates: {
     canonical: '/blog',

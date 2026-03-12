@@ -1,9 +1,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { 
-  CheckCircle2, XCircle, Clock, GitBranch, GitCommit, 
-  ArrowRight, History, AlertTriangle, Shield
+import {
+  CheckCircle2, XCircle, Clock, GitBranch, GitCommit,
+  ArrowRight, History, AlertTriangle, Shield, ArrowDownUp
 } from "lucide-react";
 
 type Scan = {
@@ -227,7 +227,15 @@ export default async function ScansPage() {
               </p>
             </div>
 
-            {/* Quick stats */}
+            {/* Actions + Quick stats */}
+            <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/scans/compare"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition"
+            >
+              <ArrowDownUp className="w-4 h-4" />
+              Compare Scans
+            </Link>
             <div className="flex items-center gap-4 text-sm bg-white border border-slate-200 rounded-xl px-4 py-3">
               <div className="text-center px-3">
                 <div className="text-xl font-bold text-slate-900">{totalScans}</div>
@@ -241,6 +249,7 @@ export default async function ScansPage() {
                 <div className="text-xl font-bold text-rose-600">{failedScans}</div>
                 <div className="text-xs text-slate-500">Failed</div>
               </div>
+            </div>
             </div>
           </header>
 

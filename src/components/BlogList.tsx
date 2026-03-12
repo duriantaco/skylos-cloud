@@ -2,15 +2,17 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Calendar, Clock, Search } from 'lucide-react';
+import { ArrowRight, Calendar, Clock, RefreshCw, Search, User } from 'lucide-react';
 
 interface Post {
   slug: string;
   title: string;
   excerpt: string;
   publishedAt: string;
+  updatedAt?: string;
+  authorName: string;
   tags: string[];
-  readingTime?: number;
+  readingTime: number;
 }
 
 interface BlogListProps {
@@ -27,13 +29,6 @@ const tagColors: Record<string, string> = {
   'dead code': 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200',
   default: 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200',
 };
-
-function estimateReadingTime(excerpt: string): number {
-  // Rough estimate: 200 words per minute, excerpt is ~10% of article
-  const words = excerpt.split(' ').length;
-  const estimatedTotalWords = words * 10;
-  return Math.max(1, Math.round(estimatedTotalWords / 200));
-}
 
 export default function BlogList({ posts }: BlogListProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -169,6 +164,25 @@ export default function BlogList({ posts }: BlogListProps) {
                     {featuredPost.excerpt}
                   </p>
 
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mb-6">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      <span>{featuredPost.authorName}</span>
+                    </div>
+                    {featuredPost.updatedAt && featuredPost.updatedAt !== featuredPost.publishedAt ? (
+                      <div className="flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4" />
+                        <span>
+                          Updated {new Date(featuredPost.updatedAt).toLocaleDateString('en-US', {
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+
                   {/* Meta */}
                   <div className="flex items-center justify-between pt-6 border-t border-slate-100">
                     <div className="flex items-center gap-5 text-sm text-slate-500">
@@ -184,7 +198,7 @@ export default function BlogList({ posts }: BlogListProps) {
                       </div>
                       <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4" />
-                        <span>{estimateReadingTime(featuredPost.excerpt)} min read</span>
+                        <span>{featuredPost.readingTime} min read</span>
                       </div>
                     </div>
 
@@ -238,9 +252,14 @@ export default function BlogList({ posts }: BlogListProps) {
                         {post.excerpt}
                       </p>
 
+                      <div className="flex items-center gap-2 text-xs text-slate-500 mb-4">
+                        <User className="w-3.5 h-3.5" />
+                        <span>{post.authorName}</span>
+                      </div>
+
                       {/* Meta */}
-                      <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                        <div className="flex items-center gap-3 text-xs text-slate-500">
+                      <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-100">
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                           <div className="flex items-center gap-1.5">
                             <Calendar className="w-3.5 h-3.5" />
                             <time>
@@ -251,9 +270,21 @@ export default function BlogList({ posts }: BlogListProps) {
                               })}
                             </time>
                           </div>
+                          {post.updatedAt && post.updatedAt !== post.publishedAt ? (
+                            <div className="flex items-center gap-1.5">
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              <span>
+                                {new Date(post.updatedAt).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
+                              </span>
+                            </div>
+                          ) : null}
                           <div className="flex items-center gap-1.5">
                             <Clock className="w-3.5 h-3.5" />
-                            <span>{estimateReadingTime(post.excerpt)} min</span>
+                            <span>{post.readingTime} min</span>
                           </div>
                         </div>
 

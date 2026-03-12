@@ -1,0 +1,348 @@
+---
+title: "Best Python SAST Tools in 2026: Semgrep, Bandit, CodeQL, Vulture, and Skylos Compared"
+excerpt: "A practical comparison of the 5 most popular Python static analysis and security tools in 2026. What each one does, where it's strongest, and which combination fits your team."
+publishedAt: "2026-03-12"
+updatedAt: "2026-03-12"
+tags: ["sast", "comparison", "python"]
+keywords:
+  - best python SAST tools 2026
+  - python static analysis tools
+  - python security scanner comparison
+  - semgrep vs bandit vs codeql
+  - best python security tool
+  - python SAST comparison
+  - python dead code tools
+  - python vulnerability scanner
+  - best python linter security
+  - python code quality tools 2026
+  - python static analysis open source
+  - python security scanning tools
+  - SAST tools for python
+  - python appsec tools
+canonicalUrl: "/compare/best-python-sast-tools-2026"
+---
+
+# Best Python SAST Tools in 2026
+
+If you're adding static analysis to a Python project, you have five realistic options: **Semgrep**, **Bandit**, **CodeQL**, **Vulture**, and **Skylos**. Each has a different focus, different strengths, and different trade-offs.
+
+This guide compares all five on what actually matters: detection coverage, false positive rates, CI/CD integration, and how well they handle the problems that Python teams face in 2026 — including AI-generated code.
+
+---
+
+## Quick comparison table
+
+| | Semgrep | Bandit | CodeQL | Vulture | Skylos |
+|---|---------|--------|--------|---------|--------|
+| **Focus** | Multi-language security | Python security | Multi-language security | Dead code | Security + dead code + quality |
+| **Languages** | 30+ | Python only | 10+ | Python only | Python, TypeScript, Go |
+| **Security rules** | 1000+ (registry) | 35+ | 100+ (Python) | None | 50+ |
+| **Dead code** | No | No | No | Yes | Yes |
+| **Code quality** | No | No | No | No | Yes |
+| **Taint analysis** | Yes (paid tier) | No | Yes | N/A | Yes |
+| **Custom rules** | Yes (powerful DSL) | Plugin system | Yes (QL language) | N/A | No |
+| **Framework aware** | Rule-dependent | No | Rule-dependent | No | Yes (built-in) |
+| **AI code detection** | Limited | No | No | No | Yes |
+| **CI/CD** | Yes | Manual | GitHub native | Manual | Auto-generated |
+| **Free tier** | OSS + free Cloud | Fully free | Free for public repos | Fully free | Fully free |
+| **Learning curve** | Medium | Low | High | Low | Low |
+
+---
+
+## 1. Semgrep
+
+**Best for:** Multi-language teams, custom rule authoring, enterprise security programs
+
+[Semgrep](https://github.com/semgrep/semgrep) is the most broadly applicable SAST tool on this list. It supports 30+ languages, has a massive community-contributed rule registry, and lets you write custom rules with an intuitive pattern syntax.
+
+### Strengths
+
+- **Custom rules are its killer feature.** The pattern-matching DSL is powerful and readable. You can encode team-specific security policies in YAML.
+- **Huge ecosystem.** Thousands of community rules for common frameworks.
+- **Multi-language.** If you have Python + Java + Go + JS, Semgrep scans all of them.
+- **Enterprise features.** Dashboard, RBAC, Jira integration, findings triage (paid tier).
+- **Taint analysis** available in the paid Cloud tier.
+
+### Weaknesses
+
+- **No dead code detection.** You need a separate tool for that.
+- **No code quality metrics.** Complexity, coupling, cohesion — not Semgrep's domain.
+- **OSS taint analysis is limited.** Cross-file taint tracking requires Semgrep Code (paid).
+- **Framework awareness depends on rules.** If no one wrote a rule for your pattern, Semgrep doesn't know about it.
+
+### Quick start
+
+```bash
+pip install semgrep
+semgrep scan --config auto src/
+```
+
+### When to choose Semgrep
+
+Choose Semgrep if you're a multi-language team, need custom rules, or want an enterprise security platform. It's the industry standard for a reason.
+
+For a detailed Semgrep vs Skylos comparison, see [Semgrep vs Skylos for Python](/compare/semgrep-vs-skylos).
+
+---
+
+## 2. Bandit
+
+**Best for:** Quick Python-only security scanning with zero configuration
+
+[Bandit](https://github.com/PyCQA/bandit) is the most widely used Python security scanner. It's maintained by the PyCQA group and comes with 35+ built-in security checks.
+
+### Strengths
+
+- **Zero setup.** Install and run. No config file needed.
+- **Well-known.** Most Python developers have heard of Bandit. Easy to get team buy-in.
+- **Maintained by PyCQA.** Part of the official Python code quality ecosystem.
+- **Plugin system.** You can write custom Bandit plugins.
+- **Broad security coverage.** Catches shell injection, SQL injection, weak crypto, pickle, YAML, eval, exec, and more.
+
+### Weaknesses
+
+- **High false positive rate.** Bandit is pattern-based with no taint analysis. It flags every `subprocess.call(shell=True)` even with hardcoded commands.
+- **No dead code detection.** Security only.
+- **No framework awareness.** Doesn't understand Django, Flask, or FastAPI patterns.
+- **No data flow analysis.** Can't trace whether input is user-controlled or hardcoded.
+- **`# nosec` fatigue.** Teams end up suppressing so many findings that real issues get lost.
+
+### Example false positive
+
+```python
+# Bandit flags this as HIGH severity
+subprocess.call("ls -la", shell=True)  # B602 — but this is a hardcoded command
+```
+
+### Quick start
+
+```bash
+pip install bandit
+bandit -r src/
+```
+
+### When to choose Bandit
+
+Choose Bandit if you want the simplest possible security scanner, you're OK with `# nosec` for false positives, and you already have separate tools for dead code and quality.
+
+For a detailed comparison, see [Bandit vs Vulture vs Skylos](/blog/python-sast-comparison-2026).
+
+---
+
+## 3. CodeQL
+
+**Best for:** Deep semantic analysis on GitHub-hosted projects
+
+[CodeQL](https://github.com/github/codeql) is GitHub's static analysis engine. It treats code as data — you write queries in a SQL-like language (QL) to find patterns.
+
+### Strengths
+
+- **Deep analysis.** CodeQL builds a database of your code and runs semantic queries against it. It can find complex vulnerability patterns that pattern-matchers miss.
+- **GitHub-native.** Results appear in the Security tab. No extra CI setup for public repos.
+- **Taint analysis.** Built-in data flow tracking across functions and files.
+- **Community queries.** Growing library of community-contributed QL queries.
+
+### Weaknesses
+
+- **Slow.** Building the CodeQL database takes minutes to tens of minutes on large codebases. Not suitable for pre-commit hooks.
+- **High learning curve.** Writing custom QL queries is harder than Semgrep rules.
+- **No dead code detection.** Not its focus.
+- **No code quality metrics.** Security only.
+- **Free for public repos only.** Private repos require GitHub Advanced Security (paid).
+- **Python support is secondary.** CodeQL's strongest coverage is for Java/C++/JavaScript. Python support exists but is less comprehensive.
+
+### Quick start
+
+CodeQL runs automatically on public GitHub repos with the default setup. For custom scanning:
+
+```yaml
+# .github/workflows/codeql.yml
+name: CodeQL
+on: [push, pull_request]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - uses: github/codeql-action/analyze@v3
+```
+
+### When to choose CodeQL
+
+Choose CodeQL if you're on GitHub, want deep semantic analysis, and have the patience for longer scan times. It's excellent for catching complex vulnerability chains that simpler tools miss.
+
+---
+
+## 4. Vulture
+
+**Best for:** Dedicated dead code detection in Python
+
+[Vulture](https://github.com/jendrikseipp/vulture) is purpose-built for finding unused Python code. It's fast, simple, and does one thing well.
+
+### Strengths
+
+- **Purpose-built.** Focused entirely on dead code — unused functions, classes, imports, variables.
+- **Fast.** Runs in seconds on large codebases.
+- **Confidence scoring.** Reports 60-100% confidence for each finding.
+- **Established.** Battle-tested across many Python projects.
+
+### Weaknesses
+
+- **No framework awareness.** Flags Flask routes, pytest fixtures, Django admin classes, and Pydantic validators as unused. You need a whitelist file.
+- **No security scanning.** Dead code only.
+- **No transitive propagation.** If function A is dead and calls function B, Vulture won't flag B.
+- **Whitelist maintenance.** Every new route, fixture, or decorator-based pattern needs manual whitelisting.
+
+### Example false positive
+
+```python
+@app.route("/api/users")  # Vulture flags this as unused
+def get_users():
+    return jsonify(users)
+
+@pytest.fixture  # Vulture flags this as unused
+def db_connection():
+    return create_connection()
+```
+
+### Quick start
+
+```bash
+pip install vulture
+vulture src/ --min-confidence 80
+```
+
+### When to choose Vulture
+
+Choose Vulture if you only need dead code detection, you don't use frameworks heavily (or you're willing to maintain a whitelist), and you have separate tools for security.
+
+For a real-world benchmark, see [Finding dead code in Flask: Skylos vs Vulture](/blog/flask-dead-code-case-study).
+
+---
+
+## 5. Skylos
+
+**Best for:** Python-focused teams wanting security + dead code + quality in one tool
+
+[Skylos](https://github.com/duriantaco/skylos) combines security scanning, dead code detection, and code quality metrics. It's newer than the other tools but goes deeper on Python-specific patterns.
+
+### Strengths
+
+- **All-in-one.** Security (50+ rules), dead code, and quality metrics in a single scan.
+- **Framework-aware.** Understands Django, Flask, FastAPI, Pydantic, pytest, Celery, and Click out of the box. No whitelist needed.
+- **Taint analysis.** Traces user input to dangerous sinks. Distinguishes hardcoded strings from user-controlled data.
+- **Transitive dead code propagation.** If A is dead and only A calls B, B is also flagged as dead.
+- **AI code detection.** Catches hallucinated imports, phantom function calls, hardcoded credentials, and disabled security controls.
+- **Auto-generated CI/CD.** `skylos cicd init` creates a complete GitHub Actions workflow with PR comments.
+- **Quality metrics.** Cyclomatic complexity, coupling, cohesion, god classes, architecture metrics.
+
+### Weaknesses
+
+- **No custom rules.** The 50+ rules are built-in. You can't add domain-specific rules.
+- **Newer ecosystem.** Smaller community than Semgrep or Bandit.
+- **Limited language support.** Python, TypeScript, and Go. No Java, Ruby, or C++.
+- **Fewer security rules** than Semgrep's full registry.
+
+### Quick start
+
+```bash
+pip install skylos
+skylos . --danger --quality
+```
+
+### When to choose Skylos
+
+Choose Skylos if your codebase is primarily Python, you want one tool instead of three (Bandit + Vulture + pylint), and you care about AI-generated code quality. Also good if you want zero-config CI with PR inline comments.
+
+For more on what Skylos catches, see [How to detect dead code in Python](/use-cases/detect-dead-code-python) and [AI-generated code security](/use-cases/ai-generated-code-security).
+
+---
+
+## Tool combinations that work
+
+### Minimal setup (Python-only team)
+
+```bash
+pip install skylos
+skylos . --danger --quality
+```
+
+One tool covers security, dead code, and quality.
+
+### Maximum coverage (multi-language team)
+
+```yaml
+# Semgrep for multi-language custom rules
+- run: semgrep scan --config auto src/
+
+# CodeQL for deep semantic analysis
+- uses: github/codeql-action/analyze@v3
+
+# Skylos for Python-specific dead code + AI code + quality
+- run: skylos . --danger --quality --github
+```
+
+### Budget-friendly stack
+
+```bash
+# Bandit for security (free, established)
+bandit -r src/
+
+# Vulture for dead code (free, established)
+vulture src/ --min-confidence 80
+```
+
+Two tools, fully free, well-known. Trade-off: more false positives and no framework awareness.
+
+---
+
+## The 2026 context: AI-generated code
+
+The biggest shift in Python static analysis in 2026 is AI-generated code. Teams using Copilot, Claude, and Cursor are generating more code faster — but with new failure modes:
+
+- **Hallucinated imports** — packages that don't exist
+- **Phantom function calls** — calling functions never defined
+- **Hardcoded credentials** — AI tools inline secrets for "working examples"
+- **Disabled security** — `verify=False`, `debug=True`
+- **Dead code accumulation** — abandoned AI-generated drafts
+
+Traditional tools (Bandit, Vulture, CodeQL) weren't designed for these patterns. Semgrep can catch some with custom rules. Skylos has specific detection built in.
+
+If your team uses AI coding tools heavily, factor this into your tool choice. See [How to catch hallucinated imports in AI-generated Python code](/use-cases/ai-generated-code-security) for more detail.
+
+---
+
+## Summary
+
+| Need | Best tool |
+|------|-----------|
+| Multi-language security | Semgrep |
+| Simplest Python security scan | Bandit |
+| Deep semantic analysis (GitHub) | CodeQL |
+| Dedicated dead code finder | Vulture |
+| Python security + dead code + quality + AI code | Skylos |
+| Custom rule authoring | Semgrep or CodeQL |
+| Framework-aware dead code (no whitelist) | Skylos |
+| Zero-config CI with PR comments | Skylos |
+| Enterprise security program | Semgrep Cloud |
+
+Pick the tool that matches your primary need. If you're not running any static analysis at all yet, start with one and expand later. Something is infinitely better than nothing.
+
+---
+
+## Related
+
+- [Semgrep vs Skylos for Python](/compare/semgrep-vs-skylos)
+- [How to Detect Dead Code in Python](/use-cases/detect-dead-code-python)
+- [How to Catch Hallucinated Imports in AI Code](/use-cases/ai-generated-code-security)
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+- [Finding Dead Code in Flask: Skylos vs Vulture](/blog/flask-dead-code-case-study)
+- [We Scanned 9 Popular Python Libraries](/blog/we-scanned-9-popular-python-libraries)
+
+---
+
+*All tools mentioned are open source or have free tiers. [Semgrep](https://github.com/semgrep/semgrep) | [Bandit](https://github.com/PyCQA/bandit) | [CodeQL](https://github.com/github/codeql) | [Vulture](https://github.com/jendrikseipp/vulture) | [Skylos](https://github.com/duriantaco/skylos) | [Skylos Docs](https://docs.skylos.dev)*

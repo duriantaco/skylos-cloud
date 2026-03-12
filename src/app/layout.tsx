@@ -18,21 +18,24 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'Skylos — Catch dead code, secrets, and risky patterns before merge',
-    template: '%s | Skylos', // Changed '·' to '|' (Standard practice, saves 1 char)
+    default: 'Skylos — Python Static Analysis, Security Scanner & Dead Code Detection',
+    template: '%s | Skylos',
   },
   description:
-    'Skylos scans your repo locally or in CI/PR checks to catch dead code, hardcoded secrets, and dangerous patterns before they ship.',
+    'Open source Python SAST tool that finds dead code, hardcoded secrets, SQL injection, and AI-generated code problems. Runs locally, in CI/CD, and as a GitHub Action.',
   applicationName: 'Skylos',
   keywords: [
-    'static analysis',
-    'SAST',
-    'python security',
-    'code scanning',
-    'dead code',
-    'secrets scanning',
-    'devsecops',
-    'CI/CD',
+    'python static analysis',
+    'python SAST',
+    'python security scanner',
+    'dead code detection python',
+    'python secrets scanner',
+    'AI generated code scanner',
+    'semgrep alternative python',
+    'vulture alternative',
+    'python code quality',
+    'GitHub Action python security',
+    'devsecops python',
   ],
   alternates: {
     canonical: siteUrl,
@@ -44,16 +47,16 @@ export const metadata: Metadata = {
     type: 'website',
     url: siteUrl,
     siteName: 'Skylos',
-    title: 'Skylos — Static analysis that blocks risky merges',
+    title: 'Skylos — Python Static Analysis & Security Scanner',
     description:
-      'Catch dead code, hardcoded secrets, and dangerous patterns before they ship. Run locally or in CI/PRs.',
-    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Skylos Dashboard' }],
+      'Open source Python SAST tool. Detect dead code, secrets, SQL injection, and AI code problems. Run locally or in CI.',
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Skylos — Python Static Analysis Tool' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Skylos — Static analysis that blocks risky merges',
+    title: 'Skylos — Python Static Analysis & Security Scanner',
     description:
-      'Catch dead code, hardcoded secrets, and dangerous patterns before they ship. Run locally or in CI/PRs.',
+      'Open source Python SAST tool. Detect dead code, secrets, SQL injection, and AI code problems. Run locally or in CI.',
     images: ['/og.png'],
   },
   robots: {
@@ -80,7 +83,7 @@ const organizationJsonLd = {
   name: 'Skylos',
   url: siteUrl,
   logo: `${siteUrl}/assets/favicon-96x96.png`,
-  description: 'Open source static analysis tool for Python. Finds dead code, secrets, and security vulnerabilities.',
+  description: 'Open source Python static analysis and SAST tool. Finds dead code, hardcoded secrets, SQL injection, and security vulnerabilities. Alternative to Semgrep, Bandit, and Vulture for Python teams.',
   sameAs: [
     'https://github.com/duriantaco/skylos',
     'https://pypi.org/project/skylos/',

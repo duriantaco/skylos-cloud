@@ -17,26 +17,27 @@ import {
 import dogImg from "../../../public/assets/favicon-96x96.png"
 
 export const metadata: Metadata = {
-  title: "VS Code Extension — Skylos",
+  title: "VS Code Python Linter & Security Scanner — Skylos",
   description:
-    "Real-time AI-powered code analysis in VS Code. Detects bugs as you type with GPT-4 or Claude. One-click fixes with diff preview.",
+    "Python static analysis and security scanner for VS Code. Detect dead code, secrets, and risky patterns as you type, with AI-assisted fixes and diff previews.",
   keywords: [
     "vscode python linter",
     "ai code review vscode",
     "python static analysis extension",
     "dead code detection vscode",
+    "python security scanner vscode",
   ],
   openGraph: {
-    title: "VS Code Extension — Skylos",
+    title: "VS Code Python Linter & Security Scanner — Skylos",
     description:
-      "Real-time AI-powered code analysis in VS Code. Detects bugs as you type with GPT-4 or Claude.",
+      "Python static analysis and security scanning in VS Code. Detect dead code, secrets, and risky patterns as you type.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "VS Code Extension — Skylos",
+    title: "VS Code Python Linter & Security Scanner — Skylos",
     description:
-      "Real-time AI-powered code analysis in VS Code. Detects bugs as you type with GPT-4 or Claude.",
+      "Python static analysis and security scanning in VS Code. Detect dead code, secrets, and risky patterns as you type.",
   },
   alternates: {
     canonical: "/vscode",
@@ -96,7 +97,15 @@ function Pill({ children, color = "slate" }: { children: React.ReactNode; color?
   )
 }
 
-function FeatureCard({ icon: Icon, title, desc }: { icon: any; title: string; desc: string }) {
+function FeatureCard({
+  icon: Icon,
+  title,
+  desc,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  desc: string
+}) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 hover:border-slate-300 hover:shadow-sm transition">
       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 border border-slate-200">
@@ -174,14 +183,14 @@ export default function VSCodePage() {
           <Pill color="violet">VS Code Extension</Pill>
           
           <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 md:text-5xl lg:text-6xl">
-            AI that watches your code
+            Python linter and security scanner
             <br />
-            <span className="text-slate-400">as you type</span>
+            <span className="text-slate-400">for VS Code</span>
           </h1>
           
           <p className="mt-5 max-w-2xl text-base text-slate-600 md:text-lg">
-            Real-time bug detection powered by GPT-4 or Claude. No save required — just type, pause, 
-            and see issues appear. One-click fixes with diff preview.
+            Real-time Python static analysis for dead code, secrets, and risky patterns. No save required. Type, pause,
+            and review AI-assisted fixes with a diff preview.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -340,7 +349,7 @@ export default function VSCodePage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 font-bold">1</div>
             <div className="mt-4 font-semibold text-slate-900">Install the extension</div>
             <div className="mt-2 text-sm text-slate-600">
-              Search "Skylos" in VS Code marketplace or click the install button above.
+                  Search &quot;Skylos&quot; in VS Code marketplace or click the install button above.
             </div>
           </div>
 

@@ -107,14 +107,6 @@ function SeverityBadge({ severity }: { severity: string }) {
   );
 }
 
-function VerifyBadge({ verdict }: { verdict?: string | null }) {
-  const v = String(verdict || "").toUpperCase();
-  if (v === "VERIFIED") return <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[9px] font-bold">VERIFIED</span>;
-  if (v === "REFUTED") return <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 text-[9px] font-bold">REFUTED</span>;
-  if (v === "UNKNOWN") return <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 text-[9px] font-bold">UNKNOWN</span>;
-  return null;
-}
-
 function escapeRegExp(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -370,10 +362,10 @@ export default function SkylosHeroSandbox() {
               {running ? "Scanning…" : "Scan"}
             </button>
             <Link
-              href="/login"
+              href="/docs"
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
             >
-              Connect GitHub
+              Read docs
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

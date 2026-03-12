@@ -31,6 +31,29 @@ type Scan = {
     gate_passed?: boolean;
     ai_findings_count?: number;
   } | null;
+  defense_score?: {
+    score_pct: number;
+    risk_rating: string;
+    weighted_score: number;
+    weighted_max: number;
+    passed: number;
+    total: number;
+    by_severity: Record<string, { passed: number; failed: number; weight: number }>;
+  } | null;
+  ops_score?: {
+    passed: number;
+    total: number;
+    score_pct: number;
+    rating: string;
+  } | null;
+  owasp_coverage?: Record<string, {
+    name: string;
+    status: string;
+    coverage_pct: number | null;
+    passed: number;
+    total: number;
+    plugins: string[];
+  }> | null;
   stats: {
     danger_count?: number;
     new_issues?: number;
@@ -891,6 +914,79 @@ export default function ScanDetailsPage() {
                 <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-purple-200 text-[10px] text-purple-700">
                   <span className="font-bold">{ind.type}</span>
                   <span className="font-mono text-purple-500">{ind.commit}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* AI Defense Panel */}
+      {scan.defense_score && (
+        <div className="mx-4 mb-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-sky-600" />
+              <span className="text-sm font-bold text-sky-900">AI Defense Score</span>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                scan.defense_score.score_pct >= 90
+                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                  : scan.defense_score.score_pct >= 70
+                  ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                  : scan.defense_score.score_pct >= 40
+                  ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+                  : 'bg-rose-100 text-rose-700 border border-rose-200'
+              }`}>
+                {scan.defense_score.score_pct}% {scan.defense_score.risk_rating}
+              </span>
+            </div>
+            <span className="text-xs text-sky-600">
+              {scan.defense_score.passed}/{scan.defense_score.total} checks passing &middot; {scan.defense_score.weighted_score}/{scan.defense_score.weighted_max} weighted
+            </span>
+          </div>
+
+          {/* Severity breakdown */}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {Object.entries(scan.defense_score.by_severity).map(([sev, data]) => (
+              <span key={sev} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border text-[10px] ${
+                data.failed > 0 ? 'border-red-200 text-red-700' : 'border-emerald-200 text-emerald-700'
+              }`}>
+                <span className="font-bold uppercase">{sev}</span>
+                <span>{data.passed}/{data.passed + data.failed}</span>
+              </span>
+            ))}
+          </div>
+
+          {/* Ops score */}
+          {scan.ops_score && scan.ops_score.total > 0 && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[10px] text-sky-600 font-semibold">Ops Score:</span>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                scan.ops_score.score_pct >= 80
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : scan.ops_score.score_pct >= 60
+                  ? 'bg-blue-100 text-blue-700'
+                  : scan.ops_score.score_pct >= 40
+                  ? 'bg-yellow-100 text-yellow-700'
+                  : 'bg-red-100 text-red-700'
+              }`}>
+                {scan.ops_score.score_pct}% {scan.ops_score.rating}
+              </span>
+              <span className="text-[10px] text-sky-500">{scan.ops_score.passed}/{scan.ops_score.total} ops checks</span>
+            </div>
+          )}
+
+          {/* OWASP Coverage */}
+          {scan.owasp_coverage && (
+            <div className="mt-2 grid grid-cols-5 gap-1">
+              {Object.entries(scan.owasp_coverage).map(([id, info]) => (
+                <span key={id} className={`text-center px-1 py-0.5 rounded text-[9px] font-bold ${
+                  info.status === 'covered' ? 'bg-emerald-100 text-emerald-700' :
+                  info.status === 'partial' ? 'bg-yellow-100 text-yellow-700' :
+                  info.status === 'not_applicable' ? 'bg-slate-100 text-slate-400' :
+                  'bg-red-100 text-red-700'
+                }`}>
+                  {id}
                 </span>
               ))}
             </div>

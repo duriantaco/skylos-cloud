@@ -1,0 +1,408 @@
+---
+title: "How to Catch Hallucinated Imports and Phantom Calls in AI-Generated Python Code"
+excerpt: "AI coding tools generate functions that don't exist, import packages that aren't installed, and hardcode secrets. Here's how to detect these patterns before they reach production."
+publishedAt: "2026-03-12"
+updatedAt: "2026-03-12"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "This guide focuses on the failure modes we keep seeing in AI-assisted Python work: references to things that do not exist, insecure defaults, and security controls that look plausible but are not really enforced."
+methodology:
+  - "Built from recurring AI-code review patterns seen in Skylos rules and recent Python security content in the repo."
+  - "Examples are intentionally minimal and meant to show detection categories such as hallucinated imports, phantom calls, and hardcoded secrets."
+  - "Commands are included so readers can map the guide directly to a local or CI workflow."
+tags: ["ai code", "security", "python"]
+keywords:
+  - hallucinated imports python
+  - ai generated code security
+  - phantom function calls
+  - ai code scanner python
+  - copilot generated bugs
+  - ai code review tool
+  - detect fake imports python
+  - ai coding tool security risks
+  - vibe coding security
+  - ai generated code guardrails
+  - python ai code scanner
+  - cursor code quality
+canonicalUrl: "/use-cases/ai-generated-code-security"
+---
+
+# How to Catch Hallucinated Imports and Phantom Calls in AI-Generated Python Code
+
+Your team is writing more code faster than ever. Copilot, Claude, Cursor, and other AI assistants are generating hundreds of lines per day. Velocity is up.
+
+But so is the rate of a specific category of bugs that barely existed before: **code that references things that don't exist.**
+
+AI coding tools hallucinate. They generate function calls to functions that aren't in your codebase. They import packages that aren't installed. They reference APIs that don't exist in the version of the library you're using. And unlike a typo or a logic error, these problems often look perfectly correct at first glance.
+
+This guide covers what these patterns look like, why they're dangerous, and how to catch them automatically.
+
+---
+
+## What AI coding tools get wrong
+
+### Hallucinated imports
+
+The AI writes an import statement for a package that doesn't exist or isn't installed in your environment:
+
+```python
+from cryptoutils import secure_hash     # this package doesn't exist
+from flask_permissions import require   # also doesn't exist
+import pandas_profiling                 # deprecated, renamed to ydata-profiling
+```
+
+This is more dangerous than it sounds. If the AI generates `from cryptoutils import secure_hash` and you `pip install cryptoutils` to make it work, you might be installing a **typosquatted package** — a malicious package uploaded to PyPI under a plausible-sounding name.
+
+In 2025 alone, PyPI removed hundreds of typosquatted packages targeting common import patterns. An AI-generated import pointing to a nonexistent package is essentially a supply chain attack waiting to happen.
+
+### Phantom function calls
+
+The AI generates code that calls functions which don't exist anywhere in your project:
+
+```python
+def process_order(order):
+    validated = validate_order_schema(order)    # doesn't exist
+    enriched = enrich_with_inventory(validated) # doesn't exist
+    result = submit_to_payment_gateway(enriched) # doesn't exist
+    send_order_confirmation(result)              # doesn't exist
+    return result
+```
+
+Each of these looks like a reasonable function name. In a code review, especially a quick one, you might not notice that none of them are defined anywhere. The AI wrote the orchestration layer but forgot to write (or reference) the actual implementations.
+
+### Fake API methods
+
+The AI generates calls to methods that don't exist on the object:
+
+```python
+import boto3
+
+s3 = boto3.client('s3')
+# This method doesn't exist — the real one is list_objects_v2
+objects = s3.list_all_objects(Bucket='my-bucket')
+```
+
+Or uses arguments that the function doesn't accept:
+
+```python
+from flask import Flask
+
+app = Flask(__name__)
+app.run(host='0.0.0.0', port=8080, workers=4)  # Flask doesn't have a 'workers' param
+```
+
+### Hardcoded credentials
+
+AI tools frequently inline secrets during development:
+
+```python
+client = openai.OpenAI(api_key="sk-proj-1234567890abcdef")
+
+db = psycopg2.connect(
+    host="prod-db.internal.company.com",
+    password="SuperSecret123!"
+)
+```
+
+The AI was trying to be helpful by filling in a complete, working example. But that API key or password is now in your source code, ready to be committed.
+
+### Disabled security controls
+
+AI-generated code often takes shortcuts with security:
+
+```python
+import requests
+response = requests.get(url, verify=False)  # SSL verification disabled
+
+import jwt
+decoded = jwt.decode(token, algorithms=["none"])  # JWT verification disabled
+
+app = Flask(__name__)
+app.config['DEBUG'] = True  # Debug mode in production
+```
+
+These work during development. They also create vulnerabilities in production.
+
+---
+
+## Why traditional tools miss these
+
+### Linters catch syntax, not semantics
+
+Pylint and Flake8 will catch an unused import or an undefined variable. But they won't catch:
+
+- A function call to a function defined in another file that was never written
+- An import of a package that exists on PyPI but isn't in your requirements.txt
+- An API method that looks valid but doesn't exist in the version you're using
+
+### Security scanners focus on known patterns
+
+Bandit and Semgrep look for known vulnerability patterns — `eval()`, `pickle.loads()`, SQL injection via string formatting. They don't look for "this function call goes nowhere" or "this import resolves to a package you've never installed."
+
+### Code review doesn't scale
+
+A careful code reviewer would catch phantom function calls. But:
+
+- AI tools generate code fast — faster than reviewers can review
+- The generated code often looks plausible and well-structured
+- Reviewers focus on logic, not on verifying every import and function reference
+- In a team of 10, you'd need to catch these across dozens of PRs per day
+
+---
+
+## How to detect AI code problems automatically
+
+### Skylos discover: find LLM integration points
+
+Skylos includes a discovery module that maps where your codebase integrates with LLM APIs:
+
+```bash
+skylos discover src/
+```
+
+This scans your code for:
+
+- Direct API calls to OpenAI, Anthropic, Cohere, and other LLM providers
+- Framework integrations (LangChain, LlamaIndex, Haystack)
+- Prompt construction patterns
+- RAG pipeline components
+
+Output example:
+
+```
+LLM Integration Discovery
+──────────────────────────
+Found 3 LLM integration points:
+
+src/chat.py:12      openai.ChatCompletion.create()
+src/rag.py:34       RetrievalQA.from_chain_type()
+src/prompts.py:8    f-string prompt with user input
+```
+
+This tells you **where AI-related code exists** in your project so you can focus security review on those areas.
+
+### Skylos defend: score AI code security
+
+Once you know where AI integrations live, assess their security posture:
+
+```bash
+skylos defend src/
+```
+
+Skylos runs 13 security checks across your AI code:
+
+| Check | What it detects |
+|-------|----------------|
+| Prompt injection | User input concatenated directly into prompts |
+| Input validation | Missing length/content validation on LLM inputs |
+| Output sanitization | LLM responses used without sanitization |
+| RAG context isolation | RAG queries that could leak cross-tenant data |
+| PII filtering | Personal data sent to LLM APIs without scrubbing |
+| Rate limiting | Missing rate limits on LLM endpoints |
+| Cost controls | No token/spend limits on API calls |
+| Logging | LLM interactions not logged for audit |
+
+Each integration point gets a defense score out of 100:
+
+```
+Defense Score: 45/100
+
+Missing controls:
+  ✗ No input validation on user prompts
+  ✗ No output sanitization
+  ✗ No rate limiting on /chat endpoint
+  ✓ API key stored in environment variable
+  ✓ Logging present
+```
+
+### Skylos standard analysis: dead code + security
+
+For the broader AI-generated code problems (phantom calls, hallucinated imports, hardcoded secrets), Skylos's standard analysis covers them:
+
+```bash
+skylos src/ --danger
+```
+
+This catches:
+
+**Hardcoded credentials** (SKY-D201):
+```
+src/config.py:7  [HIGH] Hardcoded credential: API_KEY = "sk-proj-..."
+```
+
+**Command injection from user input** (SKY-D212):
+```
+src/tools.py:23  [HIGH] Command injection: user input flows to subprocess.call()
+```
+
+**Weak cryptography** (SKY-D214):
+```
+src/auth.py:15  [MEDIUM] Weak hash: hashlib.md5() used for password hashing
+```
+
+**Disabled SSL verification** (SKY-D220):
+```
+src/api.py:9  [MEDIUM] SSL verification disabled: verify=False
+```
+
+**Unused functions** (dead code from abandoned AI drafts):
+```
+src/utils.py:45   unused function  generate_report_v1
+src/utils.py:89   unused function  _format_legacy_response
+src/helpers.py:12  unused import   from pandas_profiling import ProfileReport
+```
+
+### Combining all three
+
+For a comprehensive scan of a codebase that uses AI tools:
+
+```bash
+# Find where LLM integrations exist
+skylos discover src/
+
+# Score their security posture
+skylos defend src/
+
+# Scan everything for dead code + security + quality
+skylos src/ --danger --quality
+```
+
+---
+
+## Running this in CI
+
+### Catch AI code problems on every PR
+
+```bash
+skylos cicd init
+```
+
+This generates a GitHub Actions workflow that:
+
+1. Scans every PR for security vulnerabilities, dead code, and quality issues
+2. Posts inline comments on findings directly in the PR
+3. Fails the pipeline if critical findings are present
+
+For AI-specific scanning, add defend checks to your workflow:
+
+```yaml
+name: Skylos AI Code Check
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install skylos
+      - run: skylos . --danger --quality --github
+      - run: skylos defend . --fail-on high
+```
+
+The `--fail-on high` flag blocks the PR if any high-severity AI security findings are present.
+
+### Pre-commit hook
+
+Catch problems before they even reach the PR:
+
+```yaml
+repos:
+  - repo: https://github.com/duriantaco/skylos
+    rev: v3.5.10
+    hooks:
+      - id: skylos
+        args: ['--danger']
+```
+
+---
+
+## Real patterns we've seen
+
+### The "helpful" AI that imports malware
+
+An AI assistant suggested:
+
+```python
+from python_utils import encryption
+```
+
+The developer installed `python-utils` from PyPI to make the import work. The actual package had nothing to do with encryption — it was a generic utilities package. But a typosquatted version (`python_utils` with an underscore) was also on PyPI and contained a reverse shell.
+
+### The orchestrator with no implementation
+
+AI generated a clean service layer:
+
+```python
+class OrderService:
+    def create_order(self, data):
+        validated = OrderValidator.validate(data)
+        inventory = InventoryService.reserve(validated.items)
+        payment = PaymentGateway.charge(validated.total)
+        notification = NotificationService.send_confirmation(payment)
+        return Order.create(validated, inventory, payment, notification)
+```
+
+None of those classes existed. The code passed review because the logic was sound. It crashed at runtime.
+
+### The copy-paste credentials
+
+AI auto-completed a configuration block:
+
+```python
+STRIPE_SECRET_KEY = "sk_live_51H7b..."
+OPENAI_API_KEY = "sk-proj-abc123..."
+DATABASE_URL = "postgresql://admin:password@prod-db:5432/main"
+```
+
+The developer committed it, pushed, and the keys were scraped from the public GitHub repo within minutes.
+
+---
+
+## What this means for your team
+
+If your team uses AI coding tools (and most teams do now), you need automated scanning that catches AI-specific failure modes:
+
+1. **Hallucinated imports** — flag imports of packages not in your requirements
+2. **Phantom function calls** — flag calls to functions not defined in your codebase
+3. **Hardcoded secrets** — flag credentials that AI tools inline
+4. **Disabled security** — flag `verify=False`, `debug=True`, `algorithms=['none']`
+5. **Dead code accumulation** — flag the abandoned drafts that AI tools leave behind
+
+Traditional linters and security scanners catch some of these. None of them catch all of them. That's the gap Skylos fills.
+
+---
+
+## Get started
+
+```bash
+pip install skylos
+
+# Scan for security + dead code
+skylos src/ --danger
+
+# Find LLM integration points
+skylos discover src/
+
+# Score AI code security posture
+skylos defend src/
+```
+
+---
+
+## Related
+
+- [Semgrep vs Skylos for Python](/compare/semgrep-vs-skylos)
+- [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)
+- [How to Detect Dead Code in Python](/use-cases/detect-dead-code-python)
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+- [AI-Generated Python Code Is Shipping Vulnerabilities](/blog/vibe-coding)
+- [We Scanned 9 Popular Python Libraries](/blog/we-scanned-9-popular-python-libraries)
+
+*Skylos is open source. [View on GitHub](https://github.com/duriantaco/skylos) | [Docs](https://docs.skylos.dev) | [Install](https://pypi.org/project/skylos/)*

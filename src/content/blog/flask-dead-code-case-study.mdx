@@ -1,19 +1,31 @@
 ---
-title: "Case study: Finding dead code in Flask (69k stars)"
-excerpt: "We ran Skylos and Vulture on the Flask repository. Skylos found all 7 dead items with 12 false positives. Vulture found 6 but produced 260 false positives. Here's the full breakdown."
+title: "Finding Dead Code in Flask (69k Stars): Skylos vs Vulture Benchmark"
+excerpt: "We ran Skylos and Vulture on the Flask repository. Skylos found all 7 dead items with 12 false positives. Vulture found 6 but produced 260 false positives. Here's the full breakdown with real output."
 publishedAt: "2026-02-27"
-tags: ["case study", "flask", "dead code", "python", "benchmarks"]
+updatedAt: "2026-02-27"
+author:
+  name: "Skylos team"
+  role: "Benchmarking and product engineering"
+  type: "Organization"
+whyThisExists: "This benchmark shows how framework-heavy Python code changes dead-code accuracy, using Flask because it stresses the exact decorator and fixture patterns that often create false positives."
+methodology:
+  - "Cloned the Flask repository and ran both Skylos and Vulture at confidence level 20."
+  - "Manually reviewed flagged symbols against the source tree to separate genuinely dead code from framework-driven false positives."
+  - "Included the reproduction commands and benchmark script so readers can rerun the comparison."
+tags: ["dead code", "python", "sast"]
 keywords:
-  - flask dead code
-  - python dead code detection
-  - vulture vs skylos
-  - vulture alternative
+  - flask dead code detection
+  - vulture vs skylos benchmark
+  - vulture alternative python
   - flask static analysis
   - find unused code python
   - dead code detection benchmark
-  - python SAST comparison
-  - framework aware static analysis
+  - python dead code tool comparison
+  - framework aware static analysis python
   - flask code cleanup
+  - python dead code detection tools
+  - best dead code finder python
+  - vulture false positives
 canonicalUrl: "/blog/flask-dead-code-case-study"
 ---
 
@@ -162,3 +174,12 @@ The gap is even wider on codebases that use multiple frameworks (Flask + pytest 
 ---
 
 *Want to try it on your own codebase? [Install Skylos](https://docs.skylos.dev/getting-started) — it's free, open source, and runs 100% locally.*
+
+---
+
+## Related
+
+- [How to Detect Dead Code in Python](/use-cases/detect-dead-code-python)
+- [Dead Code in Python Is a Security Liability](/blog/dead-code-security-liability)
+- [Best Python Static Analysis Tools Compared](/blog/python-sast-comparison-2026)
+- [Semgrep vs Skylos for Python](/compare/semgrep-vs-skylos)

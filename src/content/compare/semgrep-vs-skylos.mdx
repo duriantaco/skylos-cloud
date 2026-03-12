@@ -1,0 +1,307 @@
+---
+title: "Semgrep vs Skylos: Which Python SAST Tool Should You Use?"
+excerpt: "A detailed comparison of Semgrep and Skylos for Python static analysis. Where Semgrep has the edge, where Skylos is stronger, and which one fits your workflow."
+publishedAt: "2026-03-12"
+updatedAt: "2026-03-12"
+tags: ["sast", "comparison", "python"]
+keywords:
+  - semgrep vs skylos
+  - semgrep alternative python
+  - semgrep python comparison
+  - python sast tools
+  - semgrep alternative
+  - best python security scanner
+  - semgrep dead code
+  - python static analysis comparison
+  - semgrep vs bandit
+  - python security scanner 2026
+canonicalUrl: "/compare/semgrep-vs-skylos"
+---
+
+# Semgrep vs Skylos: Which Python SAST Tool Should You Use?
+
+Semgrep is one of the most popular static analysis tools in the industry. It supports 30+ languages, has a massive community-contributed rule library, and powers security scanning at thousands of companies.
+
+Skylos is a Python-focused static analysis tool that combines security scanning, dead code detection, and code quality metrics. It's newer, smaller, and more specialized.
+
+This comparison is for Python teams deciding between the two. We'll be straightforward about where each tool is stronger.
+
+---
+
+## The short version
+
+| | Semgrep | Skylos |
+|---|---------|--------|
+| **Best for** | Multi-language teams, custom rule authoring, enterprise security programs | Python-focused teams, dead code detection, AI-generated code scanning |
+| **Languages** | 30+ | Python, TypeScript, Go |
+| **Security scanning** | Yes (huge rule library) | Yes (50+ built-in rules with taint analysis) |
+| **Dead code detection** | No | Yes (with transitive propagation) |
+| **Code quality metrics** | No | Yes (complexity, coupling, cohesion) |
+| **Custom rules** | Yes (powerful pattern DSL) | No |
+| **Framework awareness** | Rule-dependent | Built-in (Django, Flask, FastAPI, Pydantic, pytest) |
+| **CI/CD** | Yes | Yes (auto-generated workflows) |
+| **Pricing** | Free (OSS) / Paid (Cloud) | Free (OSS) / Paid (Cloud) |
+
+---
+
+## Where Semgrep is stronger
+
+### Multi-language support
+
+If you have a monorepo with Python, Java, Go, JavaScript, and Ruby, Semgrep scans all of them with one tool. Skylos covers Python, TypeScript, and Go. For a polyglot codebase, Semgrep is the more practical choice.
+
+### Custom rule authoring
+
+Semgrep's rule language is its killer feature. You can write custom rules that match specific patterns in your codebase:
+
+```yaml
+rules:
+  - id: no-raw-sql-queries
+    patterns:
+      - pattern: cursor.execute($QUERY, ...)
+      - pattern-not: cursor.execute("...", ...)
+    message: Use parameterized queries instead of string formatting
+    severity: ERROR
+    languages: [python]
+```
+
+This is incredibly powerful for teams with domain-specific security requirements. If you need to enforce "never call this internal API without an auth check" or "always use our custom logger instead of `print`," Semgrep lets you encode those rules.
+
+Skylos has no custom rule system. Its rules are built-in and cover common vulnerability patterns, but you can't extend them.
+
+### Rule ecosystem
+
+Semgrep's [registry](https://semgrep.dev/explore) has thousands of community-contributed rules. For common frameworks like Django, Flask, Rails, and Express, there are pre-built rule packs that cover a wide range of vulnerability patterns.
+
+Skylos has ~50 built-in security rules. They're focused and well-tested, but the number is smaller.
+
+### Enterprise features
+
+Semgrep Cloud (paid) offers a dashboard, team management, RBAC, SAML SSO, findings triage workflows, and integrations with Jira, Slack, and other tools. If you're running a security program across a 50-person engineering org, Semgrep's enterprise features matter.
+
+---
+
+## Where Skylos is stronger
+
+### Dead code detection
+
+Semgrep does not detect dead code. It's a security/lint tool, not a dead code finder.
+
+Skylos detects unused functions, classes, imports, variables, and parameters. More importantly, it does **transitive dead code propagation**: if function A is dead and it's the only caller of function B, Skylos marks B as dead too.
+
+```python
+def process_refund(order_id):          # dead — nothing calls this
+    validated = _validate_refund(order_id)  # also dead (transitive)
+    _send_refund_email(validated)            # also dead (transitive)
+```
+
+If dead code cleanup is a priority for your team, Semgrep won't help here. You'd need to add Vulture alongside Semgrep, which means two tools to configure and maintain.
+
+### Framework-aware analysis (out of the box)
+
+Semgrep can understand frameworks, but only through specific rules. If a rule doesn't exist for your framework pattern, Semgrep doesn't know about it.
+
+Skylos has built-in framework visitors for Django, Flask, FastAPI, Pydantic, pytest, Celery, and Click. It understands that `@app.route` handlers are called via HTTP, `@pytest.fixture` functions are called by the test runner, and Pydantic `model_validator` methods are called during validation.
+
+This means fewer false positives out of the box without writing custom rules:
+
+```python
+@app.route("/api/users")        # Skylos: alive (Flask route)
+def get_users():                 # Semgrep: won't flag (not a security tool for this)
+    return jsonify(users)        # Vulture: flags as unused (no framework awareness)
+
+@pytest.fixture
+def db():                        # Skylos: alive (pytest fixture)
+    return create_engine()       # Vulture: flags as unused
+```
+
+### Taint analysis for Python
+
+Both tools have taint analysis, but they work differently.
+
+Semgrep's taint analysis is cross-file and cross-function in their paid tier (Semgrep Code). In the free OSS version, taint tracking is more limited.
+
+Skylos traces data flow from user input sources (like `request.args.get()`, `input()`, `sys.argv`) to dangerous sinks (like `subprocess.call()`, `cursor.execute()`, `eval()`):
+
+```python
+# Skylos flags this — user input flows to shell command
+cmd = request.args.get("command")
+subprocess.call(cmd, shell=True)  # SKY-D212: Command injection
+
+# Skylos does NOT flag this — hardcoded command
+subprocess.call("ls -la", shell=True)  # No finding
+```
+
+Bandit would flag both of these. Semgrep's behavior depends on which rules you're running.
+
+### AI-generated code patterns
+
+Skylos has specific detection for patterns commonly introduced by AI coding tools:
+
+- **Phantom function calls** — calling functions that don't exist in the codebase
+- **Hallucinated imports** — importing modules that aren't installed
+- **Hardcoded credentials** — API keys and secrets that AI tools tend to inline
+- **Disabled security controls** — `verify=False`, `algorithms=['none']`, `debug=True`
+
+These patterns are increasingly common as teams adopt Copilot, Claude, and Cursor. Semgrep can catch some of these with the right rules, but Skylos detects them specifically as an AI code quality concern.
+
+For a deeper look, see our guide on [catching hallucinated imports in AI-generated code](/use-cases/ai-generated-code-security).
+
+### Code quality metrics
+
+Semgrep is not a code quality tool. It won't tell you about cyclomatic complexity, deep nesting, god classes, or coupling metrics.
+
+Skylos includes:
+
+```bash
+skylos src/ --quality
+```
+
+- Cyclomatic complexity (SKY-Q301)
+- Deep nesting detection (SKY-Q302)
+- Function length and argument count (SKY-C303, SKY-C304)
+- God class detection (SKY-Q501)
+- Coupling and cohesion metrics (SKY-Q701, SKY-Q702)
+- Architecture metrics (instability, distance from main sequence)
+- Async blocking call detection (SKY-Q401)
+
+If you want one tool that covers security, dead code, and quality, Skylos does all three.
+
+### Zero-config CI setup
+
+Skylos generates a complete GitHub Actions workflow:
+
+```bash
+skylos cicd init
+```
+
+This creates a `.github/workflows/skylos.yml` with PR scanning, inline comments, and quality gates.
+
+Semgrep also has CI integration, but it typically requires signing up for Semgrep Cloud or configuring `semgrep ci` with your own rule sets.
+
+---
+
+## Detection comparison: real examples
+
+### SQL injection
+
+**Semgrep** (with `python.django.security.injection.sql-injection` rule):
+```python
+# Semgrep flags this
+User.objects.raw("SELECT * FROM users WHERE id = %s" % user_id)
+```
+
+**Skylos**:
+```python
+# Skylos flags this (SKY-D210: SQL injection via taint analysis)
+query = f"SELECT * FROM users WHERE id = {request.args['id']}"
+cursor.execute(query)
+
+# Skylos also catches ORM-level injection (SKY-D217)
+User.objects.raw(f"SELECT * FROM users WHERE name = '{name}'")
+```
+
+Both tools catch SQL injection. Skylos uses taint analysis to trace the data flow; Semgrep uses pattern matching (which can also be very effective with the right rules).
+
+### Hardcoded secrets
+
+**Semgrep** (with `generic.secrets` rules):
+```python
+# Semgrep flags this
+api_key = "sk-1234567890abcdef"
+```
+
+**Skylos**:
+```python
+# Skylos flags this (SKY-D201: Hardcoded credentials)
+API_KEY = "sk-1234567890abcdef"
+PASSWORD = "admin123"
+```
+
+Both catch this. Semgrep's secrets rules are more comprehensive, especially for detecting API key patterns from specific providers (AWS, Stripe, GitHub, etc.). Skylos catches the common patterns.
+
+### Command injection
+
+**Semgrep**:
+```python
+# Semgrep flags this (depending on rule)
+os.system(user_input)
+```
+
+**Skylos**:
+```python
+# Skylos flags this (SKY-D212) — traces user_input from request
+user_input = request.form.get("cmd")
+subprocess.call(user_input, shell=True)
+
+# Skylos does NOT flag this (hardcoded, not user-controlled)
+subprocess.call("git status", shell=True)
+```
+
+Skylos's advantage is distinguishing user-controlled input from hardcoded strings via taint analysis.
+
+---
+
+## When to use Semgrep
+
+- You have a **multi-language** codebase (not just Python)
+- You need **custom rules** for domain-specific security policies
+- You want access to a **large rule ecosystem**
+- You're running a formal **security program** with triage workflows
+- You need **enterprise features** (SSO, RBAC, Jira integration)
+- Dead code detection is not a priority
+
+## When to use Skylos
+
+- Your codebase is **primarily Python** (or Python + TypeScript + Go)
+- You want **security + dead code + quality** in a single tool
+- You use **Django, Flask, FastAPI, or Pydantic** and want out-of-the-box framework awareness
+- Your team uses **AI coding tools** and you want to catch hallucinated imports and phantom calls
+- You want **zero-config CI** with PR inline comments
+- You don't need custom rules — the built-in 50+ rules cover your needs
+
+## Can you use both?
+
+Yes. They don't conflict. Some teams run Semgrep for custom security policies and Skylos for dead code + quality + AI code scanning. The overlap on security findings is manageable — Skylos won't duplicate Semgrep's custom rules, and Semgrep won't duplicate Skylos's dead code detection.
+
+---
+
+## Quick start
+
+### Semgrep
+
+```bash
+pip install semgrep
+semgrep scan --config auto src/
+```
+
+### Skylos
+
+```bash
+pip install skylos
+skylos src/ --danger --quality
+```
+
+---
+
+## Final thoughts
+
+Semgrep is a more mature, more broadly applicable tool with a bigger ecosystem. If you're scanning Java, Go, Ruby, and JavaScript alongside Python, Semgrep is the obvious choice.
+
+Skylos is more focused. It does fewer things but goes deeper on Python: dead code propagation, framework-aware visitors, AI code pattern detection, and combined security + quality analysis. If Python is your primary language and you want one tool instead of three (Semgrep + Vulture + pylint), Skylos is worth evaluating.
+
+The honest answer: **try both on your codebase and compare the output.** That's more useful than any comparison article.
+
+---
+
+## Related
+
+- [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)
+- [Bandit vs Vulture vs Skylos](/blog/python-sast-comparison-2026)
+- [How to Detect Dead Code in Python](/use-cases/detect-dead-code-python)
+- [How to Catch Hallucinated Imports in AI Code](/use-cases/ai-generated-code-security)
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+
+---
+
+*Both tools are open source. [Semgrep](https://github.com/semgrep/semgrep) | [Skylos](https://github.com/duriantaco/skylos) | [Skylos Docs](https://docs.skylos.dev) | [Install Skylos](https://pypi.org/project/skylos/)*

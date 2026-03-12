@@ -130,6 +130,15 @@ export default async function ProjectPage({
 
           <div className="flex items-center gap-2">
             <Link
+              href={`/dashboard/projects/${id}/defense`}
+              className="text-sky-600 hover:text-sky-800 px-3 py-2 rounded-lg border border-sky-200 bg-sky-50 hover:bg-sky-100 transition text-sm font-medium inline-flex items-center gap-2"
+              title="AI Defense analysis"
+            >
+              <Shield className="w-4 h-4" />
+              AI Defense
+            </Link>
+
+            <Link
               href={`/dashboard/projects/${id}/suppressions`}
               className="text-slate-600 hover:text-slate-900 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition text-sm font-medium"
               title="Suppression audit + revoke"

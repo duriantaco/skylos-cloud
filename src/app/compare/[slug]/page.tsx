@@ -15,15 +15,15 @@ import { getAuthorMeta, getMethodology, getUpdatedAt, getWhyThisExists } from '@
 import { getSiteUrl } from '@/lib/site';
 import TableOfContents from '@/components/TableOfContents';
 import ArticleTrustPanel from '@/components/ArticleTrustPanel';
-import '../blog.css';
+import '../../../app/blog/blog.css';
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
 async function getPost(slug: string) {
-  const filePath = path.join(process.cwd(), 'src/content/blog', `${slug}.mdx`);
-  
+  const filePath = path.join(process.cwd(), 'src/content/compare', `${slug}.mdx`);
+
   if (!fs.existsSync(filePath)) {
     return null;
   }
@@ -40,12 +40,13 @@ async function getPost(slug: string) {
 const tagColors: Record<string, string> = {
   security: 'bg-red-100 text-red-700 border-red-200',
   sast: 'bg-blue-100 text-blue-700 border-blue-200',
-  appsec: 'bg-purple-100 text-purple-700 border-purple-200',
-  devtools: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  comparison: 'bg-violet-100 text-violet-700 border-violet-200',
+  'dead code': 'bg-orange-100 text-orange-700 border-orange-200',
+  python: 'bg-yellow-100 text-yellow-700 border-yellow-200',
   default: 'bg-slate-100 text-slate-700 border-slate-200',
 };
 
-export default async function BlogPost({ params }: Props) {
+export default async function ComparePost({ params }: Props) {
   const { slug } = await params;
   const post = await getPost(slug);
 
@@ -58,16 +59,15 @@ export default async function BlogPost({ params }: Props) {
   const headings = extractHeadings(content);
   const readingTime = estimateReadingTime(content);
   const siteUrl = getSiteUrl();
-  const articleUrl = `${siteUrl}/blog/${slug}`;
+  const articleUrl = `${siteUrl}/compare/${slug}`;
   const author = getAuthorMeta(frontmatterRecord);
   const methodology = getMethodology(frontmatterRecord);
   const whyThisExists = getWhyThisExists(frontmatterRecord);
   const articleUpdatedAt = getUpdatedAt(frontmatterRecord) ?? frontmatter.publishedAt;
 
-  // JSON-LD structured data
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type': 'BlogPosting',
+    '@type': 'Article',
     headline: frontmatter.title,
     description: frontmatter.excerpt,
     url: articleUrl,
@@ -93,13 +93,12 @@ export default async function BlogPost({ params }: Props) {
 
   return (
     <>
-      {/* JSON-LD */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.18),transparent_32%),linear-gradient(to_bottom,#f8fafc,#ffffff_28%,#f8fafc)]">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(196,181,253,0.18),transparent_34%),linear-gradient(to_bottom,#faf5ff,#ffffff_28%,#f8fafc)]">
         {/* Navbar */}
         <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -116,16 +115,13 @@ export default async function BlogPost({ params }: Props) {
                 Beta
               </span>
             </Link>
-            
+
             <div className="flex items-center gap-6">
-              <Link href="/blog" className="text-sm text-slate-900 font-medium">
+              <Link href="/blog" className="text-sm text-slate-500 hover:text-slate-900 transition">
                 Blog
               </Link>
-              <Link href="/compare" className="text-sm text-slate-500 hover:text-slate-900 transition">
+              <Link href="/compare" className="text-sm text-slate-900 font-medium">
                 Compare
-              </Link>
-              <Link href="/use-cases" className="text-sm text-slate-500 hover:text-slate-900 transition">
-                Use Cases
               </Link>
               <Link href="/docs" className="text-sm text-slate-500 hover:text-slate-900 transition">
                 Docs
@@ -148,8 +144,8 @@ export default async function BlogPost({ params }: Props) {
                 Home
               </Link>
               <ChevronRight className="w-4 h-4 text-slate-400" />
-              <Link href="/blog" className="text-slate-500 hover:text-slate-900 transition">
-                Blog
+              <Link href="/compare" className="text-slate-500 hover:text-slate-900 transition">
+                Compare
               </Link>
               <ChevronRight className="w-4 h-4 text-slate-400" />
               <span className="text-slate-900 font-medium truncate">{frontmatter.title}</span>
@@ -160,27 +156,23 @@ export default async function BlogPost({ params }: Props) {
         {/* Article with sidebar */}
         <div className="max-w-7xl mx-auto px-6 py-14">
           <div className="grid lg:grid-cols-[1fr_250px] gap-12">
-            {/* Main content */}
-            <article className="article-shell article-shell--blue min-w-0">
+            <article className="article-shell article-shell--violet min-w-0">
               <div className="px-6 py-7 md:px-10 md:py-10">
-              {/* Back button */}
-              <Link 
-                href="/blog"
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm shadow-slate-900/5 hover:text-slate-900 transition"
+              <Link
+                href="/compare"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm shadow-slate-900/5 hover:text-slate-900 mb-8 transition"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Back to blog
+                All comparisons
               </Link>
 
-              {/* Header */}
               <header className="article-hero mb-12">
-                {/* Tags */}
                 <div className="flex flex-wrap items-center gap-3 mb-6">
-                  <span className="article-kicker article-kicker--blue">Blog</span>
+                  <span className="article-kicker article-kicker--violet">Comparison</span>
                 {frontmatter.tags && frontmatter.tags.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {frontmatter.tags.map((tag: string) => (
-                      <span 
+                      <span
                         key={tag}
                         className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
                           tagColors[tag.toLowerCase()] || tagColors.default
@@ -193,7 +185,6 @@ export default async function BlogPost({ params }: Props) {
                 )}
                 </div>
 
-                {/* Title */}
                 <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-slate-900 mb-4 leading-[1.05]">
                   {frontmatter.title}
                 </h1>
@@ -213,9 +204,8 @@ export default async function BlogPost({ params }: Props) {
                 />
               </header>
 
-              {/* Content */}
               <div className="blog-content article-body">
-                <MDXRemote 
+                <MDXRemote
                   source={content}
                   options={{
                     mdxOptions: {
@@ -229,20 +219,18 @@ export default async function BlogPost({ params }: Props) {
                 />
               </div>
 
-              {/* Footer */}
               <div className="mt-16 pt-8 border-t border-slate-200">
-                <Link 
-                  href="/blog"
+                <Link
+                  href="/compare"
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm shadow-slate-900/5 hover:text-slate-900 transition"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  Back to all posts
+                  All comparisons
                 </Link>
               </div>
               </div>
             </article>
 
-            {/* Table of Contents Sidebar */}
             <aside className="hidden lg:block">
               <TableOfContents headings={headings} />
             </aside>
@@ -254,8 +242,8 @@ export default async function BlogPost({ params }: Props) {
 }
 
 export async function generateStaticParams() {
-  const postsDirectory = path.join(process.cwd(), 'src/content/blog');
-  
+  const postsDirectory = path.join(process.cwd(), 'src/content/compare');
+
   if (!fs.existsSync(postsDirectory)) {
     return [];
   }
@@ -272,10 +260,10 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const post = await getPost(slug);
-  
+
   if (!post) {
     return {
-      title: 'Post Not Found',
+      title: 'Comparison Not Found',
     };
   }
 
@@ -284,7 +272,7 @@ export async function generateMetadata({ params }: Props) {
   const articleUpdatedAt = getUpdatedAt(frontmatterRecord) ?? post.frontmatter.publishedAt
 
   return {
-    title: `${post.frontmatter.title} - Skylos Blog`,
+    title: `${post.frontmatter.title} - Skylos`,
     description: post.frontmatter.excerpt,
     keywords: Array.isArray(post.frontmatter.keywords) ? post.frontmatter.keywords : undefined,
     openGraph: {
@@ -293,7 +281,7 @@ export async function generateMetadata({ params }: Props) {
       type: 'article',
       publishedTime: post.frontmatter.publishedAt,
       modifiedTime: articleUpdatedAt,
-      url: `${siteUrl}/blog/${slug}`,
+      url: `${siteUrl}/compare/${slug}`,
       siteName: 'Skylos',
       images: [{ url: `${siteUrl}/og.png`, width: 1200, height: 630, alt: post.frontmatter.title }],
     },
@@ -304,7 +292,7 @@ export async function generateMetadata({ params }: Props) {
       images: [`${siteUrl}/og.png`],
     },
     alternates: {
-      canonical: `${siteUrl}/blog/${slug}`,
+      canonical: `${siteUrl}/compare/${slug}`,
     },
   };
 }

@@ -1,0 +1,364 @@
+---
+title: "Deadcode vs Vulture vs Skylos: Which Python Dead Code Tool Should You Use?"
+excerpt: "A practical comparison of deadcode, Vulture, and Skylos for Python dead code detection. Compare autofix support, false-positive handling, framework awareness, and CI workflow."
+publishedAt: "2026-03-12"
+updatedAt: "2026-03-12"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "This comparison is meant to help Python teams choose the right dead-code workflow based on cleanup speed, false-positive burden, and whether they also need security or CI coverage."
+methodology:
+  - "Compared tool behavior using the current docs, CLI workflows, and benchmark evidence already published on the site."
+  - "Kept the evaluation focused on dead-code use cases: autofix, framework awareness, false-positive handling, and CI fit."
+  - "Called out where a claim comes from benchmarked Flask/FastAPI results versus broader product capabilities."
+tags: ["comparison", "python", "dead code"]
+keywords:
+  - deadcode vs vulture
+  - python dead code detection tools
+  - best dead code tool python
+  - vulture alternative python
+  - deadcode python
+  - find unused code python
+  - remove dead code python
+  - framework aware dead code detection
+  - python unused code tool
+  - deadcode vs skylos
+canonicalUrl: "/compare/deadcode-vs-vulture-vs-skylos"
+---
+
+# Deadcode vs Vulture vs Skylos: Which Python Dead Code Tool Should You Use?
+
+If your main goal is to find unused Python code, these are three of the most relevant options in 2026:
+
+- **deadcode** for whole-codebase dead code detection with autofix
+- **Vulture** for dedicated dead code scanning with confidence scoring
+- **Skylos** for dead code detection plus framework awareness, security scanning, and CI workflow
+
+They overlap, but they are not the same kind of tool. The right choice depends on whether you want fast cleanup, lower false-positive friction, or a broader Python analysis stack.
+
+---
+
+## The short version
+
+| | deadcode | Vulture | Skylos |
+|---|---|---|---|
+| **Best for** | Repo cleanup with autofix and configurable ignore rules | Dedicated dead code review with confidence scoring | Python teams that want dead code plus security and CI workflow |
+| **Primary focus** | Dead code only | Dead code only | Dead code + security + quality |
+| **Autofix** | Yes (`--fix`, `--dry`) | No | Interactive cleanup flow |
+| **Confidence scoring** | No | Yes | No |
+| **Framework awareness** | No built-in framework model | No built-in framework model | Yes |
+| **False-positive handling** | Rich ignore/config options | Whitelist and ignore options | Built-in framework visitors |
+| **Transitive dead code** | No | No | Yes |
+| **Security scanning** | No | No | Yes |
+| **CI/CD story** | Pre-commit friendly | Manual CI wiring | Built-in CI generation |
+
+If you want a simple answer:
+
+- choose **deadcode** if you want the fastest cleanup loop and like autofix
+- choose **Vulture** if you want an established dead code finder with confidence values
+- choose **Skylos** if you want to handle dead code in real Python app codebases without bolting on separate security and CI tooling
+
+---
+
+## What each tool is actually trying to do
+
+### deadcode
+
+[deadcode](https://github.com/albertas/deadcode) is a whole-codebase unused code detector built to complement tools like Ruff and Flake8. Its main differentiator is that it can **fix** findings automatically:
+
+```bash
+deadcode . --fix --dry
+deadcode . --fix
+```
+
+It also has a more flexible configuration surface than most dead code tools. You can exclude paths, ignore names, ignore names in certain files, and ignore names based on decorators or inheritance patterns.
+
+### Vulture
+
+[Vulture](https://github.com/jendrikseipp/vulture) is the best-known dedicated dead code finder in Python. It scans for unused functions, classes, imports, and variables, then assigns **confidence values** so you can prioritize the most likely real findings first.
+
+That confidence model is why many teams still like it. It gives you a review queue rather than directly rewriting code.
+
+### Skylos
+
+[Skylos](https://github.com/duriantaco/skylos) approaches dead code as one part of a broader Python static analysis workflow. It detects unused code, but it also tries to reduce the friction that shows up in framework-heavy applications:
+
+- Flask and FastAPI routes
+- pytest fixtures
+- Django registration patterns
+- Pydantic validators
+
+It also runs security and quality analysis in the same pass, which matters if your dead code cleanup is part of a broader CI gate rather than a one-time repository cleanup.
+
+---
+
+## Where deadcode is stronger
+
+### Autofix is its biggest advantage
+
+This is the clearest reason to pick deadcode over Vulture.
+
+If your codebase has a lot of obvious dead imports, dead functions, and dead classes, deadcode gives you a practical cleanup loop:
+
+```bash
+deadcode src/ --fix --dry
+deadcode src/ --fix
+```
+
+That is a meaningful productivity difference. With Vulture, the workflow is inspect findings, edit files manually, rerun, and repeat.
+
+If the goal is "remove a month or a year of dead code buildup without burning a week on janitorial edits," deadcode is a strong fit.
+
+### More flexible tuning than Vulture
+
+deadcode exposes more ways to tune false positives through CLI flags and `pyproject.toml` settings. It can ignore names directly, ignore names in matching files, and ignore names associated with decorators or inheritance.
+
+That matters on larger codebases where dead code detection breaks down because everything important is wired through decorators, base classes, registries, or plugin patterns.
+
+### Good alongside Ruff
+
+deadcode explicitly positions itself as a complement to Ruff and Flake8 rather than a replacement. That is a sensible workflow:
+
+- Ruff handles local unused names and general linting
+- deadcode handles whole-codebase unused definitions
+
+If your stack is already `ruff + pytest + pre-commit`, deadcode fits into that model naturally.
+
+---
+
+## Where Vulture is stronger
+
+### Confidence values make triage easier
+
+Vulture's confidence model is still useful:
+
+```bash
+vulture src/ --min-confidence 80
+```
+
+If you want to start with the safest, most obvious findings first, Vulture gives you a built-in prioritization mechanism. That makes it easier to adopt on teams that are skeptical of static dead code results.
+
+### Established review-first workflow
+
+Vulture is a review tool first. It does not try to rewrite code for you. For some teams, that is a feature rather than a limitation.
+
+If your rule is "a human must inspect every dead code candidate before it changes the codebase," Vulture maps neatly to that process.
+
+### Simpler mental model
+
+Vulture is easier to explain internally:
+
+- run the scan
+- review the findings
+- suppress the known framework false positives
+- delete the real dead code
+
+deadcode gives you more levers. Skylos gives you broader analysis. Vulture stays narrow.
+
+---
+
+## Where Skylos is stronger
+
+### Framework-heavy Python codebases
+
+This is the main reason Skylos belongs in this comparison.
+
+Dead code detection becomes much harder once your project uses decorators, registration hooks, and framework callbacks. Consider a basic Flask route and a pytest fixture:
+
+```python
+@app.route("/api/users")
+def get_users():
+    return jsonify(users)
+
+@pytest.fixture
+def db_connection():
+    return create_connection()
+```
+
+Those functions are alive, but they are not called in the normal "search for references" way.
+
+With deadcode and Vulture, you usually end up managing this through ignore rules or whitelist patterns. That can work, but the maintenance cost keeps growing as the codebase grows.
+
+Skylos is stronger here because it has built-in framework awareness instead of pushing all of that burden onto configuration.
+
+### Dead code plus security in one pass
+
+If your real problem is not only dead code but also:
+
+- secrets
+- dangerous shell execution
+- SQL injection
+- AI-generated code mistakes
+
+then deadcode and Vulture solve only part of the problem.
+
+Skylos can run dead code, security, and quality analysis together:
+
+```bash
+skylos . --danger --quality
+```
+
+That is useful when the cleanup effort is happening inside CI rather than as a local cleanup task.
+
+### Better fit for CI and PR workflow
+
+deadcode works well in pre-commit. Vulture works fine in CI if you wire it manually. Skylos goes further and is designed around GitHub PR workflows, inline feedback, and generated CI setup.
+
+If the question is "how do we keep dead code from creeping back in after cleanup," Skylos has the strongest out-of-the-box answer.
+
+### Transitive dead code
+
+Skylos also goes beyond isolated unused definitions.
+
+If function A is dead and A is the only caller of function B, then B may also be dead. That transitive relationship matters on large service codebases where dead subsystems tend to disappear in layers, not one symbol at a time.
+
+deadcode and Vulture are better viewed as direct unused definition detectors. Skylos is closer to dead code graph analysis.
+
+---
+
+## False positives and configuration burden
+
+This is where the tools diverge most in day-to-day use.
+
+### deadcode
+
+deadcode gives you the most control over tuning, which is useful, but it also means **you own the tuning**.
+
+If your repo has:
+
+- framework callbacks
+- migrations
+- plugin registries
+- DTO or schema mixins
+- test support modules
+
+you will likely spend some time building ignore rules so the output matches your codebase.
+
+That is acceptable if you want a highly configurable cleanup tool. It is less attractive if you want low-maintenance dead code scanning across multiple Python projects.
+
+### Vulture
+
+Vulture has the classic decorator problem. It can flag code that is used indirectly by the framework or test runner. The standard answer is a whitelist file or suppressing those patterns through Vulture's ignore mechanisms.
+
+That workflow is workable, but the cost is cumulative. Every project-specific magic pattern becomes one more thing to explain to the tool.
+
+### Skylos
+
+Skylos reduces that configuration burden by understanding more Python application structure up front. That does not mean zero false positives in every codebase, but it does mean less manual suppression work in the common frameworks most Python teams already use.
+
+If you are working on plain scripts or utilities, that difference matters less. If you are working on Flask, FastAPI, Django, pytest, and Celery-heavy application code, it matters a lot.
+
+---
+
+## Command line experience
+
+### deadcode
+
+```bash
+pip install deadcode
+deadcode .
+deadcode . --fix --dry
+```
+
+Best when you want a cleanup-oriented command and a path to automatic edits.
+
+### Vulture
+
+```bash
+pip install vulture
+vulture src/ --min-confidence 80
+```
+
+Best when you want a ranked list of likely dead code and prefer manual cleanup.
+
+### Skylos
+
+```bash
+pip install skylos
+skylos . --danger --quality
+```
+
+Best when dead code detection is part of a bigger static analysis workflow rather than a standalone task.
+
+---
+
+## Which tool should you pick?
+
+### Choose deadcode if
+
+- you want **autofix**
+- your team already uses Ruff and wants a complementary whole-codebase dead code tool
+- you are comfortable tuning ignore rules in `pyproject.toml`
+- your primary goal is cleanup speed
+
+### Choose Vulture if
+
+- you want an **established dedicated dead code finder**
+- you value confidence scoring
+- your team prefers review-first workflows over autofix
+- your codebase is not heavily dependent on framework magic
+
+### Choose Skylos if
+
+- you want **framework-aware dead code detection**
+- your team also needs security scanning and CI feedback
+- your app uses Flask, FastAPI, Django, pytest, or similar patterns
+- you want one Python analysis tool instead of a dead code tool plus a security tool plus more CI glue
+
+### A practical recommendation
+
+If your use case is pure cleanup in a mostly straightforward Python repository, **deadcode is the most compelling alternative to Vulture right now** because autofix changes the workflow in a real way.
+
+If your use case is dead code detection in an application codebase with frameworks, tests, and CI gates, **Skylos is the stronger fit** because framework awareness matters more than autofix.
+
+If your team specifically wants a dedicated dead code scanner with confidence-ranked findings and does not mind manual suppression work, **Vulture is still a reasonable choice**.
+
+---
+
+## If security also matters
+
+Once security enters the picture, deadcode and Vulture stop being complete solutions.
+
+They help you remove unused code, which is valuable, but they do not scan for:
+
+- hardcoded secrets
+- command injection
+- SQL injection
+- unsafe deserialization
+- AI-generated code issues
+
+If you also need that layer, see:
+
+- [Bandit vs Vulture vs Skylos](/blog/python-sast-comparison-2026)
+- [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)
+- [How to Detect Dead Code in Python](/use-cases/detect-dead-code-python)
+
+---
+
+## Final thoughts
+
+There is no universal winner.
+
+deadcode has the best cleanup ergonomics.
+
+Vulture has the cleanest review-first dead code workflow.
+
+Skylos is the best fit when dead code is only one part of a real Python engineering workflow that also includes frameworks, CI, and security.
+
+If you are choosing between deadcode and Vulture specifically, start by asking one question:
+
+**Do you want a dead code report, or do you want a dead code cleanup workflow?**
+
+If you want a cleanup workflow, deadcode has the edge.
+
+If you want the dead code scan to live inside broader Python analysis and CI, Skylos has the edge.
+
+---
+
+## Related
+
+- [How to Detect Dead Code in Python](/use-cases/detect-dead-code-python)
+- [Finding Dead Code in Flask: Skylos vs Vulture](/blog/flask-dead-code-case-study)
+- [Bandit vs Vulture vs Skylos](/blog/python-sast-comparison-2026)
+- [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)

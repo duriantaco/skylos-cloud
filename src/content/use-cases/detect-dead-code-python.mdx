@@ -1,0 +1,410 @@
+---
+title: "How to Detect Dead Code in Python"
+excerpt: "Dead code accumulates silently in every Python project. Here's how to find unused functions, unreachable code, and phantom imports — especially in codebases that use AI coding tools."
+publishedAt: "2026-03-12"
+updatedAt: "2026-03-12"
+tags: ["dead code", "python"]
+keywords:
+  - detect dead code python
+  - find unused functions python
+  - python dead code detection
+  - unused imports python
+  - unreachable code python
+  - python code cleanup
+  - remove dead code python
+  - vulture python
+  - python static analysis dead code
+  - AI generated dead code
+canonicalUrl: "/use-cases/detect-dead-code-python"
+---
+
+# How to Detect Dead Code in Python
+
+If you maintain a Python codebase of any size, you have dead code. Functions nobody calls. Imports nothing uses. Variables assigned but never read. Classes defined but never instantiated.
+
+This guide is for Python developers who want to find and remove dead code systematically — whether you're cleaning up a legacy project or dealing with the mess that AI coding tools leave behind.
+
+---
+
+## What counts as dead code
+
+Dead code is any code that exists in your project but never executes. The main categories:
+
+**Unused functions and methods** — defined but never called from any reachable code path:
+
+```python
+def calculate_tax_v2(amount, rate):
+    """Replaced by calculate_tax_v3 six months ago."""
+    return amount * rate * 1.1
+
+# This was the old implementation. Nobody calls it anymore.
+# But it's still sitting in billing.py, line 247.
+```
+
+**Unused imports** — modules imported at the top of a file but never referenced:
+
+```python
+import json          # used
+import xml.etree     # never referenced anywhere in this file
+from datetime import timedelta  # also never used
+```
+
+**Unreachable code** — code after a return, break, or unconditional raise:
+
+```python
+def get_status(code):
+    if code == 200:
+        return "OK"
+    return "Error"
+    logger.info(f"Status checked: {code}")  # never executes
+```
+
+**Unused variables** — assigned but never read:
+
+```python
+def process_order(order):
+    tax = order.amount * 0.08  # computed but never used
+    return order.amount
+```
+
+**Unused classes** — defined but never instantiated or subclassed:
+
+```python
+class LegacyPaymentProcessor:
+    """Replaced by StripeProcessor in Q3 2025."""
+    def charge(self, amount):
+        ...
+```
+
+---
+
+## Why dead code matters
+
+Dead code isn't just messy. It's actively harmful:
+
+1. **It confuses developers.** New team members read dead functions and try to understand how they fit into the system. They don't — but that takes time to figure out.
+
+2. **It creates false dependencies.** Dead imports can pull in packages you don't actually need. That bloats your Docker images and extends your install times.
+
+3. **It hides security vulnerabilities.** A dead function that contains a SQL injection pattern still shows up in security scans. You waste time triaging findings that don't matter. Read more in our article on [dead code as a security liability](/blog/dead-code-security-liability).
+
+4. **It makes refactoring harder.** Every dead function is one more thing to read, understand, and decide about when you're restructuring code.
+
+5. **It accumulates.** Dead code breeds more dead code. If function A is dead and it calls function B, B might also be dead — but only transitively.
+
+---
+
+## Why it gets worse with AI-generated code
+
+If your team uses Copilot, Claude, Cursor, or any AI coding assistant, your dead code problem is worse than you think.
+
+AI tools generate code that **works in isolation** but doesn't integrate cleanly with your existing codebase. Common patterns:
+
+**Phantom function calls** — the AI generates a function that calls helpers that don't exist:
+
+```python
+# AI generated this
+def process_payment(order):
+    validated = validate_order_schema(order)  # this function doesn't exist
+    result = charge_payment_gateway(validated)  # neither does this
+    send_confirmation_email(result)  # or this
+    return result
+```
+
+**Duplicate implementations** — the AI writes a new version of something that already exists:
+
+```python
+# Your existing code
+def format_currency(amount):
+    return f"${amount:,.2f}"
+
+# AI added this in a different file
+def format_money(value):
+    return "${:,.2f}".format(value)  # same thing, different name
+```
+
+**Import-then-abandon** — the AI imports a module, uses it in a draft, then the code evolves and the import becomes orphaned:
+
+```python
+import pandas as pd        # AI added this for a data processing approach
+import numpy as np          # that was later rewritten to use plain lists
+from scipy import stats     # none of these are used anymore
+
+def compute_average(values):
+    return sum(values) / len(values)
+```
+
+We scanned 9 popular Python libraries and found hundreds of dead code instances. The full results are in [our scan of popular Python libraries](/blog/we-scanned-9-popular-python-libraries).
+
+---
+
+## Common ways to detect dead code
+
+### Manual code review
+
+The most basic approach. You read the code and look for functions that seem unused.
+
+**Pros:** You understand the context. You can make judgment calls.
+
+**Cons:** Doesn't scale. You'll miss things. You can't review 50,000 lines manually.
+
+### grep / IDE "Find References"
+
+Search for function names across the codebase:
+
+```bash
+grep -r "calculate_tax_v2" src/
+```
+
+**Pros:** Quick for spot checks.
+
+**Cons:** Misses dynamic calls (`getattr`, dispatch tables). Doesn't handle imports. Doesn't trace transitive dead code. False negatives when the function name appears in comments or strings.
+
+### Vulture
+
+[Vulture](https://github.com/jendrikseipp/vulture) is a dedicated dead code finder for Python:
+
+```bash
+pip install vulture
+vulture src/
+```
+
+**Pros:** Purpose-built. Fast. Confidence scoring.
+
+**Cons:** No framework awareness — flags Flask routes, pytest fixtures, and Django admin classes as unused. You need a whitelist file that you maintain manually:
+
+```python
+# vulture_whitelist.py
+get_users  # Flask route, called by HTTP
+db_connection  # pytest fixture
+UserAdmin  # Django admin
+```
+
+Every time you add a new route or fixture, you update the whitelist. It works, but it's friction.
+
+### Pylint / Flake8
+
+These catch unused imports (`F401`) and unused variables, but not unused functions or classes. They're linters, not dead code detectors.
+
+### Coverage.py
+
+Run your tests and see what code was executed:
+
+```bash
+coverage run -m pytest
+coverage report --show-missing
+```
+
+**Pros:** Shows exactly what ran.
+
+**Cons:** Only as good as your test coverage. If you have 60% coverage, 40% of your codebase is a blind spot. Also, code that's executed by tests isn't necessarily "alive" — tests can cover dead code.
+
+---
+
+## How Skylos detects dead code
+
+[Skylos](https://github.com/duriantaco/skylos) takes a different approach. It combines AST analysis with framework awareness and transitive propagation.
+
+### Install and run
+
+```bash
+pip install skylos
+skylos src/
+```
+
+That's it. No configuration file needed for a first run.
+
+### What it finds
+
+Skylos detects:
+
+- Unused functions and methods
+- Unused imports
+- Unused variables and parameters
+- Unused classes
+- Unreachable code after return/break/continue/raise
+- **Transitive dead code** — if function A is dead and it's the only caller of function B, then B is also dead
+
+### Framework awareness
+
+Skylos understands Python frameworks. It won't flag these as dead:
+
+```python
+@app.route("/api/users")        # Flask/FastAPI route — called via HTTP
+def get_users():
+    return jsonify(users)
+
+@pytest.fixture                  # pytest fixture — called by test runner
+def db_connection():
+    return create_connection()
+
+@admin.register(User)           # Django admin — registered at import time
+class UserAdmin(admin.ModelAdmin):
+    list_display = ['name', 'email']
+
+class UserSchema(BaseModel):    # Pydantic model — used for validation
+    name: str
+    email: str
+```
+
+No whitelist file needed. Skylos recognizes Django, Flask, FastAPI, Pydantic, pytest, Celery, and Click patterns out of the box.
+
+### Example output
+
+Running Skylos on a Flask project with accumulated dead code:
+
+```
+$ skylos src/ --summary
+
+╭────────────────────────────────╮
+│ Python Static Analysis Results │
+│ Analyzed 47 file(s)            │
+╰────────────────────────────────╯
+
+Unused functions: 12
+Unused imports: 8
+Unused params: 3
+Unused vars: 5
+Unused classes: 2
+```
+
+Each finding includes the file, line number, and the name of the dead symbol:
+
+```
+src/billing.py:247  unused function  calculate_tax_v2
+src/billing.py:3    unused import    xml.etree
+src/utils.py:89     unused function  _legacy_format
+src/models.py:156   unused class     LegacyPaymentProcessor
+```
+
+### Transitive dead code propagation
+
+This is where Skylos goes beyond simple unused-function detection.
+
+If `process_refund()` is the only caller of `_validate_refund()` and `_send_refund_email()`, and `process_refund()` itself is dead, then all three are dead:
+
+```python
+def process_refund(order_id):          # dead — nothing calls this
+    validated = _validate_refund(order_id)  # also dead (only caller is dead)
+    _send_refund_email(validated)            # also dead (only caller is dead)
+    return validated
+
+def _validate_refund(order_id):
+    ...
+
+def _send_refund_email(result):
+    ...
+```
+
+Skylos propagates this automatically. Without propagation, you'd only find `process_refund` and miss the other two.
+
+---
+
+## Running Skylos in CI
+
+### GitHub Actions
+
+Generate a workflow with one command:
+
+```bash
+skylos cicd init
+```
+
+This creates a `.github/workflows/skylos.yml` that runs on every PR:
+
+```yaml
+name: Skylos Analysis
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install skylos
+      - run: skylos . --danger --quality --github
+```
+
+The `--github` flag posts inline PR comments with findings and fix suggestions.
+
+### Pre-commit hook
+
+Add Skylos to your `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/duriantaco/skylos
+    rev: v3.5.10
+    hooks:
+      - id: skylos
+```
+
+This catches dead code before it even reaches the PR.
+
+### Quality gate
+
+Use `--gate` to fail the CI pipeline if findings exceed a threshold:
+
+```bash
+skylos . --gate
+```
+
+---
+
+## What to do after finding dead code
+
+1. **Don't delete everything at once.** Remove dead code in focused PRs. One PR per module or feature area.
+
+2. **Check git blame first.** If the dead function was added recently, the author might be mid-refactor. Ask before deleting.
+
+3. **Search for dynamic references.** Before removing a function, check for `getattr()` calls, string-based dispatch, and plugin systems that might reference it by name.
+
+4. **Run your tests after removal.** Dead code detection is static analysis. It can miss dynamic patterns. Your test suite is the final safety net.
+
+5. **Set up CI to prevent accumulation.** The point isn't a one-time cleanup. It's making sure dead code doesn't come back.
+
+---
+
+## Quick comparison
+
+| | Vulture | grep | Skylos |
+|---|---------|------|--------|
+| Unused functions | Yes | Manual | Yes |
+| Unused imports | Yes | Manual | Yes |
+| Framework awareness | No | No | Yes |
+| Transitive propagation | No | No | Yes |
+| CI integration | Manual | Manual | Built-in |
+| Whitelist needed | Yes | N/A | No |
+| AI code patterns | No | No | Yes |
+
+For a deeper comparison, see [Bandit vs Vulture vs Skylos](/blog/python-sast-comparison-2026).
+
+---
+
+## Start scanning
+
+```bash
+pip install skylos
+skylos .
+```
+
+Find the dead code. Remove it. Set up CI so it doesn't come back.
+
+---
+
+## Related
+
+- [Deadcode vs Vulture vs Skylos](/compare/deadcode-vs-vulture-vs-skylos)
+- [Semgrep vs Skylos for Python](/compare/semgrep-vs-skylos)
+- [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)
+- [How to Catch Hallucinated Imports in AI Code](/use-cases/ai-generated-code-security)
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+- [Dead Code in Python Is a Security Liability](/blog/dead-code-security-liability)
+- [Finding Dead Code in Flask: Skylos vs Vulture](/blog/flask-dead-code-case-study)
+
+*Skylos is open source. [View on GitHub](https://github.com/duriantaco/skylos) | [Docs](https://docs.skylos.dev) | [Install](https://pypi.org/project/skylos/)*

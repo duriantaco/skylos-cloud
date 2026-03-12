@@ -1,20 +1,32 @@
 ---
-title: "We Scanned 9 Popular Python Libraries. Here's What We Found."
-excerpt: "We ran Skylos against FastAPI, Flask, Pydantic, Rich, Requests, httpx, Click, Starlette, and tqdm. The results: 1,800+ security findings, 4,195 quality issues, and 750 pieces of dead code across 9 of the most popular Python packages."
+title: "We Scanned 9 Popular Python Libraries for Security and Dead Code. Here's What We Found."
+excerpt: "We ran static analysis on FastAPI, Flask, Pydantic, Rich, Requests, httpx, Click, Starlette, and tqdm. The results: 1,800+ security findings, 4,195 quality issues, and 730 pieces of dead code across 9 of the most popular Python packages."
 publishedAt: "2026-03-05"
 updatedAt: "2026-03-05"
-tags: ["security", "sast", "appsec", "devtools"]
+author:
+  name: "Skylos team"
+  role: "Benchmarking and product engineering"
+  type: "Organization"
+whyThisExists: "This writeup documents what happened when we ran the current Skylos ruleset against widely used Python libraries, so readers can judge the signal quality and tradeoffs with real repositories instead of marketing copy."
+methodology:
+  - "Scanned FastAPI, Flask, Pydantic, Rich, Requests, httpx, Click, Starlette, and tqdm with `skylos . --danger --quality --table`."
+  - "Used each repository as-is, with no extra tuning or per-project suppression rules."
+  - "Counts in the article reflect pattern findings and dead-code candidates surfaced by the scan, not confirmed CVEs in those upstream projects."
+tags: ["security", "sast", "appsec"]
 keywords:
-  - python security scan
+  - python security scan results
   - static analysis popular python libraries
   - FastAPI security vulnerabilities
   - Pydantic dead code
   - Flask security scan
-  - python SAST results
+  - python SAST results 2026
   - dead code detection python
-  - popular python library code quality
-  - requests library security
-  - open source code quality
+  - python library code quality
+  - requests library security audit
+  - open source security scan
+  - python vulnerability scanner
+  - FastAPI static analysis
+canonicalUrl: "/blog/we-scanned-9-popular-python-libraries"
 ---
 
 Every Python developer has `pip install`'d at least one of these libraries. FastAPI, Flask, Requests, Pydantic — they power millions of applications. But how do they actually hold up under static analysis?
@@ -124,3 +136,12 @@ The point isn't to hit zero findings. It's to know what's in your code before yo
 ---
 
 *Skylos is an open-source static analysis tool for Python, TypeScript, and Go. It detects dead code, security vulnerabilities, and quality issues in a single scan. [GitHub](https://github.com/duriantaco/skylos) | [Docs](https://docs.skylos.dev) | [PyPI](https://pypi.org/project/skylos/)*
+
+---
+
+## Related
+
+- [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)
+- [Semgrep vs Skylos for Python](/compare/semgrep-vs-skylos)
+- [Finding Dead Code in Flask: Skylos vs Vulture](/blog/flask-dead-code-case-study)
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)

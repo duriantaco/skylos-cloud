@@ -267,6 +267,10 @@ function normalizeIncomingReport(body: any) {
     tool: "skylos" as const,
     source: "skylos" as string,
     source_metadata: null as any[] | null,
+    defense_score: body.defense_score || null,
+    ops_score: body.ops_score || null,
+    owasp_coverage: body.owasp_coverage || null,
+    defense_findings: body.defense_findings || [],
   }
 }
 
@@ -491,7 +495,7 @@ export async function POST(req: Request) {
 
     const body = await req.json()
     const normalized = normalizeIncomingReport(body)
-    const { summary, findings, commit_hash, branch, actor, tool, source, source_metadata } = normalized
+    const { summary, findings, commit_hash, branch, actor, tool, source, source_metadata, defense_score, ops_score, owasp_coverage, defense_findings } = normalized
     const { is_forced } = body
     const analysis_mode = String(body.analysis_mode || "static");
     const ai_code = body.ai_code || null;
@@ -806,6 +810,9 @@ export async function POST(req: Request) {
         override_reason: isWhitelisted ? `Inherited override` : null,
         ai_code_detected: !!ai_code?.detected,
         ai_code_stats: ai_code || null,
+        defense_score: defense_score || null,
+        ops_score: ops_score || null,
+        owasp_coverage: owasp_coverage || null,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -852,6 +859,82 @@ export async function POST(req: Request) {
 
     if (dbRows.length > 0) {
       await batchInsertFindings(supabase, dbRows);
+    }
+
+    // --- AI Defense: populate normalized tables if defense data present ---
+    if (defense_score && typeof defense_score === 'object') {
+      try {
+        // Insert aggregate defense score
+        const { error: dsErr } = await supabase.from('defense_scores').insert({
+          scan_id: scan.id,
+          project_id: project.id,
+          weighted_score: defense_score.weighted_score || 0,
+          weighted_max: defense_score.weighted_max || 0,
+          score_pct: defense_score.score_pct ?? 0,
+          risk_rating: defense_score.risk_rating || 'UNKNOWN',
+          passed: defense_score.passed || 0,
+          total: defense_score.total_checks || defense_score.total || 0,
+          ops_passed: ops_score?.passed || 0,
+          ops_total: ops_score?.total || 0,
+          ops_score_pct: ops_score?.score_pct ?? 100,
+          ops_rating: ops_score?.rating || 'EXCELLENT',
+          integrations_found: defense_score.integrations_found || 0,
+          files_scanned: defense_score.files_scanned || 0,
+        });
+        if (dsErr) console.error('defense_scores insert failed:', dsErr.message);
+
+        // Insert defense findings (individual check results)
+        if (defense_findings && defense_findings.length > 0) {
+          if (defense_findings.length > 500) {
+            defense_findings.length = 500;
+          }
+          const defenseRows = defense_findings.map((f: any) => ({
+            scan_id: scan.id,
+            project_id: project.id,
+            plugin_id: f.plugin_id || 'unknown',
+            category: f.category || 'defense',
+            severity: f.severity || 'medium',
+            weight: f.weight || 2,
+            passed: !!f.passed,
+            location: f.integration_location || f.location || null,
+            message: f.message || null,
+            owasp_llm: f.owasp_llm || null,
+            remediation: f.remediation || null,
+          }));
+          const { error: dfErr } = await supabase.from('defense_findings').insert(defenseRows);
+          if (dfErr) console.error('defense_findings insert failed:', dfErr.message);
+        }
+
+        // Insert defense integrations (unique locations from findings)
+        const integrationLocations = new Map<string, any>();
+        for (const f of defense_findings) {
+          const loc = f.integration_location || f.location || 'unknown';
+          if (!integrationLocations.has(loc)) {
+            integrationLocations.set(loc, {
+              scan_id: scan.id,
+              project_id: project.id,
+              provider: f.provider || 'unknown',
+              integration_type: f.integration_type || 'chat',
+              location: loc,
+              model: f.model || null,
+              tools_count: 0,
+              input_sources: '[]',
+              weighted_score: 0,
+              weighted_max: 0,
+              score_pct: 0,
+              risk_rating: 'UNKNOWN',
+            });
+          }
+        }
+        if (integrationLocations.size > 0) {
+          await supabase.from('defense_integrations').insert(
+            Array.from(integrationLocations.values())
+          );
+        }
+      } catch (defErr: any) {
+        // Defense insert failures are non-fatal — don't break the scan upload
+        console.error('Defense data insert failed:', defErr?.message);
+      }
     }
 
     const { data: insertedFindings, error: insSelErr } = await supabase

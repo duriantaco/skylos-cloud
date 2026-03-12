@@ -1,0 +1,364 @@
+---
+title: "Python Security Scanner for GitHub Actions: Automate SAST in CI/CD"
+excerpt: "How to add Python static analysis and security scanning to your GitHub Actions pipeline. Catch dead code, hardcoded secrets, SQL injection, and AI-generated code problems on every pull request."
+publishedAt: "2026-03-12"
+updatedAt: "2026-03-12"
+tags: ["ci", "security", "python"]
+keywords:
+  - python security scanner github actions
+  - python SAST github action
+  - python static analysis CI CD
+  - github action python security
+  - python security scanning CI
+  - automated python security scan
+  - python PR security check
+  - github actions SAST
+  - python pre commit security
+  - python security pipeline
+  - CI CD python security
+  - python code scanning github
+canonicalUrl: "/use-cases/python-security-github-actions"
+---
+
+# Python Security Scanner for GitHub Actions
+
+If you're running a Python project on GitHub and you don't have automated security scanning, every PR is a gamble. Hardcoded secrets, SQL injection patterns, dead code, and AI-generated bugs all slip through manual review.
+
+This guide shows you how to set up automated Python security and quality scanning in GitHub Actions using Skylos — from zero to PR-blocking quality gates in under 5 minutes.
+
+---
+
+## Why scan Python code in CI
+
+Manual code review catches logic problems. It's bad at catching:
+
+- **Hardcoded secrets** — API keys and passwords that look like config values
+- **SQL injection patterns** — string formatting in database queries
+- **Dead code** — functions nobody calls that expand your attack surface
+- **Weak cryptography** — MD5/SHA1 used for hashing passwords
+- **AI-generated problems** — hallucinated imports, phantom function calls, disabled SSL verification
+
+These are exactly the patterns that static analysis is designed to catch automatically. Running it on every PR means nothing ships without being scanned.
+
+---
+
+## Option 1: One-command setup with Skylos
+
+The fastest way to add Python security scanning to GitHub Actions:
+
+```bash
+pip install skylos
+skylos cicd init
+```
+
+This generates `.github/workflows/skylos.yml` with everything configured:
+
+```yaml
+name: Skylos Analysis
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Skylos
+        run: pip install skylos
+
+      - name: Run security and quality scan
+        run: skylos . --danger --quality --github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+**What this does:**
+
+- Scans every PR for security vulnerabilities, dead code, and quality issues
+- Posts inline PR comments pointing to the exact lines with problems
+- Includes fix suggestions in the comments
+- Runs on push to main for baseline tracking
+
+The `--github` flag is what enables PR inline comments. The `GITHUB_TOKEN` is automatically provided by GitHub Actions — no secret configuration needed.
+
+---
+
+## Option 2: Manual workflow with quality gate
+
+If you want more control, here's a workflow with separate security and quality steps plus a blocking gate:
+
+```yaml
+name: Python Security & Quality
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install skylos
+
+      # Security scan — finds vulnerabilities, secrets, injection
+      - name: Security scan
+        run: skylos . --danger --severity high --github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Dead code scan — finds unused functions, imports, classes
+      - name: Dead code scan
+        run: skylos . --summary
+
+      # Quality gate — fails PR if critical issues found
+      - name: Quality gate
+        run: skylos . --danger --gate
+```
+
+The `--gate` flag exits with code 1 if findings exceed the configured threshold. This blocks the PR from merging until issues are resolved.
+
+### Configuring the quality gate
+
+You can control what triggers a failure with `--severity`:
+
+```bash
+# Fail only on HIGH severity findings
+skylos . --danger --gate --severity high
+
+# Fail on MEDIUM and above
+skylos . --danger --gate --severity medium
+```
+
+---
+
+## Option 3: Diff-only scanning
+
+On large codebases, scanning the entire project on every PR is slow. Scan only the changed files:
+
+```yaml
+- name: Scan changed files only
+  run: skylos . --danger --diff origin/main --github
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+The `--diff` flag scans only files that changed relative to the base branch. This keeps CI fast while still catching issues in new code.
+
+---
+
+## What Skylos catches in CI
+
+### Hardcoded secrets (SKY-D201)
+
+```python
+# Skylos flags this
+API_KEY = "sk-proj-1234567890abcdef"
+DATABASE_URL = "postgresql://admin:password@prod:5432/db"
+```
+
+PR comment:
+> **Hardcoded credential detected** at `config.py:7`. Move this to an environment variable or secrets manager.
+
+### SQL injection (SKY-D210)
+
+```python
+# Skylos flags this — user input in SQL query
+query = f"SELECT * FROM users WHERE id = {request.args['id']}"
+cursor.execute(query)
+```
+
+PR comment:
+> **SQL injection risk** at `routes.py:23`. User input flows directly into SQL query. Use parameterized queries instead.
+
+### Command injection (SKY-D212)
+
+```python
+# Skylos flags this
+cmd = request.form.get("command")
+subprocess.call(cmd, shell=True)
+```
+
+### Dead code
+
+```python
+# Skylos flags this — never called from any reachable code
+def calculate_tax_v2(amount, rate):
+    return amount * rate * 1.1
+```
+
+### Weak cryptography (SKY-D214)
+
+```python
+# Skylos flags this
+def hash_password(pw):
+    return hashlib.md5(pw.encode()).hexdigest()
+```
+
+### AI-generated patterns
+
+```python
+# Skylos flags disabled SSL
+requests.get(url, verify=False)
+
+# Skylos flags disabled JWT verification
+jwt.decode(token, algorithms=["none"])
+```
+
+---
+
+## Adding a pre-commit hook
+
+Catch issues before they reach the PR:
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/duriantaco/skylos
+    rev: v3.5.10
+    hooks:
+      - id: skylos
+        args: ['--danger']
+```
+
+Install and run:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+Now every `git commit` runs Skylos on staged files. Issues are caught at the developer's desk, not in CI.
+
+---
+
+## Combining with other tools
+
+Skylos doesn't conflict with other security tools. Common combinations:
+
+### Skylos + Semgrep
+
+```yaml
+steps:
+  - name: Semgrep (custom rules)
+    run: semgrep scan --config custom-rules/ src/
+
+  - name: Skylos (dead code + security + quality)
+    run: skylos . --danger --quality --github
+```
+
+Use Semgrep for domain-specific custom rules. Use Skylos for dead code detection, AI code scanning, and built-in security rules.
+
+### Skylos + Dependabot
+
+Skylos scans your code. Dependabot scans your dependencies. Together they cover both first-party and third-party risk.
+
+---
+
+## Scan AI-generated code specifically
+
+If your team uses Copilot, Claude, or Cursor, add AI defense scanning:
+
+```yaml
+- name: AI code security check
+  run: |
+    skylos discover . --json
+    skylos defend . --fail-on high
+```
+
+`skylos discover` finds LLM integration points. `skylos defend` scores their security posture and fails if defenses are missing.
+
+For more on AI code scanning, see [How to catch hallucinated imports in AI-generated Python code](/use-cases/ai-generated-code-security).
+
+---
+
+## SARIF output for GitHub Code Scanning
+
+If you use GitHub's native code scanning tab, output SARIF:
+
+```yaml
+- name: Skylos SARIF scan
+  run: skylos . --danger --sarif results.sarif
+
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: results.sarif
+```
+
+This integrates Skylos findings directly into GitHub's Security tab alongside CodeQL results.
+
+---
+
+## Performance tips
+
+| Codebase size | Full scan time | Diff-only scan |
+|---------------|---------------|----------------|
+| 100 files | ~2s | ~1s |
+| 1,000 files | ~5s | ~2s |
+| 10,000 files | ~45s | ~5s |
+
+Tips for keeping CI fast:
+
+1. **Use `--diff`** on PRs to scan only changed files
+2. **Cache pip installs** with `actions/setup-python`'s built-in caching
+3. **Run security and quality in parallel** using separate jobs
+4. **Skip scans on docs-only PRs** using path filters:
+
+```yaml
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**.py'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+```
+
+---
+
+## Quick start
+
+```bash
+# Install
+pip install skylos
+
+# Generate GitHub Actions workflow
+skylos cicd init
+
+# Or run manually
+skylos . --danger --quality --github
+```
+
+That's it. Commit the workflow file, push, and every PR gets scanned.
+
+---
+
+## Related guides
+
+- [How to detect dead code in Python](/use-cases/detect-dead-code-python)
+- [Semgrep vs Skylos for Python](/compare/semgrep-vs-skylos)
+- [How to catch AI-generated code problems](/use-cases/ai-generated-code-security)
+- [Best Python SAST tools compared](/blog/python-sast-comparison-2026)
+
+*Skylos is open source. [View on GitHub](https://github.com/duriantaco/skylos) | [Docs](https://docs.skylos.dev) | [Install](https://pypi.org/project/skylos/)*

@@ -19,7 +19,12 @@ function verifySignature(payload: string, signature: string): boolean {
     .createHmac("sha256", WEBHOOK_SECRET)
     .update(payload)
     .digest("hex");
-  return `sha256=${sig}` === signature;
+  const expected = Buffer.from(`sha256=${sig}`);
+  const received = Buffer.from(signature || "");
+  if (expected.length !== received.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(expected, received);
 }
 
 async function getInstallationOctokit(installationId: number): Promise<Octokit> {

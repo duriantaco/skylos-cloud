@@ -4,24 +4,31 @@ import { Metadata } from 'next'
 import Navbar from '@/components/Navbar'
 import CopyInstallButton from '@/components/CopyInstallButton'
 import SkylosHeroSandbox from '@/components/SkylosHeroSandbox'
-import AnimatedCounter from '@/components/AnimatedCounter'
 import { getGithubRepo, getSiteUrl } from '@/lib/site'
-import { ArrowRight, Terminal, Shield, AlertTriangle, Code2, GitBranch, Timer, Search, Check, Zap, TrendingUp, Clock, Bug } from 'lucide-react'
+import { ArrowRight, Terminal, Shield, AlertTriangle, Code2, GitBranch, Timer, Search, Check, Zap, Bug } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Skylos | Low-Noise Python Static Analysis & Dead Code Detection',
-  description: 'The context-aware alternative to Vulture. Detects dead code in FastAPI, Pydantic, and Django with 0% false positives. CI/CD ready.',
+  title: 'Skylos | Python Security Scanner, Dead Code Detection & Static Analysis',
+  description: 'Open source Python SAST tool that finds dead code, hardcoded secrets, SQL injection, and AI-generated code problems. Framework-aware analysis for Django, Flask, FastAPI, and Pydantic. Runs in CLI, CI/CD, and GitHub Actions.',
   keywords: [
-    'python static analysis', 
-    'vulture alternative', 
-    'reduce false positives python', 
-    'fastapi dead code detection', 
-    'pydantic unused fields', 
-    'devsecops pipeline'
+    'python static analysis tool',
+    'python security scanner',
+    'python SAST tool',
+    'dead code detection python',
+    'python secrets scanner',
+    'vulture alternative',
+    'semgrep alternative python',
+    'bandit alternative',
+    'AI generated code scanner',
+    'python GitHub Action security',
+    'FastAPI dead code detection',
+    'Django security scanner',
+    'Flask static analysis',
+    'python CI security scanning',
   ],
   openGraph: {
-    title: 'Skylos - Static Analysis Without the Noise',
-    description: 'Benchmark: 100% Recall, 70% Precision vs Vulture. Stop chasing false positives.',
+    title: 'Skylos — Python Security Scanner & Dead Code Detection',
+    description: 'Open source SAST tool for Python. Finds dead code, secrets, SQL injection, and AI code problems. Framework-aware. CI/CD ready.',
     type: 'website',
   },
 }
@@ -89,7 +96,7 @@ function BenchmarkSection() {
             <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
               <h4 className="font-semibold text-slate-900 mb-2">The Takeaway</h4>
               <p className="text-sm text-slate-600 mb-4">
-                Vulture is faster (0.1s) but "dumb"—it missed 17% of the dead code and flagged used code as dead.
+                Vulture is faster (0.1s) but &quot;dumb&quot;: it missed 17% of the dead code and flagged used code as dead.
               </p>
               <p className="text-sm text-slate-600">
                 <strong>Skylos found 100% of the dead code</strong> with higher precision, taking ~1.6s to parse the full AST context.
@@ -203,6 +210,7 @@ export default async function Home() {
   const stars = await getGithubStars()
   const siteUrl = getSiteUrl()
   const DISCORD_URL = process.env.NEXT_PUBLIC_DISCORD_URL || "https://discord.gg/Hm5KQMzyrR"
+  const docsUrl = 'https://docs.skylos.dev/'
 
   const faq = [
     {
@@ -242,7 +250,7 @@ export default async function Home() {
       { '@type': 'ListItem', position: 2, name: 'Features', item: `${siteUrl}/#features` },
       { '@type': 'ListItem', position: 3, name: 'Pricing', item: `${siteUrl}/#pricing` },
       { '@type': 'ListItem', position: 4, name: 'Blog', item: `${siteUrl}/blog` },
-      { '@type': 'ListItem', position: 5, name: 'Docs', item: 'https://docs.skylos.dev/' },
+      { '@type': 'ListItem', position: 5, name: 'Docs', item: docsUrl },
     ],
   }
 
@@ -309,133 +317,145 @@ export default async function Home() {
 
           {/* Hero Title - Clean & Professional */}
           <div className="relative max-w-5xl mx-auto text-center">
-            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.05] animate-fade-in-up">
-              <span className="block text-slate-900">
-                <span className="inline-block hover:scale-105 hover:text-slate-950 transition-all duration-200 cursor-default">Secure</span>
-                {" "}
-                <span className="inline-block hover:scale-105 hover:text-slate-950 transition-all duration-200 cursor-default">your</span>
-                {" "}
-                <span className="relative inline-block group cursor-default">
-                  <span className="relative z-10 text-slate-900 group-hover:scale-105 group-hover:text-slate-950 transition-all duration-200 inline-block">Python</span>
-                  <span className="absolute bottom-2 left-0 right-0 h-4 bg-blue-400/40 group-hover:bg-blue-500/50 -z-10 -rotate-1 transition-all duration-200"></span>
-                </span>
-              </span>
+            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.02] animate-fade-in-up">
+              <span className="block text-slate-900">Framework-aware</span>
               <span className="block mt-2 text-slate-900">
-                <span className="inline-block hover:scale-105 hover:text-slate-950 transition-all duration-200 cursor-default">before</span>
-                {" "}
-                <span className="inline-block hover:scale-105 hover:text-slate-950 transition-all duration-200 cursor-default">you</span>
-                {" "}
-                <span className="inline-block hover:scale-105 hover:text-slate-950 transition-all duration-200 cursor-default">ship</span>
-                <span className="text-slate-900 inline-block">.</span>
+                <span className="relative inline-block">
+                  Python
+                  <span className="absolute bottom-2 left-0 right-0 h-4 bg-blue-400/35 -z-10 -rotate-1"></span>
+                </span>
+                {' '}static analysis
               </span>
             </h1>
 
             {/* Enhanced Subtitle */}
             <p className="mt-8 text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto leading-relaxed animate-fade-in-up [animation-delay:200ms] font-medium">
-              Open source <span className="text-slate-900 font-bold relative inline-block group">
-                static analysis
-                <span className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent group-hover:h-0.5 transition-all"></span>
-              </span> that finds dead code, secrets, and vulnerabilities.
+              Find dead code, security issues, and AI-generated code mistakes before merge.
               <br className="hidden sm:block" />
-              <span className="text-slate-500">Run locally or gate your GitHub PRs.</span>
+              <span className="text-slate-500">Run locally, in GitHub Actions, or inside VS Code.</span>
             </p>
 
             {/* Enhanced CTA Buttons */}
             <div className="mt-12 flex flex-col sm:flex-row gap-5 justify-center items-center animate-fade-in-up [animation-delay:400ms]">
               <Link
-                href="/login"
+                href="/docs"
                 className="group relative inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 px-10 py-5 text-lg font-bold text-white hover:shadow-2xl hover:shadow-slate-900/40 hover:scale-105 transition-all duration-300 overflow-hidden"
-                aria-label="Connect GitHub to Skylos"
+                aria-label="Install Skylos CLI"
               >
                 {/* Shimmer Effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
                 <span className="relative z-10 flex items-center gap-2">
-                  Connect GitHub
+                  Install CLI
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </span>
               </Link>
 
-              <CopyInstallButton command="pip install skylos" />
-
-              <a
-                href="mailto:founder@skylos.dev"
+              <Link
+                href="#example-output"
                 className="group relative inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-white/80 backdrop-blur-sm px-10 py-5 text-lg font-bold text-slate-900 hover:border-slate-300 hover:bg-white hover:shadow-xl hover:scale-105 transition-all duration-300"
               >
-                Book a Demo
+                See example output
                 <ArrowRight className="w-5 h-5 text-slate-400 group-hover:translate-x-1 group-hover:text-slate-900 transition-all" />
-              </a>
+              </Link>
+
+              <Link
+                href="/login"
+                className="group inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-8 py-4 text-base font-semibold text-slate-900 hover:border-slate-300 hover:bg-white transition-all"
+              >
+                Connect GitHub
+                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
+
+            <div className="mt-6 flex justify-center animate-fade-in-up [animation-delay:500ms]">
+              <CopyInstallButton command="pip install skylos" />
             </div>
 
             {/* Trust Indicators */}
             <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm text-slate-500 animate-fade-in-up [animation-delay:600ms]">
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-500" />
-                <span>Open source</span>
+                <span>Open source CLI</span>
               </div>
               <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-500" />
-                <span>2-minute setup</span>
+                <Terminal className="w-4 h-4 text-amber-500" />
+                <span>Docs and quickstart live</span>
               </div>
               <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-blue-500" />
-                <span>SOC2 ready</span>
+                <GitBranch className="w-4 h-4 text-blue-500" />
+                <span>Local scans or GitHub PR gates</span>
               </div>
             </div>
           </div>
 
-          <div className="mt-16 md:mt-20">
+          <div className="mt-16 md:mt-20" id="example-output">
             <SkylosHeroSandbox />
           </div>
         </div>
       </section>
 
-      <section className="relative py-20 bg-gradient-to-b from-white to-slate-50 border-y border-slate-200 overflow-hidden">
+      <section id="proof" className="relative py-20 bg-gradient-to-b from-white to-slate-50 border-y border-slate-200 overflow-hidden">
         {/* Background Accent */}
         <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-purple-50/50" />
 
         <div className="relative mx-auto max-w-7xl px-6">
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="group relative overflow-hidden rounded-2xl bg-white p-8 border-2 border-slate-200 hover:border-blue-400 hover:shadow-2xl hover:shadow-blue-500/20 hover:-translate-y-2 transition-all duration-300">
-              <div className="absolute top-0 right-0 w-48 h-48"></div>
-              <div className="relative">
-                <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center mb-4">
-                  <Bug className="w-6 h-6 text-blue-600" />
-                </div>
-                <div className="text-4xl font-black text-slate-900 mb-2">
-                  <AnimatedCounter end={5000} suffix="+" />
-                </div>
-                <div className="text-slate-600 font-medium">Vulnerabilities Caught</div>
-                <div className="text-sm text-slate-500 mt-1">Across 100+ projects</div>
-              </div>
-            </div>
+          <div className="mx-auto max-w-3xl text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
+              Proof before promises
+            </h2>
+            <p className="mt-4 text-lg text-slate-600">
+              These numbers come from benchmarks, case studies, and reproducible scans already published on the site.
+            </p>
+          </div>
 
-            <div className="group relative overflow-hidden rounded-2xl bg-white p-8 border-2 border-slate-200 hover:border-emerald-400 hover:shadow-2xl hover:shadow-emerald-500/20 hover:-translate-y-2 transition-all duration-300">
-              <div className="absolute top-0 right-0 w-48 h-48"></div>
-              <div className="relative">
-                <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center mb-4">
-                  <Clock className="w-6 h-6 text-emerald-600" />
-                </div>
-                <div className="text-4xl font-black text-slate-900 mb-2">
-                  <AnimatedCounter end={1000} suffix="+" />
-                </div>
-                <div className="text-slate-600 font-medium">Hours Saved</div>
-                <div className="text-sm text-slate-500 mt-1">Manual code review time</div>
-              </div>
-            </div>
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <a href="#benchmark" className="group rounded-2xl border border-slate-200 bg-white p-7 hover:border-slate-300 hover:shadow-xl transition-all">
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">FastAPI benchmark</div>
+              <div className="mt-4 text-4xl font-black text-slate-900">29/29</div>
+              <h3 className="mt-3 text-lg font-semibold text-slate-900">Seeded dead-code findings caught</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                FastAPI + Pydantic benchmark on Apple Silicon M3. Skylos reached 100% recall and 70.7% precision.
+              </p>
+              <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                See benchmark <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </span>
+            </a>
 
-            <div className="group relative overflow-hidden rounded-2xl bg-white p-8 border-2 border-slate-200 hover:border-purple-400 hover:shadow-2xl hover:shadow-purple-500/20 hover:-translate-y-2 transition-all duration-300">
-              <div className="absolute top-0 right-0 w-48 h-48"></div>
-              <div className="relative">
-                <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center mb-4">
-                  <TrendingUp className="w-6 h-6 text-purple-600" />
-                </div>
-                <div className="text-4xl font-black text-slate-900 mb-2">
-                  <AnimatedCounter end={85} suffix="%" />
-                </div>
-                <div className="text-slate-600 font-medium">Accuracy Rate</div>
-                <div className="text-sm text-slate-500 mt-1">Near-zero false positives</div>
-              </div>
-            </div>
+            <Link href="/blog/flask-dead-code-case-study" className="group rounded-2xl border border-slate-200 bg-white p-7 hover:border-slate-300 hover:shadow-xl transition-all">
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Flask case study</div>
+              <div className="mt-4 text-4xl font-black text-slate-900">21x</div>
+              <h3 className="mt-3 text-lg font-semibold text-slate-900">Fewer false positives than Vulture</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                Manual review on Flask found 7/7 dead items, with 12 false positives instead of 260.
+              </p>
+              <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                Read case study <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </span>
+            </Link>
+
+            <Link href="/blog/we-scanned-9-popular-python-libraries" className="group rounded-2xl border border-slate-200 bg-white p-7 hover:border-slate-300 hover:shadow-xl transition-all">
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Repository scan</div>
+              <div className="mt-4 text-4xl font-black text-slate-900">9 repos</div>
+              <h3 className="mt-3 text-lg font-semibold text-slate-900">Scanned without cherry-picking</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                FastAPI, Flask, Pydantic, Requests, Rich and more: 1,800 security findings, 4,195 quality issues, and 730 dead code items.
+              </p>
+              <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                Review the scan <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </span>
+            </Link>
+
+            <Link href="/use-cases/ai-generated-code-security" className="group rounded-2xl border border-slate-200 bg-white p-7 hover:border-slate-300 hover:shadow-xl transition-all">
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">AI workflow</div>
+              <div className="mt-4 text-4xl font-black text-slate-900">13 checks</div>
+              <h3 className="mt-3 text-lg font-semibold text-slate-900">AI code risk coverage</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                Catch hallucinated imports, phantom calls, hardcoded secrets, and missing AI safety controls before merge.
+              </p>
+              <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                See AI workflow <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </span>
+            </Link>
           </div>
         </div>
       </section>
@@ -445,10 +465,10 @@ export default async function Home() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
-              Complete Python Security Scanning
+              What Skylos checks
             </h2>
             <p className="mt-4 text-lg text-slate-600">
-              Four detection engines in one fast tool.
+              Framework-aware analysis for dead code, secrets, vulnerabilities, and AI-generated code mistakes.
             </p>
           </div>
 
@@ -749,6 +769,106 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* RESOURCES / SEO SECTION */}
+      <section className="py-24 bg-white">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
+              Guides, Comparisons & Use Cases
+            </h2>
+            <p className="mt-4 text-lg text-slate-600">
+              Learn how Python teams use Skylos for security scanning, dead code detection, and AI code quality.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Use Cases */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 hover:border-slate-300 hover:shadow-lg transition-all">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-5">
+                <Search className="w-6 h-6 text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">Use Cases</h3>
+              <ul className="space-y-3 text-sm text-slate-600 mb-6">
+                <li>
+                  <Link href="/use-cases/detect-dead-code-python" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    How to detect dead code in Python
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/use-cases/ai-generated-code-security" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Catch hallucinated imports in AI code
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/use-cases/python-security-github-actions" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Python security scanner for GitHub Actions
+                  </Link>
+                </li>
+              </ul>
+              <Link href="/use-cases" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-900 hover:gap-2 transition-all">
+                All use cases <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            {/* Comparisons */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 hover:border-slate-300 hover:shadow-lg transition-all">
+              <div className="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center mb-5">
+                <Code2 className="w-6 h-6 text-violet-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">Tool Comparisons</h3>
+              <ul className="space-y-3 text-sm text-slate-600 mb-6">
+                <li>
+                  <Link href="/compare/deadcode-vs-vulture-vs-skylos" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Deadcode vs Vulture vs Skylos
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/compare/semgrep-vs-skylos" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Semgrep vs Skylos for Python
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/compare/best-python-sast-tools-2026" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Best Python SAST tools in 2026
+                  </Link>
+                </li>
+              </ul>
+              <Link href="/compare" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-900 hover:gap-2 transition-all">
+                All comparisons <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            {/* Blog */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 hover:border-slate-300 hover:shadow-lg transition-all">
+              <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center mb-5">
+                <Bug className="w-6 h-6 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">Latest from the Blog</h3>
+              <ul className="space-y-3 text-sm text-slate-600 mb-6">
+                <li>
+                  <Link href="/blog/vibe-coding" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    AI-generated code is shipping vulnerabilities
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/blog/we-scanned-9-popular-python-libraries" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    We scanned 9 popular Python libraries
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/blog/dead-code-security-liability" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Dead code is a security liability
+                  </Link>
+                </li>
+              </ul>
+              <Link href="/blog" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-900 hover:gap-2 transition-all">
+                All articles <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FAQ SECTION */}
       <section id="faq" className="py-24 bg-slate-50">
         <div className="mx-auto max-w-3xl px-6">
@@ -771,14 +891,92 @@ export default async function Home() {
         </div>
       </section>
 
+      <section className="py-24 bg-white border-y border-slate-200">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="mx-auto max-w-3xl text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
+              Open source locally. Use cloud when you need workflow.
+            </h2>
+            <p className="mt-4 text-lg text-slate-600">
+              The CLI works without login. Credits apply when you upload scans, compare history, or run AI-assisted cloud actions.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8">
+              <div className="text-sm font-semibold text-slate-900">OSS CLI</div>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                Best for trying Skylos on a repo today.
+              </p>
+              <ul className="mt-6 space-y-3 text-sm text-slate-600">
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-900">pip install skylos</code>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Local scans, JSON output, and SARIF
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> No login required
+                </li>
+              </ul>
+              <Link href="/docs" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                Install locally <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-8">
+              <div className="text-sm font-semibold text-slate-900">Cloud dashboard</div>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                Best for history, suppressions, scan compare, and shared visibility.
+              </p>
+              <ul className="mt-6 space-y-3 text-sm text-slate-600">
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Upload scans for trends, history, and triage
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Shared findings, suppressions, and exports
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Credits used for uploads and AI-assisted workflows
+                </li>
+              </ul>
+              <Link href="/login" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                Connect a repo <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8">
+              <div className="text-sm font-semibold text-slate-900">GitHub and teams</div>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                Best once the local scan is already useful and you want repeatable enforcement.
+              </p>
+              <ul className="mt-6 space-y-3 text-sm text-slate-600">
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> PR gates, inline comments, and scan comparison
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Slack or Discord notifications and team workflows
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Compliance reports, governance, and higher limits
+                </li>
+              </ul>
+              <Link href="/use-cases/python-security-github-actions" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                See CI setup <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="pricing" className="py-24 bg-white">
         <div className="mx-auto max-w-6xl px-6">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
-              Simple pricing
+              Credits for cloud workflows
             </h2>
             <p className="mt-4 text-lg text-slate-600">
-              Pay for what you use. If you're not happy, we will refund you.
+              Local CLI scans stay free. Buy credits when you want uploads, history, PR automation, or AI-assisted actions. No subscriptions.
             </p>
           </div>
 
@@ -790,81 +988,69 @@ export default async function Home() {
                   <Zap className="w-3 h-3" /> Most Popular
                 </span>
               </div>
-              <h3 className="text-xl font-semibold text-slate-900">Pay as you go</h3>
-              <p className="mt-2 text-slate-600 text-sm">Buy credits, use what you need</p>
+              <h3 className="text-xl font-semibold text-slate-900">Cloud workflow</h3>
+              <p className="mt-2 text-slate-600 text-sm">Buy credits when you need shared history and automation</p>
               <div className="mt-6">
                 <span className="text-5xl font-bold text-slate-900">$9</span>
                 <span className="text-slate-500 text-sm ml-1">/ 500 credits</span>
               </div>
               <ul className="mt-8 space-y-3 text-sm text-slate-600 flex-1">
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Unlimited local scans
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Local CLI stays free and unlimited
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> All finding categories
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Upload scans to the dashboard
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> CLI + JSON + SARIF output
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Scan compare, trends, and finding history
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Auto-fix codemods
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Inline PR comments and team collaboration
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Trend dashboard & analytics
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Slack and Discord notifications
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> PR decoration (inline comments)
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Team collaboration
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Slack & Discord alerts
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> AI triage, PR auto-fix, and compliance reports
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Credits never expire
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Volume discounts up to 45%
                 </li>
               </ul>
               <Link
                 href="/login"
                 className="mt-8 block w-full text-center rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white hover:bg-slate-800 transition"
               >
-                Get started
+                Connect GitHub
               </Link>
-              <p className="mt-3 text-center text-xs text-slate-500">30-day money-back guarantee</p>
+              <p className="mt-3 text-center text-xs text-slate-500">Starts with credits, then grows with usage.</p>
             </div>
 
             {/* Enterprise */}
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-8 flex flex-col">
-              <h3 className="text-xl font-semibold text-slate-900">Enterprise</h3>
-              <p className="mt-2 text-slate-600 text-sm">For organizations at scale</p>
+              <h3 className="text-xl font-semibold text-slate-900">Team and enterprise</h3>
+              <p className="mt-2 text-slate-600 text-sm">For higher limits, rollout help, and procurement</p>
               <div className="mt-6">
                 <span className="text-3xl font-bold text-slate-900">Custom</span>
               </div>
               <ul className="mt-8 space-y-3 text-sm text-slate-600 flex-1">
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Everything in Pay as you go
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Everything in Cloud workflow
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Unlimited repos & history
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Unlimited credits
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Custom quality gates
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> More projects, scans, and longer history
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Compliance reports
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Advanced gates, exports, and compliance reports
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> SSO / SAML
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Shared workspace, integrations, and governance
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Priority support & SLA
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Audit logs
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Contact for rollout support and procurement
                 </li>
               </ul>
               <a
@@ -882,28 +1068,34 @@ export default async function Home() {
       <section className="py-24 bg-white">
         <div className="mx-auto max-w-4xl px-6 text-center">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
-            Start scanning in 30 seconds
+            Try it locally first
           </h2>
           <p className="mt-4 text-lg text-slate-600">
-            No config files. No setup wizards. Just results.
+            Run the CLI on a repo, then connect GitHub when you want PR gates and shared history.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Link
-              href="/login"
+              href="/docs"
               className="group inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-4 text-base font-semibold text-white hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
             >
-              Connect GitHub
+              Install CLI
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
 
-            <CopyInstallButton command="pip install skylos" />
-            <a
-              href="mailto:founder@skylos.dev"
+            <Link
+              href="#proof"
               className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-8 py-4 text-base font-semibold text-slate-900 hover:bg-slate-50 transition-all"
             >
-              Book a Demo
+              See proof
               <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
-            </a>
+            </Link>
+            <Link
+              href="/login"
+              className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-8 py-4 text-base font-semibold text-slate-900 hover:bg-white transition-all"
+            >
+              Connect GitHub
+              <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
+            </Link>
           </div>
         </div>
       </section>
@@ -917,9 +1109,10 @@ export default async function Home() {
             <span className="text-slate-400 ml-4">© {new Date().getFullYear()}</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-slate-600">
-            <a href="https://docs.skylos.dev" target="_blank" rel="noopener noreferrer">
-            Docs
-            </a>
+            <Link href="/blog" className="hover:text-slate-900 transition">Blog</Link>
+            <Link href="/compare" className="hover:text-slate-900 transition">Compare</Link>
+            <Link href="/use-cases" className="hover:text-slate-900 transition">Use Cases</Link>
+            <a href={docsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-slate-900 transition">Docs</a>
             <Link href="/login" className="hover:text-slate-900 transition">Login</Link>
             <a href={DISCORD_URL} target="_blank" rel="noreferrer" className="hover:text-slate-900 transition">Discord</a>
             <a href="mailto:founder@skylos.dev" className="hover:text-slate-900 transition">Contact</a>
