@@ -85,7 +85,7 @@ CREATE POLICY "org_members_read_defense_scores" ON defense_scores
     FOR SELECT USING (
         project_id IN (
             SELECT p.id FROM projects p
-            JOIN organization_members om ON om.organization_id = p.org_id
+            JOIN organization_members om ON om.org_id = p.org_id
             WHERE om.user_id = auth.uid()
         )
     );
@@ -94,7 +94,7 @@ CREATE POLICY "org_members_read_defense_integrations" ON defense_integrations
     FOR SELECT USING (
         project_id IN (
             SELECT p.id FROM projects p
-            JOIN organization_members om ON om.organization_id = p.org_id
+            JOIN organization_members om ON om.org_id = p.org_id
             WHERE om.user_id = auth.uid()
         )
     );
@@ -103,7 +103,7 @@ CREATE POLICY "org_members_read_defense_findings" ON defense_findings
     FOR SELECT USING (
         project_id IN (
             SELECT p.id FROM projects p
-            JOIN organization_members om ON om.organization_id = p.org_id
+            JOIN organization_members om ON om.org_id = p.org_id
             WHERE om.user_id = auth.uid()
         )
     );
