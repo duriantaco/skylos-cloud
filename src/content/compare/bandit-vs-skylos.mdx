@@ -116,8 +116,8 @@ Skylos uses taint analysis. It traces data flow from user input sources (like `r
 cmd = request.args.get("command")
 subprocess.call(cmd, shell=True)     # SKY-D212: Command injection
 
-# Skylos does NOT flag this -- hardcoded command, no tainted input
-subprocess.call("ls -la", shell=True)  # No finding
+# Skylos flags SKY-D209 (shell=True) but NOT SKY-D212 -- no tainted input
+subprocess.call("ls -la", shell=True)  # Warning only, not a command injection finding
 ```
 
 The practical impact: Bandit reports tend to be noisier on codebases that use `subprocess`, `exec`, `eval`, or raw SQL with hardcoded strings. Skylos reports fewer findings but the ones it reports involve actual user-controlled data flow.
@@ -260,11 +260,11 @@ subprocess.call(user_cmd, shell=True)         # flagged
 
 **Skylos**:
 ```python
-# Skylos only flags when user-controlled data reaches the sink
+# Skylos flags the taint-aware command injection rule only when user input reaches the sink
 user_cmd = request.form.get("cmd")
-subprocess.call(user_cmd, shell=True)         # SKY-D212: flagged
+subprocess.call(user_cmd, shell=True)         # SKY-D212: command injection (tainted input)
 
-subprocess.call("ls -la", shell=True)         # not flagged (hardcoded)
+subprocess.call("ls -la", shell=True)         # SKY-D209: shell=True warning, but NO D212 (no tainted input)
 ```
 
 ### Hardcoded secrets
@@ -277,7 +277,7 @@ password = "admin123"
 
 **Skylos**:
 ```python
-# Skylos flags SKY-D201 (hardcoded credentials)
+# Skylos flags SKY-L014 (hardcoded credentials)
 API_KEY = "sk-1234567890abcdef"
 PASSWORD = "admin123"
 ```

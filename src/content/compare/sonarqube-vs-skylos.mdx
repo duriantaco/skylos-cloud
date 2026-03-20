@@ -223,7 +223,7 @@ cursor.execute(query)
 
 **Skylos**:
 ```python
-# Skylos flags this (SKY-D210: SQL injection via taint analysis)
+# Skylos flags this (SKY-D211: SQL injection via taint analysis)
 user_id = request.args.get("id")
 query = f"SELECT * FROM users WHERE id = {user_id}"
 cursor.execute(query)
@@ -244,7 +244,7 @@ password = "admin123"
 
 **Skylos**:
 ```python
-# Skylos flags this (SKY-D201: Hardcoded credentials)
+# Skylos flags this (SKY-L014: Hardcoded credentials)
 API_KEY = "sk-1234567890abcdef"
 DATABASE_PASSWORD = "production_password_123"
 ```

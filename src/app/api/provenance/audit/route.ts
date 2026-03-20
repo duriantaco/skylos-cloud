@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'format must be "json" or "csv"' }, { status: 400 });
   }
 
-  const auth = await requirePermission(supabase, 'read:scans');
+  const auth = await requirePermission(supabase, 'view:scans');
   if (isAuthError(auth)) return auth;
 
   const { data: org } = await supabase

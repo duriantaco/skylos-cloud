@@ -255,7 +255,7 @@ cursor.execute(query)
 
 **Skylos:**
 ```python
-# Skylos flags this (SKY-D210: SQL injection via taint analysis)
+# Skylos flags this (SKY-D211: SQL injection via taint analysis)
 query = f"SELECT * FROM users WHERE id = {request.args['id']}"
 cursor.execute(query)
 
