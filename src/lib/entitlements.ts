@@ -20,6 +20,8 @@ export type PlanCapabilities = {
   exportsEnabled: boolean;
   customRulesMax: number;
   maxSuppressionsPerProject: number;
+  provenanceDetailEnabled: boolean;
+  provenanceAuditEnabled: boolean;
 };
 
 export const PLAN_CAPABILITIES: Record<Plan, PlanCapabilities> = {
@@ -43,6 +45,8 @@ export const PLAN_CAPABILITIES: Record<Plan, PlanCapabilities> = {
     exportsEnabled: false,
     customRulesMax: 3,
     maxSuppressionsPerProject: 25,
+    provenanceDetailEnabled: false,
+    provenanceAuditEnabled: false,
   },
   pro: {
     maxScansStored: 500,
@@ -64,6 +68,8 @@ export const PLAN_CAPABILITIES: Record<Plan, PlanCapabilities> = {
     exportsEnabled: true,
     customRulesMax: 50,
     maxSuppressionsPerProject: 999999,
+    provenanceDetailEnabled: true,
+    provenanceAuditEnabled: false,
   },
   enterprise: {
     maxScansStored: 10000,
@@ -85,6 +91,8 @@ export const PLAN_CAPABILITIES: Record<Plan, PlanCapabilities> = {
     exportsEnabled: true,
     customRulesMax: 999999,
     maxSuppressionsPerProject: 999999,
+    provenanceDetailEnabled: true,
+    provenanceAuditEnabled: true,
   },
 };
 
@@ -165,6 +173,14 @@ export function canExport(plan: Plan): boolean {
   return getCapabilities(plan).exportsEnabled;
 }
 
+export function canViewProvenanceDetail(plan: Plan): boolean {
+  return getCapabilities(plan).provenanceDetailEnabled;
+}
+
+export function canUseProvenanceAudit(plan: Plan): boolean {
+  return getCapabilities(plan).provenanceAuditEnabled;
+}
+
 export function getPlanFeatures(plan: Plan): { name: string; enabled: boolean }[] {
   const caps = getCapabilities(plan);
   return [
@@ -185,5 +201,7 @@ export function getPlanFeatures(plan: Plan): { name: string; enabled: boolean }[
     { name: "Compliance reports", enabled: caps.complianceEnabled },
     { name: "Full trends & analytics", enabled: caps.fullTrendsEnabled },
     { name: "Findings export", enabled: caps.exportsEnabled },
+    { name: "AI provenance detail", enabled: caps.provenanceDetailEnabled },
+    { name: "Provenance compliance export", enabled: caps.provenanceAuditEnabled },
   ];
 }

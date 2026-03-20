@@ -1,0 +1,344 @@
+---
+title: "SonarQube vs Skylos: Enterprise Code Quality Platform vs AI Code Security Scanner"
+excerpt: "An honest comparison of SonarQube and Skylos. SonarQube is a mature enterprise platform with 30+ languages and millions of users. Skylos is a focused tool for catching what AI writes wrong and what AI silently removes."
+publishedAt: "2026-03-20"
+updatedAt: "2026-03-20"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "Python teams evaluating lighter alternatives to SonarQube deserve a clear picture of what they gain and what they lose. This comparison is especially relevant for teams using AI coding assistants where SonarQube's traditional analysis model leaves gaps."
+methodology:
+  - "Compared tool capabilities based on current SonarQube documentation, public feature lists, and direct CLI experience with both tools."
+  - "Focused on Python-centric workflows since that is where the tools overlap most directly."
+  - "Called out SonarQube's clear advantages in enterprise governance, language breadth, and maturity."
+tags: ["sast", "comparison", "python", "enterprise"]
+keywords:
+  - sonarqube alternative
+  - sonarqube alternative open source
+  - sonarqube vs skylos
+  - sonarqube alternative python
+  - sonarqube lightweight alternative
+  - sonarqube alternative for small teams
+  - python static analysis tools
+  - sonarqube python scanner
+  - lightweight sast tool python
+  - sonarqube self-hosted alternative
+canonicalUrl: "/compare/sonarqube-vs-skylos"
+---
+
+# SonarQube vs Skylos: Enterprise Code Quality Platform vs AI Code Security Scanner
+
+SonarQube is one of the most widely adopted code quality platforms in the world. It supports 30+ languages, has millions of users, and is the default choice for enterprise engineering organizations that need quality gates, portfolio management, and governance dashboards. It has been around since 2007 and has earned its position.
+
+Skylos is a smaller, more focused tool. It combines security scanning, dead code detection, and code quality metrics for Python, TypeScript, and Go. Its specific niche is catching problems introduced by AI coding assistants — including when AI silently removes security controls during refactoring.
+
+This is not a "Skylos is better" comparison. SonarQube is a more mature, more broadly capable platform. But there are specific use cases where Skylos addresses gaps that SonarQube does not cover, and there are teams for whom SonarQube is more than they need. This page is for those teams.
+
+---
+
+## The short version
+
+| | SonarQube | Skylos |
+|---|-----------|--------|
+| **Best for** | Enterprise governance, multi-language quality gates, portfolio management | Python-focused teams, AI code security, dead code detection |
+| **Languages** | 30+ | Python, TypeScript, Go |
+| **Security scanning** | Yes (extensive rule library) | Yes (50+ built-in rules with taint analysis) |
+| **Dead code detection** | Limited (unused imports, some unreachable code) | Yes (with transitive propagation and LLM verification) |
+| **Code quality metrics** | Yes (comprehensive) | Yes (complexity, coupling, cohesion) |
+| **AI regression detection** | No | Yes (13 categories of removed security controls) |
+| **AI provenance tracking** | No | Yes (which AI agent introduced which vulnerability) |
+| **AI defense scanning** | No | Yes (13 plugins, OWASP LLM Top 10) |
+| **Custom rules** | Yes (via profiles and plugins) | No |
+| **IDE integration** | Yes (SonarLint) | No |
+| **Setup** | Server deployment (self-hosted or cloud) | `pip install skylos` |
+| **CI/CD** | Yes (scanner + server) | Yes (auto-generated workflows) |
+| **Pricing** | Free (Community) / Paid (Developer, Enterprise, Data Center) | Free (OSS) / Paid (Cloud credits) |
+
+---
+
+## Where SonarQube is stronger
+
+### Language breadth
+
+SonarQube covers Java, C#, JavaScript, TypeScript, Python, Go, C, C++, Kotlin, Ruby, PHP, Swift, Scala, and many more. If you have a polyglot organization with a dozen services in different languages, SonarQube scans all of them under one roof. Skylos covers three languages.
+
+### Enterprise governance
+
+SonarQube was built for organizations with hundreds of developers and dozens of repositories. It provides:
+
+- **Quality profiles**: standardized rule sets across teams
+- **Quality gates**: pass/fail criteria enforced across the org
+- **Portfolio views**: aggregate quality metrics across all projects
+- **RBAC**: role-based access control for different teams
+- **Branch analysis**: quality tracking across feature branches
+- **Pull request decoration**: inline comments on PRs
+
+These features matter when you are running a security or quality program at scale. Skylos has CI/CD integration and PR comments, but it does not have org-wide governance features.
+
+### Massive rule library
+
+SonarQube has thousands of built-in rules across its supported languages. For Python alone, it covers reliability, security, maintainability, and code smell categories with hundreds of rules. Skylos has roughly 50 built-in security rules for Python. The gap in rule coverage is significant.
+
+### IDE integration via SonarLint
+
+SonarLint brings SonarQube findings directly into VS Code, IntelliJ, and other IDEs. Developers see issues as they type, before they even commit. Skylos does not have an IDE plugin. It runs as a CLI tool or in CI.
+
+### Maturity and ecosystem
+
+SonarQube has been in production since 2007. It has extensive documentation, an active community, professional support, and integrations with every major CI/CD platform, issue tracker, and DevOps toolchain. Skylos is newer and has a smaller community.
+
+### Quality gate enforcement
+
+SonarQube's quality gate system is well thought out. You define conditions (e.g., "no new critical issues," "coverage above 80%," "no security hotspots"), and SonarQube enforces them across every project in the organization. This is table stakes for enterprise code quality programs, and SonarQube does it better than almost any other tool.
+
+---
+
+## Where Skylos is stronger
+
+### AI regression detection
+
+This is the core gap that Skylos addresses.
+
+SonarQube analyzes code as it is. It scans the current state of a file and reports issues in that snapshot. It does not compare the current state to the previous state to detect what was removed.
+
+Skylos does diff-aware analysis. It detects when AI coding assistants silently remove security controls during refactoring:
+
+```python
+# Before AI refactoring
+@login_required                    # auth decorator
+@csrf_protect                      # CSRF protection
+@rate_limit("10/minute")           # rate limiting
+def transfer_funds(request):
+    validate_amount(request.POST["amount"])
+    process_transfer(request)
+
+# After AI refactoring — AI "cleaned up" the function
+def transfer_funds(request):       # Skylos flags: auth, CSRF, rate limit REMOVED
+    process_transfer(request)
+```
+
+SonarQube would analyze the "after" version and see no issues — the code is syntactically valid and has no security bugs in the remaining code. The problem is what is missing, not what is present. Skylos detects 13 categories of removed security controls: authentication, authorization, CSRF, rate limiting, input validation, output encoding, error handling, logging, session management, encryption, security headers, content security policy, and CORS configuration.
+
+### AI provenance tracking
+
+Skylos tracks which AI agent introduced which vulnerability by examining git provenance. If Cursor added a hardcoded API key on Tuesday and Copilot introduced a SQL injection on Wednesday, Skylos attributes each finding to the specific tool.
+
+SonarQube does not track AI authorship. It reports findings against the current code without distinguishing whether a human or an AI wrote it.
+
+### AI defense scanning
+
+Skylos includes a dedicated defense scanning module for applications that integrate with LLMs:
+
+```bash
+skylos defend .
+```
+
+This runs 13 plugins that check for:
+
+- Untrusted input flowing directly into LLM prompts (prompt injection)
+- Missing RAG context isolation
+- Missing PII filtering on LLM outputs
+- Missing rate limiting and cost controls on LLM API calls
+- Missing logging for LLM interactions
+
+These map to the OWASP LLM Top 10. SonarQube does not have LLM-specific security rules. As more applications integrate with GPT, Claude, and other LLMs, this coverage gap will grow.
+
+### Dead code detection
+
+SonarQube detects some dead code patterns — unused imports, unreachable code after return statements, unused local variables. But it is not a dedicated dead code detection tool.
+
+Skylos does full dead code analysis with transitive propagation:
+
+```python
+def process_refund(order_id):          # dead — nothing calls this
+    validated = _validate_refund(order_id)  # also dead (transitive)
+    _send_refund_email(validated)            # also dead (transitive)
+```
+
+Skylos also has an LLM verification agent that achieves 100% accuracy (35/35) on real-world codebases (pip-tools, tox, mesa), matching Claude Code's verification accuracy.
+
+On benchmarks across 9 popular Python repositories with 350k+ combined GitHub stars, Skylos achieved 98.1% recall versus Vulture's 84.6%, with 3x fewer false positives (220 vs 644).
+
+SonarQube would not flag the `process_refund` function above unless it could determine it is unreachable, and it does not do transitive dead code propagation.
+
+### Framework-aware analysis
+
+Skylos has built-in framework visitors for Django, Flask, FastAPI, Pydantic, pytest, Celery, and Click. It understands that `@app.route` handlers are HTTP entry points, `@pytest.fixture` functions are called by the test runner, and Pydantic `model_validator` methods are invoked during validation.
+
+SonarQube handles some framework patterns through its rule definitions, but its Python framework awareness is more limited, particularly for newer frameworks like FastAPI and for pytest fixture detection.
+
+### Setup and time to first scan
+
+SonarQube requires a server. Even SonarQube Community Edition needs a running instance (Java-based), a database, and project configuration. SonarCloud (the hosted version) requires signup and project onboarding.
+
+Skylos is a pip package:
+
+```bash
+pip install skylos
+skylos . -a
+```
+
+That is the entire setup. First scan results in under 30 seconds on most codebases.
+
+For CI/CD:
+
+```bash
+skylos cicd init
+```
+
+This generates a complete GitHub Actions workflow with PR scanning, inline comments, and quality gates. SonarQube CI setup involves installing the scanner, configuring the server URL, setting up authentication tokens, and defining project keys.
+
+### No "Community" vs "Enterprise" feature gating
+
+SonarQube Community Edition is free but limited. Branch analysis, pull request decoration, and several language analyzers are only available in the paid Developer or Enterprise editions. This creates a common frustration: teams start with SonarQube Community, grow to need branch analysis, and then face a purchasing decision.
+
+Skylos is Apache 2.0 licensed. All analysis features — security scanning, dead code detection, quality metrics, AI regression detection, AI defense scanning — are available in the open-source CLI. The paid cloud dashboard adds upload, history, and team features, but the analysis itself is not gated.
+
+### MCP server for AI agents
+
+Skylos includes an MCP (Model Context Protocol) server that provides real-time security scanning inside AI coding agents like Claude Code and Cursor:
+
+```bash
+skylos-mcp
+```
+
+This means AI agents can check their own output for security vulnerabilities as they generate code. SonarQube does not have an equivalent integration point for AI coding assistants.
+
+---
+
+## Detection comparison: real examples
+
+### SQL injection
+
+**SonarQube**:
+```python
+# SonarQube flags this (S3649: SQL injection)
+query = "SELECT * FROM users WHERE id = " + user_id
+cursor.execute(query)
+```
+
+**Skylos**:
+```python
+# Skylos flags this (SKY-D210: SQL injection via taint analysis)
+user_id = request.args.get("id")
+query = f"SELECT * FROM users WHERE id = {user_id}"
+cursor.execute(query)
+
+# Skylos does NOT flag this — hardcoded value, not user-controlled
+cursor.execute("SELECT * FROM users WHERE active = 1")
+```
+
+Both tools catch SQL injection. SonarQube has broader rule coverage across more SQL patterns. Skylos uses taint analysis to distinguish user-controlled input from hardcoded values.
+
+### Hardcoded secrets
+
+**SonarQube**:
+```python
+# SonarQube flags this (S6418: Hardcoded credentials)
+password = "admin123"
+```
+
+**Skylos**:
+```python
+# Skylos flags this (SKY-D201: Hardcoded credentials)
+API_KEY = "sk-1234567890abcdef"
+DATABASE_PASSWORD = "production_password_123"
+```
+
+Both catch this category. SonarQube has more patterns for provider-specific API key formats.
+
+### Security control removal (Skylos only)
+
+```python
+# Skylos flags this — AI removed auth decorator in a refactoring commit
+# SonarQube does not detect this because the remaining code is valid
+
+# git diff shows:
+# -@login_required
+# -@csrf_protect
+def admin_panel(request):
+    return render(request, "admin.html")
+```
+
+This is the category where Skylos provides coverage that SonarQube does not. SonarQube cannot detect what was removed because it only analyzes the current state.
+
+---
+
+## When to use SonarQube
+
+- You have a **multi-language** organization (not just Python)
+- You need **enterprise governance**: quality profiles, quality gates, portfolio views
+- You need **RBAC and compliance** features
+- You want **IDE integration** via SonarLint
+- You need a **proven platform** with professional support and SLAs
+- You are running a formal **security program** across dozens of projects
+- Dead code detection and AI-specific scanning are not priorities
+
+## When to use Skylos
+
+- Your codebase is **primarily Python** (or Python + TypeScript + Go)
+- Your team uses **AI coding assistants** (Cursor, Copilot, Claude Code) and you want to catch regressions
+- You want **dead code detection** with transitive propagation and LLM verification
+- You build applications that **integrate with LLMs** and need OWASP LLM Top 10 coverage
+- You want a **local-first tool** without server deployment
+- You want **security + dead code + quality** in a single `pip install`
+- You need **30-second CI/CD setup** rather than server configuration
+
+## When to use both
+
+SonarQube and Skylos do not conflict. A practical setup for teams that use both:
+
+- **SonarQube** for enterprise governance, multi-language quality gates, and portfolio-level visibility
+- **Skylos** for AI regression detection, dead code cleanup, and LLM app security
+
+SonarQube tells you what is wrong with your code right now. Skylos also tells you what changed — and catches when AI removes your security controls.
+
+---
+
+## Quick start
+
+### SonarQube
+
+```bash
+# Community Edition (self-hosted)
+docker run -d --name sonarqube -p 9000:9000 sonarqube:community
+
+# Then: create project, generate token, configure scanner
+sonar-scanner \
+  -Dsonar.projectKey=my-project \
+  -Dsonar.sources=src/ \
+  -Dsonar.host.url=http://localhost:9000 \
+  -Dsonar.token=your-token
+```
+
+### Skylos
+
+```bash
+pip install skylos
+skylos src/ --danger --quality
+```
+
+---
+
+## Final thoughts
+
+SonarQube is the incumbent for a reason. It is mature, broadly capable, and trusted by enterprises worldwide. If you need a platform that covers 30+ languages with governance features, quality profiles, and portfolio management, SonarQube is the standard choice. Skylos is not trying to replace that.
+
+Where Skylos adds value is in a specific and growing problem space: AI-generated code security. Traditional SAST tools analyze code as it exists. They are good at finding what is wrong. They are not designed to find what is missing — and "missing security controls" is exactly how AI coding assistants introduce the most dangerous vulnerabilities. They refactor a function and quietly drop the auth decorator. They rewrite a module and forget the rate limiter.
+
+If your team ships AI-generated code (and most teams do now), consider whether your current tooling catches what AI removes, not just what AI adds. That is the gap Skylos was built for.
+
+---
+
+## Related
+
+- [Semgrep vs Skylos](/compare/semgrep-vs-skylos)
+- [Deadcode vs Vulture vs Skylos](/compare/deadcode-vs-vulture-vs-skylos)
+- [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)
+- [How to Detect Dead Code in Python](/use-cases/detect-dead-code-python)
+- [How to Catch Hallucinated Imports in AI Code](/use-cases/ai-generated-code-security)
+
+---
+
+*Both tools are open source. [SonarQube](https://github.com/SonarSource/sonarqube) | [Skylos](https://github.com/duriantaco/skylos) | [Skylos Docs](https://docs.skylos.dev) | [Install Skylos](https://pypi.org/project/skylos/)*

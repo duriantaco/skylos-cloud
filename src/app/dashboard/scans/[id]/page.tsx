@@ -7,10 +7,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, CheckCircle, XCircle, FileText, ChevronRight, ChevronDown,
   Search, ExternalLink, AlertTriangle, Lock, Unlock, Ban, Shield, Terminal, X, ChevronUp,
-  Share2, Link2, Check,
+  Share2, Link2, Check, Fingerprint,
 } from "lucide-react";
 import FlowVisualizerButton from "@/components/FlowVisualizerButton";
 import FixPrButton from "@/components/FixPrButton";
+import ProFeatureLock from "@/components/ProFeatureLock";
+import ProvenanceDetail from "@/components/ProvenanceDetail";
 
 type Scan = {
   id: string;
@@ -71,6 +73,14 @@ type Scan = {
     };
   };
   projects?: { name: string; repo_url: string };
+  provenance_summary?: {
+    total_files: number;
+    agent_count: number;
+    human_count: number;
+    agents_seen: string[];
+  } | null;
+  provenance_agent_count?: number;
+  provenance_confidence?: string | null;
   share_token?: string | null;
   is_public?: boolean;
 };
@@ -419,6 +429,8 @@ export default function ScanDetailsPage() {
   const [search, setSearch] = useState('');
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   const [expandedFiles, setExpandedFiles] = useState<Record<string, boolean>>({});
+  const [showAiOnly, setShowAiOnly] = useState(false);
+  const [provenanceFiles, setProvenanceFiles] = useState<string[]>([]);
 
   const [isOverriding, setIsOverriding] = useState(false);
   const [isSuppressing, setIsSuppressing] = useState(false);
@@ -514,6 +526,17 @@ export default function ScanDetailsPage() {
 
     if (findingsData) {
       setFindings(findingsData as Finding[]);
+    }
+
+    // Fetch provenance files for AI-authored filter
+    const { data: provFiles } = await supabase
+      .from("provenance_files")
+      .select("file_path")
+      .eq("scan_id", id)
+      .eq("agent_authored", true);
+
+    if (provFiles) {
+      setProvenanceFiles(provFiles.map((f: any) => f.file_path));
     }
 
     // Fetch plan for gating
@@ -626,9 +649,12 @@ export default function ScanDetailsPage() {
           return false;
         }
       }
+      if (showAiOnly && provenanceFiles.length > 0) {
+        if (!provenanceFiles.includes(f.file_path)) return false;
+      }
       return true;
     });
-  }, [viewFindings, activeTab, search]);
+  }, [viewFindings, activeTab, search, showAiOnly, provenanceFiles]);
 
   useEffect(() => {
     if (filteredFindings.length > 0 && !selectedFinding) {
@@ -921,6 +947,35 @@ export default function ScanDetailsPage() {
         </div>
       )}
 
+      {/* AI Provenance Panel */}
+      {scan.provenance_agent_count != null && scan.provenance_agent_count > 0 && scan.provenance_summary && (
+        <div className="mx-4 mb-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Fingerprint className="w-4 h-4 text-violet-600" />
+              <span className="text-sm font-bold text-violet-900">AI Provenance</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">
+                {scan.provenance_agent_count} AI FILES
+              </span>
+            </div>
+            <span className="text-xs text-violet-600">
+              {scan.provenance_confidence} confidence &middot; {scan.provenance_summary.agents_seen?.join(', ')}
+            </span>
+          </div>
+
+          {userPlan === 'free' ? (
+            <div className="mt-3">
+              <ProFeatureLock
+                feature="Per-file AI provenance breakdown"
+                description="See which files were AI-authored, by which agent, with exact line ranges"
+              />
+            </div>
+          ) : (
+            <ProvenanceDetail scanId={scan.id} />
+          )}
+        </div>
+      )}
+
       {/* AI Defense Panel */}
       {scan.defense_score && (
         <div className="mx-4 mb-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
@@ -1030,6 +1085,24 @@ export default function ScanDetailsPage() {
               )}
               {counts.REVIEW > 0 && (
                 <TabButton label="Review" active={activeTab === 'REVIEW'} onClick={() => setActiveTab('REVIEW')} count={counts.REVIEW} />
+              )}
+              {provenanceFiles.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (userPlan === 'free') return;
+                    setShowAiOnly(!showAiOnly);
+                  }}
+                  className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
+                    showAiOnly
+                      ? 'bg-violet-100 text-violet-700 border-violet-300'
+                      : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-violet-50'
+                  } ${userPlan === 'free' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={userPlan === 'free' ? 'Pro feature: filter by AI-authored files' : 'Show only AI-authored files'}
+                >
+                  {userPlan === 'free' && <Lock className="w-2.5 h-2.5 inline mr-0.5" />}
+                  <Fingerprint className="w-2.5 h-2.5 inline mr-0.5" />
+                  AI
+                </button>
               )}
             </div>
           </div>

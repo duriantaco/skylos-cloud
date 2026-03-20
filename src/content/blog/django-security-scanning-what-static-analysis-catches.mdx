@@ -1,0 +1,444 @@
+---
+title: "Django Security Scanning: What Static Analysis Actually Catches in 2026"
+excerpt: "Django's ORM prevents SQL injection — until your code uses raw(), .extra(), or cursor.execute(). Here are 7 real vulnerability patterns in Django applications, which tools detect each one, and how to test them yourself."
+publishedAt: "2026-03-13"
+updatedAt: "2026-03-13"
+author:
+  name: "Skylos team"
+  role: "Product engineering"
+  type: "Organization"
+whyThisExists: "Django is the most-used Python web framework in production. Most teams have no idea which vulnerability patterns static analysis catches in Django code versus which it misses. This guide documents 7 real patterns with reproducible examples so teams can evaluate tools themselves."
+tags: ["security", "django", "sast", "python"]
+keywords:
+  - django security scanning
+  - django static analysis
+  - django vulnerability scanner
+  - django SAST tools
+  - django security best practices 2026
+  - bandit django security
+  - semgrep django rules
+  - django SQL injection detection
+  - django dead code detection
+  - django ORM security
+  - python web framework security scan
+  - django security audit
+  - secure django application
+  - django code review security
+  - static analysis django project
+  - django security checklist
+canonicalUrl: "/blog/django-security-scanning-what-static-analysis-catches"
+---
+
+# Django security scanning: what static analysis actually catches
+
+Most Django teams assume their code is safe because they use the ORM. The ORM handles SQL injection, right?
+
+Mostly. But Django applications are far more than ORM calls. They include raw SQL, subprocess invocations, file handling, auth decorator logic, Celery tasks, management commands, template tags, signals, middleware, and admin customizations.
+
+Static analysis tools can find real issues in all of these — but each tool catches different patterns. This guide breaks down 7 real vulnerability categories in Django code, explains which tools detect each one, and gives you the code to test it yourself.
+
+## TL;DR: what gets caught, what gets missed
+
+| Vulnerability pattern | Bandit | Semgrep | Skylos |
+|:---|:---|:---|:---|
+| **SQL injection via `raw()` with f-strings** | Yes | Yes | Yes |
+| **ORM bypass via `.extra()`, `RawSQL`** | No | Yes (Django ruleset) | Yes |
+| **Subprocess injection in management commands** | Partial (flags all `shell=True`) | Yes | Yes |
+| **Hardcoded secrets** | Yes | Yes | Yes |
+| **SSRF in views** | No | Partial | Yes |
+| **Insecure deserialization** | Yes | Yes | Yes |
+| **Dead views / dead Celery tasks** | No | No | Yes |
+
+Every "Yes" and "No" in this table is based on documented tool behavior and publicly available rule sets. You can verify each one with the example code below.
+
+---
+
+## Pattern 1: SQL injection in raw queries
+
+Django's ORM is safe by default. But every Django codebase eventually has raw SQL — reporting queries, bulk operations, legacy migrations.
+
+```python
+# VULNERABLE: user input interpolated into raw SQL
+def search_users(request):
+    query = request.GET.get("q")
+    users = User.objects.raw(f"SELECT * FROM auth_user WHERE username LIKE '%{query}%'")
+    return render(request, "results.html", {"users": users})
+```
+
+```python
+# SAFE: parameterized query
+def search_users(request):
+    query = request.GET.get("q")
+    users = User.objects.raw(
+        "SELECT * FROM auth_user WHERE username LIKE %s",
+        [f"%{query}%"]
+    )
+    return render(request, "results.html", {"users": users})
+```
+
+**Bandit** flags both versions. It triggers `B703` on any string formatting near SQL-like methods, but it doesn't distinguish parameterized queries from vulnerable ones. This is a documented limitation — Bandit is pattern-based, not dataflow-aware.
+
+**Semgrep** catches the vulnerable version with `python.django.security.injection.sql.sql-injection-using-raw`. It understands Django's parameterized `raw()` syntax and does not flag the safe version.
+
+**Skylos** catches the vulnerable version via taint analysis — tracing data from `request.GET` through the f-string into `raw()`.
+
+**Try it yourself:**
+
+```bash
+# Save the vulnerable example as test_raw.py, then:
+bandit test_raw.py          # Expect B703
+semgrep --config p/django test_raw.py  # Expect sql-injection-using-raw
+skylos test_raw.py --danger            # Expect SQL injection finding
+```
+
+---
+
+## Pattern 2: ORM bypass methods
+
+Beyond `raw()`, Django has several ORM methods that bypass query parameterization. These are the ones that surprise teams:
+
+```python
+# VULNERABLE: .extra() with user input — deprecated since Django 3.0 but still in production code
+queryset.extra(select={"full_name": f"first_name || ' ' || '{user_input}'"})
+
+# VULNERABLE: RawSQL expression with interpolation
+from django.db.models.expressions import RawSQL
+queryset.annotate(val=RawSQL(f"SELECT col FROM other WHERE id = {param}", []))
+
+# VULNERABLE: cursor.execute() with f-string — common in management commands
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(f"DELETE FROM logs WHERE date < '{cutoff}'")
+```
+
+**Bandit** does not have specific rules for `.extra()` or `RawSQL`. It may catch `cursor.execute()` if the string formatting is obvious, but it's inconsistent.
+
+**Semgrep** catches `.extra()` and `RawSQL` with the Django ruleset (`python.django.security.injection.sql.sql-injection-using-extra-where` and similar rules). It may miss `cursor.execute()` in management commands unless you add a custom rule.
+
+**Skylos** catches all three via taint analysis on Django's database layer.
+
+**Why this matters:** `.extra()` is [deprecated](https://docs.djangoproject.com/en/5.0/ref/models/querysets/#extra) but still present in thousands of production codebases. `RawSQL` is the recommended replacement for some `.extra()` use cases but is equally dangerous with string interpolation.
+
+---
+
+## Pattern 3: Subprocess injection in management commands
+
+Management commands are a blind spot because developers think of them as internal tools:
+
+```python
+# VULNERABLE: management command with user-controlled subprocess
+from django.core.management.base import BaseCommand
+import subprocess
+
+class Command(BaseCommand):
+    def add_arguments(self, parser):
+        parser.add_argument("--repo", type=str)
+
+    def handle(self, *args, **options):
+        repo = options["repo"]
+        subprocess.run(f"git clone {repo} /tmp/analysis", shell=True)
+```
+
+The `--repo` argument comes from the command line, but management commands can also be called programmatically via `call_command("mycommand", repo=untrusted_input)` — which means the input may not always be trusted.
+
+**Bandit** catches `shell=True` with `B602`. However, Bandit flags *every* `subprocess.run(shell=True)` equally — including `subprocess.run("ls -la", shell=True)` where the command is hardcoded. This makes it noisy in Django projects that use subprocess for build scripts or deployment tasks.
+
+**Semgrep** catches it with `python.lang.security.audit.subprocess-shell-true`. Same broad approach as Bandit but the rule metadata is more informative.
+
+**Skylos** distinguishes between hardcoded commands and user-controlled input by tracing data flow from `options["repo"]` through the f-string into `subprocess.run()`.
+
+**Try it yourself:**
+
+```bash
+# Save as myapp/management/commands/clone_repo.py
+bandit myapp/ -r     # Expect B602 on shell=True
+semgrep --config auto myapp/  # Expect subprocess-shell-true
+skylos myapp/ --danger        # Expect command injection finding
+```
+
+---
+
+## Pattern 4: Broken auth decorator patterns
+
+This category is where framework awareness matters most — and where most tools are blind.
+
+```python
+# RISKY: requires login but not staff/permission check
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
+from django.views import View
+
+class AdminReportView(View):
+    @method_decorator(login_required)
+    def get(self, request):
+        # Any authenticated user can access revenue data
+        return JsonResponse(get_revenue_data())
+```
+
+The view requires login but not `@staff_member_required` or `@permission_required("reports.view_revenue")`. Any authenticated user — including a customer with a free account — can access admin revenue data.
+
+Another pattern:
+
+```python
+# RISKY: class-based view with dispatch override
+@method_decorator(login_required, name="dispatch")
+class SensitiveView(View):
+    def dispatch(self, request, *args, **kwargs):
+        # This code runs — but does the decorator protect it?
+        # It depends on MRO and how method_decorator wraps dispatch.
+        log_access(request)
+        return super().dispatch(request, *args, **kwargs)
+```
+
+**Bandit** does not analyze Django decorators or view dispatch. No detection.
+
+**Semgrep** does not have a built-in rule for checking decorator sufficiency on class-based views. You could write a custom rule, but matching decorator ordering on CBVs is complex in a pattern-matching system.
+
+**Skylos** can flag views that access sensitive models without corresponding permission decorators, because it understands Django's view dispatch chain and decorator wrapping.
+
+**Why this matters:** Broken access control is [#1 on the OWASP Top 10](https://owasp.org/Top10/A01_2021-Broken_Access_Control/). It's also one of the hardest categories for static analysis because "is this view properly protected?" depends on business context, not just code patterns.
+
+---
+
+## Pattern 5: Dead views and orphaned URL patterns
+
+Every Django project accumulates views that are no longer routed:
+
+```python
+# views.py — this function exists but no URL pattern points to it
+def legacy_export(request):
+    """Export user data to CSV — replaced by DRF endpoint in v2."""
+    users = User.objects.all().values("email", "first_name", "last_name", "date_joined")
+    # ... builds CSV with PII
+    return HttpResponse(content, content_type="text/csv")
+```
+
+Dead views are not just tech debt. They're importable and functional — if someone later adds a URL pattern pointing to one (or if a dynamic URL resolver picks it up), the code executes. When dead views handle PII or bypass current auth patterns, they become real attack surface.
+
+**Bandit** has no concept of URL routing. It cannot tell whether a view is reachable.
+
+**Semgrep** is pattern-based. It cannot cross-reference function definitions in `views.py` against `urlpatterns` in `urls.py`.
+
+**Skylos** performs cross-module analysis and can flag view functions that have no corresponding URL route as dead code candidates.
+
+**How to check manually:**
+
+```bash
+# Find all view functions/classes
+grep -rn "def .*request" myapp/views/ | head -20
+
+# Find all URL patterns
+grep -rn "path\|re_path\|url(" myapp/urls/ | head -20
+
+# Compare the two lists — any view not referenced is a candidate
+```
+
+Static analysis automates this comparison across the entire project.
+
+---
+
+## Pattern 6: Dead Celery tasks
+
+Same problem as dead views, different surface:
+
+```python
+# tasks.py
+from celery import shared_task
+
+@shared_task
+def send_weekly_digest(user_id):
+    """Sends weekly email digest — disabled Q3 2025, never removed."""
+    user = User.objects.get(id=user_id)
+    send_email(user.email, build_digest(user))
+```
+
+If this task isn't called from any `.delay()`, `.apply_async()`, or `CELERYBEAT_SCHEDULE` configuration, it's dead. But it's still registered with Celery's task registry, which means it can be invoked via the Celery CLI, the Flower dashboard, or a crafted message to the broker.
+
+**Bandit** does not analyze task registration or invocation patterns.
+
+**Semgrep** does not have built-in rules for Celery task liveness.
+
+**Skylos** can detect `@shared_task` and `@app.task` decorated functions that have no corresponding `.delay()` or `.apply_async()` call anywhere in the codebase, flagging them as dead code.
+
+**How to check manually:**
+
+```bash
+# Find all task definitions
+grep -rn "@shared_task\|@app.task" myapp/
+
+# Find all task invocations
+grep -rn "\.delay(\|\.apply_async(" myapp/
+
+# Cross-reference — any defined task not invoked is a candidate
+```
+
+---
+
+## Pattern 7: SSRF in DRF views
+
+Server-Side Request Forgery is increasingly common in API backends that accept callback URLs or webhook configurations:
+
+```python
+# VULNERABLE: user-controlled URL passed to requests.get()
+from rest_framework.views import APIView
+from rest_framework.response import Response
+import requests
+
+class WebhookTestView(APIView):
+    def post(self, request):
+        url = request.data.get("callback_url")
+        response = requests.get(url, timeout=5)
+        return Response({"status": response.status_code})
+```
+
+An attacker can pass `http://169.254.169.254/latest/meta-data/` (AWS metadata endpoint) or internal service URLs to probe the network from inside your infrastructure.
+
+**Bandit** does not have SSRF-specific rules.
+
+**Semgrep** has partial coverage. Rules like `python.requests.security.no-auth-over-http` catch some HTTP patterns but don't specifically trace user input into `requests.get()` in the DRF context.
+
+**Skylos** traces data from `request.data` through to `requests.get()` via taint analysis.
+
+**Try it yourself:**
+
+```bash
+# Save the example as test_ssrf.py
+semgrep --config auto test_ssrf.py
+skylos test_ssrf.py --danger
+```
+
+---
+
+## The false positive problem in Django projects
+
+Detection is only useful if the signal-to-noise ratio is manageable. Here's where Django projects specifically suffer:
+
+### Bandit's known Django false positives
+
+Bandit flags these in virtually every Django project:
+
+- **`mark_safe()`** — triggers `B703` ("potential XSS") even on static strings like `mark_safe("<br>")`. In Django, `mark_safe()` on trusted content is the intended API.
+- **`assert` statements** — triggers `B101` ("assert used") on every test assertion. Django test suites use `assert` extensively.
+- **`SECRET_KEY` in settings** — triggers `B105` ("hardcoded password"). Django's `SECRET_KEY` in `settings.py` is expected; the real question is whether `settings.py` is committed with a production secret.
+- **`yaml.load()`** — triggers `B506` even with `Loader=SafeLoader`. This was fixed in newer Bandit versions but older pinned versions still flag it.
+
+If you use Bandit on a Django project, configure a `.bandit.yml` to skip the noisiest rules:
+
+```yaml
+# .bandit.yml — reduce Django-specific noise
+skips:
+  - B101  # assert in tests
+  - B703  # mark_safe (handle with Semgrep/Skylos instead)
+```
+
+### Semgrep's advantage: Django-specific rulesets
+
+Semgrep's `p/django` ruleset was written specifically for Django. It understands:
+
+- `mark_safe()` context
+- ORM parameterization patterns
+- Django settings conventions
+
+This dramatically reduces false positives compared to generic Python scanning. If you only use one tool, Semgrep with the Django ruleset is a strong default.
+
+### Framework-aware analysis
+
+Tools that understand Django's internal wiring — decorator dispatch, URL routing, ORM methods, task registration — produce fewer false positives because they don't flag framework-intended patterns as suspicious. This is the core advantage of framework-aware static analysis.
+
+---
+
+## What static analysis cannot catch
+
+Be honest about the limits. No tool in this category detects:
+
+- **Business logic authorization bugs**: a view that correctly requires `login_required` but serves data the user shouldn't see based on their subscription tier
+- **Race conditions**: TOCTOU bugs in balance checks, inventory management, or coupon redemption
+- **Misconfigured deployment settings**: `DEBUG = True` in production requires runtime or infrastructure-level checks
+- **Complex template injection**: Jinja2/Django template logic that builds HTML through multiple layers of context
+- **Logic errors in permission checks**: `if user.is_staff or user.is_superuser` when the intent was `and`
+
+Static analysis finds bugs that follow structural patterns. Logic bugs and business rule violations require code review, integration testing, or runtime monitoring.
+
+---
+
+## Setting up Django security scanning in CI
+
+The highest-impact approach is layering tools, each catching what others miss:
+
+```yaml
+# .github/workflows/security.yml
+name: Django Security Scan
+on: [pull_request]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: pip install bandit semgrep skylos
+
+      - name: Skylos (framework-aware scan)
+        run: skylos myproject/ --danger --quality --ci
+
+      - name: Semgrep (Django rules)
+        run: semgrep --config p/django myproject/ --error
+
+      - name: Bandit (broad sweep, tuned)
+        run: bandit -r myproject/ -c .bandit.yml --exit-zero
+```
+
+Use Skylos or Semgrep as the blocking gate (`--error` / `--ci` flags fail the build on findings). Use Bandit as an informational sweep with `--exit-zero` so it doesn't block PRs on known false positive categories.
+
+---
+
+## Where to start: the Django security scanning checklist
+
+If you're adding static analysis to a Django project for the first time, scan these surfaces first:
+
+1. **Files with `raw()`, `.extra()`, or `cursor.execute()`** — search for direct SQL injection
+2. **Management commands** — check for subprocess calls and unsanitized arguments
+3. **Views that call `requests.get/post`** — check for SSRF with user-controlled URLs
+4. **Views without permission decorators** — check whether auth requirements match the data sensitivity
+5. **Celery tasks with no `.delay()` callers** — dead tasks are hidden attack surface
+6. **Any `subprocess` call with `shell=True`** — command injection risk
+
+```bash
+# Scan your Django project now
+pip install skylos
+skylos your_project/ --danger --quality --table
+```
+
+---
+
+## Key takeaways
+
+1. **Django's ORM protects you from SQL injection — until it doesn't.** `.extra()`, `RawSQL`, and `cursor.execute()` are in most Django codebases. Static analysis finds them.
+
+2. **Dead views and dead tasks are real attack surface.** Unreachable code is still importable and functional. Framework-aware tools detect dead code that generic tools miss.
+
+3. **Auth decorator bugs are invisible to most scanners.** The difference between `login_required` and `permission_required` on a view that serves revenue data is a real vulnerability — and it requires understanding Django's dispatch chain to detect.
+
+4. **False positives kill adoption faster than missed findings.** A tool that flags every `mark_safe("<br>")` as XSS will be disabled within a week. Framework awareness is what makes the difference between a tool teams use and a tool teams ignore.
+
+5. **Layer your tools.** Use a framework-aware scanner as your primary gate and a broad pattern-matcher as a secondary sweep.
+
+---
+
+*Try scanning your Django project: [Install Skylos](https://docs.skylos.dev/getting-started) — free, open source, runs locally.*
+
+---
+
+## Related
+
+- [Finding Dead Code in Flask: Skylos vs Vulture Benchmark](/blog/flask-dead-code-case-study)
+- [We Scanned 9 Popular Python Libraries](/blog/we-scanned-9-popular-python-libraries)
+- [Why Python SAST Tools Drown Teams in False Positives](/blog/sast-false-positives-what-works)
+- [Best Python Static Analysis Tools Compared (2026)](/blog/python-sast-comparison-2026)
+- [Python Security Scanning in GitHub Actions](/use-cases/python-security-github-actions)

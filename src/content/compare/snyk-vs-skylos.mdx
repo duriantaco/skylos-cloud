@@ -1,0 +1,371 @@
+---
+title: "Snyk vs Skylos: When You Need Each Tool (and When to Use Both)"
+excerpt: "An honest comparison of Snyk and Skylos for Python security scanning. Where Snyk dominates, where Skylos fills the gaps, and why many teams benefit from running both."
+publishedAt: "2026-03-20"
+updatedAt: "2026-03-20"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "This comparison helps Python teams decide whether Snyk, Skylos, or both belong in their security workflow. Many teams already use Snyk and are evaluating whether Skylos covers gaps that Snyk does not address."
+methodology:
+  - "Compared tool capabilities using current public documentation, CLI behavior, and published feature sets."
+  - "Focused on areas where the tools differ most: dependency scanning, dead code, AI regression detection, and deployment model."
+  - "Called out Snyk's strengths honestly where it clearly outperforms Skylos."
+tags: ["sast", "comparison", "python", "security"]
+keywords:
+  - snyk alternative
+  - snyk vs skylos
+  - snyk alternative open source
+  - snyk alternative free
+  - python sast free
+  - snyk code alternative
+  - snyk open source alternative
+  - python security scanner comparison
+  - snyk dead code
+  - free python sast tool
+canonicalUrl: "/compare/snyk-vs-skylos"
+---
+
+# Snyk vs Skylos: When You Need Each Tool (and When to Use Both)
+
+Snyk is one of the largest application security platforms in the world. It scans dependencies, containers, IaC, and source code across dozens of languages. It has a massive vulnerability database, enterprise integrations, and a security-focused organization behind it.
+
+Skylos is a focused, open-source static analysis tool for Python, TypeScript, and Go. It combines security scanning, dead code detection, and AI-specific analysis. It runs locally, requires no signup, and your code never leaves your machine.
+
+These tools solve overlapping but different problems. This page is an honest comparison of where each one is stronger and where they complement each other.
+
+---
+
+## The short version
+
+| | Snyk | Skylos |
+|---|------|--------|
+| **Best for** | Dependency/container scanning, enterprise security programs, multi-language SCA | Python-focused teams, dead code detection, AI regression detection |
+| **Languages** | 30+ | Python, TypeScript, Go |
+| **Dependency scanning (SCA)** | Yes (industry-leading vulnerability database) | No |
+| **Container scanning** | Yes | No |
+| **IaC scanning** | Yes (Terraform, CloudFormation, Kubernetes) | No |
+| **Source code SAST** | Yes (Snyk Code) | Yes (50+ built-in rules with taint analysis) |
+| **Dead code detection** | No | Yes (with transitive propagation) |
+| **AI regression detection** | No | Yes (diff-aware, 13 categories) |
+| **AI provenance tracking** | No | Yes |
+| **AI defense scanning** | No | Yes (13 plugins, OWASP LLM Top 10) |
+| **Code quality metrics** | No | Yes (complexity, coupling, cohesion) |
+| **Framework awareness** | Rule-dependent | Built-in (Django, Flask, FastAPI, Pydantic, pytest) |
+| **MCP server** | No | Yes (real-time guardrails inside AI agents) |
+| **Deployment** | SaaS (code uploaded to Snyk) | Local-only (code never leaves your machine) |
+| **Pricing** | Free tier / Team ($25/dev/mo) / Enterprise (custom) | Free (Apache 2.0) / Optional credit packs for cloud features |
+| **CI/CD setup** | Guided onboarding, integrations | `skylos cicd init` (30-second auto-generated workflow) |
+
+---
+
+## Where Snyk is stronger
+
+### Dependency scanning (SCA)
+
+This is Snyk's core strength and the primary reason most teams adopt it.
+
+Snyk maintains one of the largest vulnerability databases in the industry. When you run `snyk test`, it analyzes your `requirements.txt`, `Pipfile.lock`, `package-lock.json`, or other dependency manifests and checks every transitive dependency against known CVEs.
+
+Skylos does not do dependency scanning. If you need to know whether your `requests==2.28.0` has a known vulnerability, Snyk answers that question. Skylos does not.
+
+### Container scanning
+
+Snyk Container scans Docker images, identifies vulnerable base image layers, and recommends safer base images. This is a specialized capability that Skylos does not attempt.
+
+If you ship containers, Snyk Container is genuinely useful and there is no Skylos equivalent.
+
+### Infrastructure as Code scanning
+
+Snyk IaC scans Terraform, CloudFormation, Kubernetes manifests, and ARM templates for misconfigurations. Again, this is outside of Skylos's scope.
+
+### Multi-language support
+
+Snyk supports 30+ languages across its product suite. If your organization has Java, .NET, Ruby, and Python services, Snyk gives you a single security platform across all of them.
+
+Skylos covers Python, TypeScript, and Go. If your stack extends beyond those languages, Snyk provides broader coverage.
+
+### Enterprise features
+
+Snyk offers team management, RBAC, SSO/SAML, Jira integration, compliance reporting, and priority scoring across an entire organization's portfolio. If you are running a formal AppSec program across 50+ developers, Snyk's enterprise features are purpose-built for that.
+
+Skylos has no team management, no RBAC, and no compliance dashboards.
+
+### Vulnerability database depth
+
+Snyk's vulnerability database is continuously updated by a dedicated security research team. For known CVE coverage across open-source packages, Snyk's database is one of the most comprehensive available.
+
+Skylos's security rules are focused on source code patterns (injection, hardcoded secrets, unsafe deserialization), not known package vulnerabilities.
+
+---
+
+## Where Skylos is stronger
+
+### Dead code detection
+
+Snyk does not detect dead code. It is a security platform, not a code quality tool.
+
+Skylos detects unused functions, classes, imports, variables, and parameters. It also performs **transitive dead code propagation**: if function A is dead and it is the only caller of function B, Skylos marks B as dead too.
+
+```python
+def process_legacy_order(order_id):       # dead -- nothing calls this
+    validated = _validate_order(order_id)  # also dead (transitive)
+    _notify_warehouse(validated)           # also dead (transitive)
+```
+
+Dead code is not just a quality concern. Dead code that still contains database queries, API calls, or security-sensitive logic is a maintenance risk and an attack surface. Snyk will not help you find it.
+
+### Diff-aware AI regression detection
+
+This is the capability gap that matters most for teams using AI coding assistants.
+
+When Cursor, Copilot, or Claude Code refactors your code, it sometimes silently removes security controls. An `@login_required` decorator disappears. A CSRF token check gets dropped. Rate limiting gets removed during a "cleanup."
+
+Snyk analyzes the current state of your code. It tells you what vulnerabilities exist right now. It does not tell you what security controls were **removed** between commits.
+
+Skylos detects 13 categories of removed security controls:
+
+- Authentication decorators (`@login_required`, `@requires_auth`)
+- CSRF protection
+- Rate limiting
+- Input validation
+- Output encoding
+- Security headers
+- Permission checks
+- Audit logging
+- Error handling
+- Cryptographic controls
+- Session management
+- CORS restrictions
+- Security middleware
+
+```bash
+skylos diff main..HEAD --danger
+```
+
+This catches the number one way AI assistants introduce vulnerabilities: not by writing bad code, but by removing existing security controls during refactoring.
+
+### AI provenance tracking
+
+Skylos tracks which AI agent introduced which code via git provenance analysis. When a vulnerability is found, you can see whether it was written by a human, Copilot, Cursor, or Claude Code.
+
+Snyk does not track code authorship or AI provenance.
+
+### AI defense scanning (LLM application security)
+
+If you are building applications that integrate LLMs (calling OpenAI, Anthropic, or running RAG pipelines), Skylos has dedicated scanning for LLM-specific risks:
+
+```bash
+skylos defend .
+```
+
+This runs 13 security plugins mapped to the OWASP LLM Top 10:
+
+- Prompt injection detection
+- Untrusted input flowing to LLM prompts
+- RAG context isolation
+- Output PII filtering
+- Cost controls
+- Rate limiting on LLM calls
+
+Snyk does not have LLM-specific security scanning.
+
+### Code never leaves your machine
+
+Snyk Code (their SAST product) uploads your source code to Snyk's servers for analysis. For some teams and some compliance environments, that is a blocker.
+
+Skylos runs entirely locally. Your code is never uploaded anywhere unless you explicitly use the optional `--upload` flag for the cloud dashboard. The CLI, the MCP server, and the CI workflow all run on your infrastructure.
+
+### Open source and free
+
+Skylos is Apache 2.0 licensed. The full CLI, all security rules, dead code detection, AI defense scanning, and CI workflow generation are free with no usage limits.
+
+Snyk has a free tier, but it is limited. Snyk's Team plan starts at $25/developer/month. Enterprise pricing is custom. Snyk Code (their SAST product) is not available on the free tier.
+
+For individuals, small teams, and open-source projects, the cost difference is significant.
+
+### MCP server for AI agent guardrails
+
+Skylos includes an MCP (Model Context Protocol) server that provides real-time security guardrails inside AI agents:
+
+```bash
+skylos mcp serve
+```
+
+This lets AI coding agents like Claude Code check their own output for security issues, dead code, and regressions before committing. It is a fundamentally different integration model than running a scan after the code is written.
+
+Snyk does not have an MCP server or equivalent real-time AI agent integration.
+
+### Framework-aware analysis
+
+Snyk Code's SAST capabilities depend on the rules available for your framework. Coverage varies.
+
+Skylos has built-in framework visitors for Django, Flask, FastAPI, Pydantic, pytest, Celery, and Click. It understands that `@app.route` handlers are called via HTTP, `@pytest.fixture` functions are called by the test runner, and Pydantic `model_validator` methods are called during validation.
+
+This means fewer false positives out of the box without configuring framework-specific rules:
+
+```python
+@app.route("/api/users")        # Skylos: alive (Flask route handler)
+def get_users():
+    return jsonify(users)
+
+@pytest.fixture
+def db():                        # Skylos: alive (pytest fixture)
+    return create_engine()
+```
+
+### 30-second CI/CD setup
+
+```bash
+skylos cicd init
+```
+
+This generates a complete GitHub Actions workflow with PR scanning, inline comments, and quality gates. No signup, no API key, no onboarding flow.
+
+Snyk's CI integration requires creating a Snyk account, generating an auth token, configuring the integration, and selecting which projects to monitor. The setup is more involved because Snyk is a larger platform with more configuration surface.
+
+---
+
+## Detection comparison: what each tool catches
+
+### Known dependency vulnerabilities
+
+**Snyk:** Yes. This is what Snyk does best.
+
+```bash
+snyk test
+# Found 3 vulnerabilities in 47 dependencies
+# HIGH: CVE-2024-XXXXX in requests 2.28.0
+```
+
+**Skylos:** No. Skylos does not scan dependencies for known CVEs.
+
+### SQL injection in source code
+
+**Snyk Code:**
+```python
+# Snyk Code can flag this (depending on rules/language support)
+query = f"SELECT * FROM users WHERE id = {user_id}"
+cursor.execute(query)
+```
+
+**Skylos:**
+```python
+# Skylos flags this (SKY-D210: SQL injection via taint analysis)
+query = f"SELECT * FROM users WHERE id = {request.args['id']}"
+cursor.execute(query)
+
+# Skylos does NOT flag this (hardcoded, not user-controlled)
+cursor.execute("SELECT * FROM users WHERE active = 1")
+```
+
+Both tools can catch SQL injection in source code. Skylos uses taint analysis to distinguish user-controlled input from hardcoded values.
+
+### Removed security controls
+
+**Snyk:** Does not detect this. Snyk scans the current code state.
+
+**Skylos:**
+```bash
+skylos diff main..feature-branch --danger
+# WARNING: @login_required removed from view_profile (line 42)
+# WARNING: csrf_protect decorator removed from submit_form (line 89)
+# WARNING: rate_limit decorator removed from api_endpoint (line 156)
+```
+
+This is the gap that matters most for teams shipping AI-generated code.
+
+### Dead code
+
+**Snyk:** Does not detect dead code.
+
+**Skylos:**
+```bash
+skylos src/
+# DEAD: process_refund() in payments.py:34 (0 references)
+# DEAD: _validate_refund() in payments.py:52 (only caller is dead)
+# DEAD: OldPaymentProcessor class in legacy.py:12 (0 references)
+```
+
+---
+
+## When to use Snyk
+
+- You need **dependency scanning (SCA)** across your package ecosystem
+- You need **container scanning** for Docker images
+- You need **IaC scanning** for Terraform or Kubernetes
+- You have a **multi-language** codebase beyond Python/TypeScript/Go
+- You are running a formal **AppSec program** with compliance requirements
+- You need **enterprise features** (SSO, RBAC, Jira integration, compliance dashboards)
+- Your primary concern is **known CVEs** in third-party packages
+
+## When to use Skylos
+
+- Your codebase is **primarily Python** (or Python + TypeScript + Go)
+- You want **dead code detection** alongside security scanning
+- Your team uses **AI coding assistants** and you need to catch removed security controls
+- You are building **LLM-integrated applications** and need AI defense scanning
+- You want a tool that runs **locally with no signup** and keeps code on your machine
+- You want **free, open-source** security scanning with no usage limits
+- You want **30-second CI/CD setup** without onboarding flows
+- You want **MCP integration** for real-time AI agent guardrails
+
+## When to use both
+
+This is the most practical answer for many teams.
+
+**Use Snyk for what it does best:** dependency scanning, container scanning, and known CVE detection. Snyk's vulnerability database is genuinely valuable and Skylos does not replicate it.
+
+**Use Skylos for what Snyk does not cover:** dead code detection, AI regression detection, AI provenance tracking, LLM defense scanning, and code quality metrics.
+
+The tools do not conflict. They scan different things. Running both in CI gives you:
+
+- Snyk: "Your `pyjwt==2.4.0` dependency has a known vulnerability"
+- Skylos: "Your AI agent removed `@login_required` from 3 views during last refactor, and you have 47 dead functions"
+
+That is a more complete security posture than either tool alone.
+
+---
+
+## Quick start
+
+### Snyk
+
+```bash
+npm install -g snyk
+snyk auth
+snyk test
+snyk code test
+```
+
+### Skylos
+
+```bash
+pip install skylos
+skylos src/ --danger --quality
+```
+
+---
+
+## Final thoughts
+
+Snyk is a broader, more mature security platform. It covers dependency scanning, container scanning, and IaC in ways that Skylos does not attempt. If you need SCA or enterprise AppSec program management, Snyk is the right tool.
+
+Skylos is more focused. It goes deeper on Python code-level analysis: dead code with transitive propagation, diff-aware regression detection for AI-generated code, LLM application security, and framework-aware scanning. It runs locally, it is free, and it requires no signup.
+
+The honest recommendation: if you are a Python team using AI coding assistants, **use Snyk for dependency scanning and use Skylos for everything else.** They solve different problems and the combination is stronger than either one alone.
+
+---
+
+## Related
+
+- [Semgrep vs Skylos](/compare/semgrep-vs-skylos)
+- [Deadcode vs Vulture vs Skylos](/compare/deadcode-vs-vulture-vs-skylos)
+- [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)
+- [How to Detect Dead Code in Python](/use-cases/detect-dead-code-python)
+- [How to Catch Hallucinated Imports in AI Code](/use-cases/ai-generated-code-security)
+
+---
+
+*Snyk is a registered trademark of Snyk Ltd. [Snyk](https://snyk.io) | [Skylos](https://github.com/duriantaco/skylos) | [Skylos Docs](https://docs.skylos.dev) | [Install Skylos](https://pypi.org/project/skylos/)*

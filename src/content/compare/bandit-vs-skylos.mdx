@@ -1,0 +1,405 @@
+---
+title: "Bandit vs Skylos: Which Python Security Scanner Should You Use?"
+excerpt: "A detailed comparison of Bandit and Skylos for Python security scanning. Where Bandit has the edge, where Skylos is stronger, and which one fits your workflow in 2026."
+publishedAt: "2026-03-20"
+updatedAt: "2026-03-20"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "This comparison is meant to help Python teams decide between Bandit and Skylos based on their security scanning needs, whether they also need dead code detection, and how much AI-generated code they ship."
+methodology:
+  - "Compared tool behavior using current docs, CLI workflows, and benchmark evidence already published on the site."
+  - "Skylos detection claims are based on existing test suite (2634 tests) and published benchmark data. Bandit capabilities are based on current docs and published rule set."
+  - "Called out where a claim comes from benchmarked results versus broader product capabilities."
+tags: ["sast", "comparison", "python", "security"]
+keywords:
+  - bandit vs skylos
+  - bandit alternative
+  - bandit alternative 2026
+  - python security scanner
+  - python sast tool
+  - bandit python security
+  - python static analysis security
+  - best python security scanner 2026
+  - bandit dead code
+  - python security scanning comparison
+canonicalUrl: "/compare/bandit-vs-skylos"
+---
+
+# Bandit vs Skylos: Which Python Security Scanner Should You Use?
+
+Bandit is the most widely adopted Python security scanner. It's maintained by the PyCQA project, has been around since 2015, and is the default choice for teams adding security scanning to a Python codebase. If you've ever googled "python security linter," Bandit was probably the first result.
+
+Skylos is a newer Python-focused static analysis tool that combines security scanning, dead code detection, code quality metrics, and AI-specific detection. It covers more ground but is less established.
+
+This comparison is for Python teams evaluating both tools. We'll be straightforward about where each is stronger.
+
+---
+
+## The short version
+
+| | Bandit | Skylos |
+|---|--------|--------|
+| **Best for** | Quick security audits, teams that want a mature and simple security linter | Python teams that also need dead code detection, AI code scanning, and CI quality gates |
+| **Languages** | Python only | Python, TypeScript, Go |
+| **Security scanning** | Yes (AST pattern matching, well-known CWE mappings) | Yes (taint analysis, 50+ built-in rules) |
+| **Dead code detection** | No | Yes (with transitive propagation) |
+| **AI defense scanning** | No | Yes (13 plugins, OWASP LLM Top 10) |
+| **AI regression detection** | No | Yes (diff-aware, 13 categories) |
+| **Code quality metrics** | No | Yes (complexity, coupling, cohesion) |
+| **Framework awareness** | No | Built-in (Django, Flask, FastAPI, Pydantic, pytest) |
+| **Taint analysis** | No (pattern matching only) | Yes |
+| **Custom rules / plugins** | Yes (plugin system) | No |
+| **CI/CD** | Manual wiring | Auto-generated workflows |
+| **Maturity** | 10+ years, widely adopted | Newer, actively developed |
+| **Pricing** | Free (OSS) | Free (OSS) / Paid (Cloud) |
+
+---
+
+## Where Bandit is stronger
+
+### Maturity and adoption
+
+Bandit has been the standard Python security scanner for over a decade. It's referenced in security guides, compliance checklists, and CI templates across the Python ecosystem. If you're working with auditors or security reviewers who expect to see "Bandit" in your toolchain, that matters.
+
+Skylos is newer. It has traction (merged cleanup PRs into psf/black, networkx, mitmproxy, pypdf, Flagsmith), but it does not have Bandit's name recognition in security-focused organizations.
+
+### Simplicity
+
+Bandit does one thing: scan Python code for security issues. The mental model is easy to explain to any developer:
+
+```bash
+pip install bandit
+bandit -r src/
+```
+
+You get a list of findings with severity and confidence ratings. No configuration needed, no additional analysis categories to understand.
+
+Skylos does more, which also means there's more to learn. If all you need is a quick security audit of a Python codebase, Bandit gets you there faster.
+
+### CWE mappings
+
+Bandit maps findings directly to CWE identifiers, which matters for compliance reporting and security documentation. If your team needs to reference specific CWE numbers in audit reports, Bandit has well-established mappings for its entire rule set.
+
+### Plugin system
+
+Bandit supports custom plugins. If you need to add detection for a project-specific security pattern, you can write a Bandit plugin and distribute it. Skylos has no custom rule or plugin system.
+
+### Lightweight and fast
+
+Bandit is a lightweight tool with minimal dependencies. It's fast on large codebases and adds very little overhead to a CI pipeline. Skylos does more analysis per run (dead code, quality, security), which means it takes longer on large repositories.
+
+---
+
+## Where Skylos is stronger
+
+### Taint analysis vs. pattern matching
+
+This is the most significant technical difference between the two tools.
+
+Bandit uses AST pattern matching. It looks at individual statements and checks whether they match known-dangerous patterns. This means Bandit flags the pattern itself regardless of context:
+
+```python
+# Bandit flags BOTH of these as B602 (subprocess with shell=True)
+subprocess.call("ls -la", shell=True)           # Hardcoded string - low risk
+subprocess.call(user_input, shell=True)          # User-controlled - high risk
+```
+
+Skylos uses taint analysis. It traces data flow from user input sources (like `request.args.get()`, `input()`, `sys.argv`) to dangerous sinks:
+
+```python
+# Skylos flags this -- user input flows to shell command
+cmd = request.args.get("command")
+subprocess.call(cmd, shell=True)     # SKY-D212: Command injection
+
+# Skylos does NOT flag this -- hardcoded command, no tainted input
+subprocess.call("ls -la", shell=True)  # No finding
+```
+
+The practical impact: Bandit reports tend to be noisier on codebases that use `subprocess`, `exec`, `eval`, or raw SQL with hardcoded strings. Skylos reports fewer findings but the ones it reports involve actual user-controlled data flow.
+
+Neither approach is strictly better. Bandit's pattern matching catches cases where a hardcoded dangerous pattern might later be refactored to accept user input. Skylos's taint analysis gives you fewer findings to triage right now.
+
+### Dead code detection
+
+Bandit has no dead code detection at all. If you need to find unused functions, classes, imports, and variables, you need a second tool alongside Bandit (typically Vulture or deadcode).
+
+Skylos detects dead code with transitive propagation:
+
+```python
+def process_refund(order_id):               # dead -- nothing calls this
+    validated = _validate_refund(order_id)   # also dead (transitive)
+    _send_refund_email(validated)            # also dead (transitive)
+```
+
+On 9 popular Python repositories (350k+ combined stars), Skylos achieves 98.1% recall with 220 false positives, compared to Vulture's 84.6% recall with 644 false positives. Bandit would not detect any of these -- dead code is outside its scope entirely.
+
+Dead code is a security concern too. Unused code still gets scanned, reviewed, and maintained. Removing it reduces attack surface and review burden.
+
+### AI defense scanning
+
+Skylos has a dedicated AI defense engine with 13 plugins mapped to the OWASP LLM Top 10:
+
+```bash
+skylos defend .
+```
+
+This scans codebases that integrate with LLMs (via OpenAI, Anthropic, LangChain, etc.) and checks for:
+
+- Untrusted input flowing directly to prompts
+- Missing RAG context isolation
+- Output PII filtering gaps
+- Missing rate limiting on LLM endpoints
+- Missing cost controls
+- Insufficient logging on LLM interactions
+
+Bandit has no awareness of LLM integration patterns. If your application calls OpenAI or Anthropic APIs and passes user input into prompts without validation, Bandit will not flag it. Skylos will.
+
+### Diff-aware security regression detection
+
+This is the capability that has no equivalent in Bandit or any traditional SAST tool.
+
+When AI coding assistants refactor code, they sometimes silently remove security controls. Skylos detects this across 13 categories:
+
+- Removed authentication decorators (`@login_required`, `@requires_auth`)
+- Removed CSRF protection
+- Removed rate limiting
+- Removed input validation
+- Disabled security headers
+- Removed error handling
+
+Bandit analyzes the current state of the code. If an AI agent removes `@login_required` from a view function during a refactoring PR, Bandit will not flag the removal because the remaining code is syntactically valid. Skylos's diff-aware scanning catches this.
+
+### AI provenance tracking
+
+Skylos tracks which AI agent introduced which vulnerability via git provenance. If a security finding was introduced in a commit authored by an AI coding assistant, Skylos surfaces that attribution. This matters for teams that want visibility into how much of their security debt comes from AI-generated code versus human-written code.
+
+Bandit does not track code authorship or provenance.
+
+### Framework awareness
+
+Bandit does not understand Python frameworks. It analyzes code at the AST level without knowledge of Django views, Flask routes, FastAPI endpoints, or pytest fixtures.
+
+Skylos has built-in framework visitors for Django, Flask, FastAPI, Pydantic, pytest, Celery, and Click. This matters primarily for dead code detection (avoiding false positives on framework-registered functions), but it also improves security analysis by understanding framework-specific input sources and sinks:
+
+```python
+@app.route("/api/users")
+def get_users():
+    user_id = request.args.get("id")
+    # Skylos knows request.args.get() is a taint source in Flask
+    cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
+    # SKY-D210: SQL injection (tainted data flows to query)
+```
+
+### Code quality metrics
+
+Bandit is not a code quality tool. It does not report on complexity, coupling, cohesion, or architectural metrics.
+
+Skylos includes:
+
+```bash
+skylos src/ --quality
+```
+
+- Cyclomatic complexity (SKY-Q301)
+- Deep nesting detection (SKY-Q302)
+- Function length and argument count (SKY-C303, SKY-C304)
+- God class detection (SKY-Q501)
+- Coupling and cohesion metrics (SKY-Q701, SKY-Q702)
+- Architecture metrics (instability, distance from main sequence)
+- Async blocking call detection (SKY-Q401)
+
+### CI/CD quality gate
+
+Skylos generates a complete GitHub Actions workflow:
+
+```bash
+skylos cicd init
+```
+
+This creates a `.github/workflows/skylos.yml` with PR scanning, inline comments, and quality gates. Bandit can be added to CI, but you need to write the workflow yourself and handle the output formatting.
+
+---
+
+## Detection comparison: real examples
+
+### SQL injection
+
+**Bandit**:
+```python
+# Bandit flags this as B608 (hardcoded SQL expressions)
+query = "SELECT * FROM users WHERE id = %s" % user_id
+cursor.execute(query)
+```
+
+Bandit detects the string formatting pattern in a SQL context. It does not trace where `user_id` comes from.
+
+**Skylos**:
+```python
+# Skylos flags this (SKY-D210: SQL injection via taint analysis)
+user_id = request.args.get("id")
+query = f"SELECT * FROM users WHERE id = {user_id}"
+cursor.execute(query)
+
+# Skylos does NOT flag this -- hardcoded value, no tainted input
+cursor.execute("SELECT * FROM users WHERE active = 1")
+```
+
+### Command injection
+
+**Bandit**:
+```python
+# Bandit flags B602 for shell=True regardless of input source
+subprocess.call("ls -la", shell=True)       # flagged
+subprocess.call(user_cmd, shell=True)         # flagged
+```
+
+**Skylos**:
+```python
+# Skylos only flags when user-controlled data reaches the sink
+user_cmd = request.form.get("cmd")
+subprocess.call(user_cmd, shell=True)         # SKY-D212: flagged
+
+subprocess.call("ls -la", shell=True)         # not flagged (hardcoded)
+```
+
+### Hardcoded secrets
+
+**Bandit**:
+```python
+# Bandit flags B105 (hardcoded password string)
+password = "admin123"
+```
+
+**Skylos**:
+```python
+# Skylos flags SKY-D201 (hardcoded credentials)
+API_KEY = "sk-1234567890abcdef"
+PASSWORD = "admin123"
+```
+
+Both catch hardcoded secrets. Bandit has specific checks for password-like variable names and high-entropy strings.
+
+### Disabled security controls
+
+**Bandit**:
+```python
+# Bandit flags B501 (requests with verify=False)
+requests.get(url, verify=False)
+```
+
+**Skylos**:
+```python
+# Skylos also catches this pattern
+requests.get(url, verify=False)
+
+# Skylos additionally detects when verify=False was ADDED by an AI agent
+# in a diff-aware scan, and tracks provenance
+```
+
+Both catch `verify=False`. The difference is that Skylos can also detect when this pattern was introduced in a specific commit and by which tool.
+
+---
+
+## Migration guide: Bandit to Skylos
+
+If you're currently running Bandit and want to evaluate Skylos, here's how to compare:
+
+### 1. Run both on the same codebase
+
+```bash
+# Bandit
+pip install bandit
+bandit -r src/ -f json -o bandit-results.json
+
+# Skylos
+pip install skylos
+skylos src/ --danger --json > skylos-results.json
+```
+
+### 2. Compare the overlap
+
+Most of Bandit's high-severity findings will have Skylos equivalents. The main differences:
+
+- Bandit will have more findings on `subprocess`, `exec`, `eval` with hardcoded strings (pattern matching vs. taint analysis)
+- Skylos will have additional findings for dead code, quality, and AI-specific patterns
+- Skylos may catch SQL injection and command injection that Bandit misses when the data flow spans multiple statements
+
+### 3. Evaluate the noise difference
+
+Count the findings you'd suppress in each tool. Teams running Bandit on real codebases typically suppress a meaningful number of `shell=True` and `subprocess` findings where the input is hardcoded. Compare that suppression burden against Skylos's taint-aware output.
+
+### 4. Decide if you need both
+
+Bandit and Skylos can run side by side. If you have existing Bandit suppressions and custom plugins that represent institutional knowledge, keep Bandit and add Skylos for dead code, quality, and AI defense. If you're starting fresh, Skylos covers more ground in a single tool.
+
+---
+
+## When to use Bandit
+
+- You need a **mature, well-known** security scanner with industry recognition
+- You want **simple, fast** security scanning with no additional analysis
+- You need **CWE mappings** for compliance or audit reports
+- You have **custom Bandit plugins** encoding project-specific security rules
+- You need to scan **only for security** -- dead code and quality are handled by other tools
+- Your team is familiar with Bandit and its findings format
+
+## When to use Skylos
+
+- Your codebase is **primarily Python** (or Python + TypeScript + Go)
+- You want **security + dead code + quality** in a single tool
+- Your team uses **AI coding tools** (Cursor, Copilot, Claude Code) and you want to catch regressions
+- You want **taint analysis** instead of pattern matching for fewer false positives on injection findings
+- You need **AI defense scanning** for LLM-integrated applications
+- You want **zero-config CI** with PR inline comments and quality gates
+- You use **Django, Flask, FastAPI, or Pydantic** and want framework-aware analysis
+
+## Can you use both?
+
+Yes. They don't conflict. Some teams run Bandit for its established CWE mappings and compliance value, and Skylos for dead code, quality, AI defense, and taint-aware security scanning. The security overlap is manageable -- Bandit's pattern matching and Skylos's taint analysis often flag different instances of the same vulnerability class.
+
+---
+
+## Quick start
+
+### Bandit
+
+```bash
+pip install bandit
+bandit -r src/
+```
+
+### Skylos
+
+```bash
+pip install skylos
+skylos src/ --danger --quality
+```
+
+---
+
+## Final thoughts
+
+Bandit is the safe, established choice. It has been the default Python security scanner for a decade, it's fast, it's simple, and every Python developer has heard of it. If all you need is a security linter that maps findings to CWEs and integrates into any CI pipeline, Bandit works.
+
+Skylos is the broader tool. It does security scanning differently (taint analysis vs. pattern matching), and it adds dead code detection, code quality metrics, AI defense scanning, and diff-aware regression detection on top. If your team ships AI-generated code and you want one tool instead of three (Bandit + Vulture + pylint), Skylos covers that ground.
+
+The honest answer: if security scanning is your only need and you value maturity and simplicity, Bandit is a solid choice. If you also care about dead code, AI-specific risks, and quality metrics, Skylos is worth evaluating alongside it.
+
+**Try both on your codebase and compare the output.** That tells you more than any comparison article.
+
+---
+
+## Related
+
+- [Semgrep vs Skylos](/compare/semgrep-vs-skylos)
+- [Deadcode vs Vulture vs Skylos](/compare/deadcode-vs-vulture-vs-skylos)
+- [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)
+- [How to Detect Dead Code in Python](/use-cases/detect-dead-code-python)
+- [How to Catch Hallucinated Imports in AI Code](/use-cases/ai-generated-code-security)
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+
+---
+
+*Both tools are open source. [Bandit](https://github.com/PyCQA/bandit) | [Skylos](https://github.com/duriantaco/skylos) | [Skylos Docs](https://docs.skylos.dev) | [Install Skylos](https://pypi.org/project/skylos/)*

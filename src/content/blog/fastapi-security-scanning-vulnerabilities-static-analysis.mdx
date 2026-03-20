@@ -1,0 +1,506 @@
+---
+title: "FastAPI Security Scanning: 8 Vulnerability Patterns Static Analysis Catches"
+excerpt: "FastAPI's async-first design and Pydantic validation prevent some bugs but introduce others. Here are 8 real vulnerability patterns in FastAPI applications — from SSRF in background tasks to Pydantic validation bypass — and how to detect them with static analysis."
+publishedAt: "2026-03-14"
+updatedAt: "2026-03-14"
+author:
+  name: "Skylos team"
+  role: "Product engineering"
+  type: "Organization"
+whyThisExists: "FastAPI is the fastest-growing Python web framework but has less security tooling coverage than Django or Flask. This guide documents real vulnerability patterns specific to FastAPI so teams can evaluate their scanning coverage."
+tags: ["security", "fastapi", "sast", "python"]
+keywords:
+  - fastapi security scanning
+  - fastapi static analysis
+  - fastapi vulnerability scanner
+  - fastapi security best practices
+  - fastapi SAST
+  - fastapi SQL injection
+  - fastapi SSRF
+  - fastapi pydantic security
+  - fastapi dependency injection security
+  - fastapi async security
+  - secure fastapi application
+  - fastapi security audit
+  - fastapi security checklist 2026
+  - python api security scanning
+  - fastapi code review security
+  - fastapi background task security
+canonicalUrl: "/blog/fastapi-security-scanning-vulnerabilities-static-analysis"
+---
+
+# FastAPI security scanning: 8 vulnerability patterns static analysis catches
+
+FastAPI has become the default choice for new Python APIs. It's fast, type-hinted, and Pydantic validation catches malformed input at the boundary. That gives teams a false sense of security.
+
+Pydantic validates *shape*. It does not validate *intent*. A perfectly well-formed URL can still be an SSRF payload. A valid string can still be a SQL injection. And FastAPI's async-first design introduces patterns — background tasks, dependency injection, streaming responses — that create vulnerability surfaces most scanning tools don't understand.
+
+Here are 8 real vulnerability patterns we see in FastAPI applications, which tools detect each one, and how to test them yourself.
+
+## TL;DR
+
+| Vulnerability pattern | Bandit | Semgrep | Skylos |
+|:---|:---|:---|:---|
+| **SSRF via user-supplied URLs** | No | Partial | Yes |
+| **SQL injection in raw queries** | Partial | Yes | Yes |
+| **Background task injection** | No | No | Yes |
+| **Pydantic validation bypass** | No | No | Partial |
+| **Dependency injection misuse** | No | No | Yes |
+| **Hardcoded secrets in config** | Yes | Yes | Yes |
+| **Insecure file uploads** | Partial | Yes | Yes |
+| **Dead routes and unused endpoints** | No | No | Yes |
+
+Based on documented tool capabilities and publicly available rule sets. Verify each one with the example code below.
+
+---
+
+## Pattern 1: SSRF via user-supplied URLs
+
+The most common FastAPI vulnerability. APIs that fetch external resources — webhooks, image processing, URL previews, PDF generation — are all SSRF candidates.
+
+```python
+# VULNERABLE: user-controlled URL passed directly to httpx
+from fastapi import FastAPI
+import httpx
+
+app = FastAPI()
+
+@app.post("/webhook/test")
+async def test_webhook(callback_url: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(callback_url)
+    return {"status": response.status_code}
+```
+
+Pydantic validates that `callback_url` is a string. It does not validate that it doesn't point to `http://169.254.169.254/latest/meta-data/` (AWS metadata), `http://localhost:6379/` (Redis), or any internal service.
+
+Even with `HttpUrl` type validation:
+
+```python
+# STILL VULNERABLE: HttpUrl validates format, not destination
+from pydantic import HttpUrl
+
+@app.post("/webhook/test")
+async def test_webhook(callback_url: HttpUrl):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(str(callback_url))
+    return {"status": response.status_code}
+```
+
+`HttpUrl` confirms the string is a valid URL. It does not block internal IPs, link-local addresses, or cloud metadata endpoints. SSRF prevention requires an allowlist or a network-level control, not just type validation.
+
+**Bandit** has no SSRF-specific rules. It won't flag this.
+
+**Semgrep** has partial coverage via rules like `python.requests.security.no-auth-over-http`, but these target `requests` not `httpx`, and they don't specifically model the SSRF pattern from FastAPI route parameters.
+
+**Skylos** traces taint from route parameters through to HTTP client calls (`httpx`, `requests`, `aiohttp`) and flags the data flow as potential SSRF.
+
+**Try it yourself:**
+
+```bash
+# Save the example as test_ssrf.py
+bandit test_ssrf.py                    # No finding expected
+semgrep --config auto test_ssrf.py     # May or may not flag
+skylos test_ssrf.py --danger           # Expect SSRF finding
+```
+
+---
+
+## Pattern 2: SQL injection with async database libraries
+
+FastAPI projects rarely use Django's ORM. They use SQLAlchemy, Tortoise ORM, databases, or raw asyncpg/aiomysql. These libraries have their own injection surfaces:
+
+```python
+# VULNERABLE: f-string in SQLAlchemy text()
+from sqlalchemy import text
+from fastapi import FastAPI, Query
+
+app = FastAPI()
+
+@app.get("/users/search")
+async def search_users(q: str = Query(...)):
+    query = text(f"SELECT * FROM users WHERE name LIKE '%{q}%'")
+    result = await database.fetch_all(query)
+    return result
+```
+
+```python
+# VULNERABLE: raw asyncpg query with string interpolation
+import asyncpg
+
+@app.get("/users/{user_id}/orders")
+async def get_orders(user_id: str):
+    conn = await asyncpg.connect(DATABASE_URL)
+    rows = await conn.fetch(f"SELECT * FROM orders WHERE user_id = '{user_id}'")
+    return rows
+```
+
+```python
+# SAFE: parameterized query
+@app.get("/users/{user_id}/orders")
+async def get_orders(user_id: int):
+    conn = await asyncpg.connect(DATABASE_URL)
+    rows = await conn.fetch("SELECT * FROM orders WHERE user_id = $1", user_id)
+    return rows
+```
+
+**Bandit** catches string formatting in some SQL contexts (`B608`) but doesn't understand `sqlalchemy.text()` or `asyncpg.fetch()` specifically. It relies on detecting SQL keywords near string formatting.
+
+**Semgrep** has SQLAlchemy-specific rules (`python.sqlalchemy.security.sqlalchemy-execute-raw-query`) that catch `text()` with interpolation. Coverage for `asyncpg` and `databases` is thinner — you may need custom rules.
+
+**Skylos** traces taint from FastAPI route parameters and query parameters through to database execution methods, regardless of which async library is used.
+
+**Why this matters:** FastAPI's type hints (`user_id: int`) provide some protection — FastAPI will reject non-integer values before your code runs. But `str` parameters, `Query(...)` parameters, and request body fields have no such protection.
+
+---
+
+## Pattern 3: Background task injection
+
+FastAPI's `BackgroundTasks` let you defer work after returning a response. The security problem: data validated in the request handler may be used unsafely in the background task.
+
+```python
+# VULNERABLE: user input flows into background task subprocess
+from fastapi import BackgroundTasks
+
+def process_repo(repo_url: str):
+    import subprocess
+    subprocess.run(f"git clone {repo_url} /tmp/analysis", shell=True)
+
+@app.post("/analyze")
+async def analyze_repo(repo_url: str, background_tasks: BackgroundTasks):
+    background_tasks.add_task(process_repo, repo_url)
+    return {"status": "processing"}
+```
+
+The request handler looks clean — it just queues a task. The actual vulnerability is in `process_repo()`, which runs in a background thread with user-controlled input flowing into `subprocess.run(shell=True)`.
+
+**Bandit** flags `shell=True` in `process_repo()` (`B602`) but doesn't connect it to the FastAPI route. It would flag this even if `repo_url` were hardcoded.
+
+**Semgrep** similarly catches `shell=True` but doesn't trace the data flow from the route parameter through `BackgroundTasks.add_task()` into the background function.
+
+**Skylos** traces the taint across the `add_task()` boundary — from `repo_url` in the route handler through to `subprocess.run()` in the background task.
+
+**Why this matters:** Background tasks are a common pattern in FastAPI for anything slow — sending emails, processing files, calling external APIs. The data that flows into them often receives less scrutiny than data handled directly in the request-response cycle.
+
+---
+
+## Pattern 4: Pydantic validation bypass
+
+Pydantic is excellent at validating data shape. But there are patterns where validation appears to protect you but doesn't:
+
+```python
+# APPEARS SAFE but isn't: validator doesn't prevent path traversal
+from pydantic import BaseModel, field_validator
+
+class FileRequest(BaseModel):
+    filename: str
+
+    @field_validator("filename")
+    @classmethod
+    def validate_filename(cls, v):
+        if not v.endswith((".csv", ".json")):
+            raise ValueError("Only CSV and JSON files allowed")
+        return v
+
+@app.post("/download")
+async def download_file(req: FileRequest):
+    path = f"/data/exports/{req.filename}"
+    return FileResponse(path)
+```
+
+The validator checks the file extension. It does not prevent `../../etc/passwd.csv` — a string that ends with `.csv` but traverses the filesystem.
+
+```python
+# APPEARS SAFE but isn't: Pydantic coerces types silently
+class TransferRequest(BaseModel):
+    amount: float
+    to_account: str
+
+@app.post("/transfer")
+async def transfer(req: TransferRequest):
+    # amount is already a float — but Pydantic coerced it from string
+    # Negative values? Infinity? NaN? All valid floats.
+    process_transfer(req.amount, req.to_account)
+```
+
+Pydantic will coerce `"Infinity"`, `"-0.01"`, and `"NaN"` to valid Python floats. Business logic bugs from unexpected numeric values aren't type errors — they're validation gaps.
+
+**Bandit** does not analyze Pydantic models.
+
+**Semgrep** does not have built-in rules for Pydantic validation sufficiency.
+
+**Skylos** can flag path construction from user input (the path traversal pattern) via taint analysis. The numeric coercion issue is a business logic bug that static analysis generally cannot catch.
+
+**Try it yourself:**
+
+```bash
+# Test with the path traversal example
+echo '{"filename": "../../etc/passwd.csv"}' | \
+  curl -X POST http://localhost:8000/download \
+    -H "Content-Type: application/json" -d @-
+```
+
+---
+
+## Pattern 5: Dependency injection misuse
+
+FastAPI's `Depends()` system is powerful but can create hidden security assumptions:
+
+```python
+# RISKY: dependency that caches auth state incorrectly
+from fastapi import Depends, HTTPException, Header
+
+async def get_current_user(authorization: str = Header(...)):
+    token = authorization.replace("Bearer ", "")
+    user = await verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401)
+    return user
+
+async def require_admin(user = Depends(get_current_user)):
+    if not user.is_admin:
+        raise HTTPException(status_code=403)
+    return user
+
+@app.get("/admin/users")
+async def list_users(admin = Depends(require_admin)):
+    return await get_all_users()
+
+@app.get("/admin/delete-user/{user_id}")
+async def delete_user(user_id: int, user = Depends(get_current_user)):
+    # BUG: requires authentication but not admin
+    # Developer probably meant Depends(require_admin)
+    await remove_user(user_id)
+    return {"deleted": user_id}
+```
+
+The `delete_user` endpoint uses `Depends(get_current_user)` instead of `Depends(require_admin)`. Any authenticated user can delete any other user. This is a copy-paste error that's invisible in code review unless you're specifically checking which dependency each endpoint uses.
+
+**Bandit** does not understand FastAPI's dependency injection.
+
+**Semgrep** could match this with a custom rule, but writing a generic rule for "wrong Depends choice" is impractical — it requires understanding which dependency provides which authorization level.
+
+**Skylos** can flag endpoints that perform destructive operations (DELETE-like actions, writes to sensitive models) where the dependency chain doesn't include an authorization-level dependency.
+
+**Why this matters:** FastAPI's dependency injection makes auth composable, which is great. But it also makes it easy to use the wrong dependency and get no error — the code runs fine, it just doesn't check permissions.
+
+---
+
+## Pattern 6: Hardcoded secrets in configuration
+
+FastAPI projects commonly use Pydantic's `BaseSettings` for configuration. But secrets still leak:
+
+```python
+# VULNERABLE: hardcoded fallback secrets
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    secret_key: str = "super-secret-key-change-me-in-production"
+    database_url: str = "postgresql://admin:password123@localhost/mydb"
+    stripe_api_key: str = "sk_test_4eC39HqLyjWDarjtT1zdp7dc"
+
+settings = Settings()
+```
+
+The intention is that environment variables override these defaults. In practice, if `.env` is missing or incomplete, the hardcoded values are used — including in production if the deployment doesn't set all required variables.
+
+**Bandit** catches hardcoded passwords (`B105`, `B106`) and flags strings that look like credentials.
+
+**Semgrep** catches these with `python.lang.security.audit.hardcoded-password-default-argument` and similar rules.
+
+**Skylos** catches hardcoded secrets and also flags cases where `BaseSettings` fields have credential-like defaults.
+
+All three tools detect this pattern. The difference is in noise level — Bandit may flag non-secret defaults that happen to contain words like "key" or "token".
+
+---
+
+## Pattern 7: Insecure file uploads
+
+FastAPI's `UploadFile` provides convenient file handling but doesn't enforce security:
+
+```python
+# VULNERABLE: no size limit, no type validation, predictable path
+from fastapi import UploadFile
+
+@app.post("/upload")
+async def upload_file(file: UploadFile):
+    contents = await file.read()  # No size limit — memory exhaustion
+    path = f"/uploads/{file.filename}"  # Path traversal via filename
+    with open(path, "wb") as f:
+        f.write(contents)
+    return {"path": path}
+```
+
+Three problems: no file size limit (denial of service), the original filename is used directly (path traversal via `../`), and no content-type validation (upload a `.py` or `.html` file to a static-served directory).
+
+```python
+# SAFER: size limit, sanitized filename, type validation
+import uuid
+from pathlib import Path
+
+ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_SIZE = 5 * 1024 * 1024  # 5MB
+
+@app.post("/upload")
+async def upload_file(file: UploadFile):
+    if file.content_type not in ALLOWED_TYPES:
+        raise HTTPException(400, "File type not allowed")
+    contents = await file.read()
+    if len(contents) > MAX_SIZE:
+        raise HTTPException(413, "File too large")
+    safe_name = f"{uuid.uuid4()}{Path(file.filename).suffix}"
+    path = Path("/uploads") / safe_name
+    path.write_bytes(contents)
+    return {"path": str(path)}
+```
+
+**Bandit** does not have FastAPI-specific upload rules but may flag `open()` with user-controlled paths.
+
+**Semgrep** has rules for path traversal patterns (`python.lang.security.audit.path-traversal-open`) that can catch the filename usage.
+
+**Skylos** traces taint from `file.filename` through to `open()` and flags the path traversal risk.
+
+---
+
+## Pattern 8: Dead routes and unused endpoints
+
+FastAPI applications accumulate dead endpoints over time — versioned APIs where v1 routes are never removed, feature-flagged endpoints that were disabled but not deleted, internal debug endpoints left in production code:
+
+```python
+# Dead endpoint — replaced by v2 but never removed
+@app.get("/api/v1/users/export")
+async def export_users_v1():
+    """Deprecated: use /api/v2/users/export instead."""
+    users = await get_all_users()  # Returns PII
+    return users  # No pagination, no auth, no rate limit
+
+# Debug endpoint — should never be in production
+@app.get("/debug/config")
+async def debug_config():
+    return {
+        "database_url": settings.database_url,
+        "secret_key": settings.secret_key,
+        "debug": settings.debug,
+    }
+```
+
+Dead routes in FastAPI are more dangerous than dead views in Django because FastAPI routes are always live — there's no separate URL configuration file. If the decorator is there, the endpoint is reachable.
+
+**Bandit** does not analyze route reachability or usage.
+
+**Semgrep** is pattern-based and cannot determine whether an endpoint is actually called by any client.
+
+**Skylos** can flag endpoints that appear to be dead based on naming patterns (deprecated docstrings, version prefixes with newer versions present, debug/test naming) and cross-reference with the codebase for internal references.
+
+**How to audit manually:**
+
+```bash
+# List all registered routes
+python -c "from main import app; [print(r.path, r.methods) for r in app.routes]"
+
+# Search for route references in frontend/client code
+grep -rn "/api/v1/" frontend/ mobile/ --include="*.ts" --include="*.js"
+```
+
+---
+
+## FastAPI vs Django vs Flask: where scanning differs
+
+If you've read our [Django](/blog/django-security-scanning-what-static-analysis-catches) and [Flask](/blog/flask-dead-code-case-study) scanning guides, here's how FastAPI changes the picture:
+
+| Aspect | Flask | Django | FastAPI |
+|:---|:---|:---|:---|
+| **Primary ORM** | SQLAlchemy | Django ORM | SQLAlchemy / asyncpg / Tortoise |
+| **Injection surface** | `raw()`, `text()` | `raw()`, `.extra()`, `cursor` | `text()`, raw asyncpg, raw SQL |
+| **Auth model** | Manual / Flask-Login | Decorators + middleware | Dependency injection |
+| **Background work** | Celery | Celery | BackgroundTasks + Celery |
+| **Route registration** | Decorators | urls.py | Decorators |
+| **Dead code detection** | Decorator-aware | URL cross-reference | Decorator + usage analysis |
+| **Biggest scanning gap** | Decorator callbacks as FP | `.extra()` + auth decorators | Async data flow + Depends() |
+
+The key difference: FastAPI's async-first design means data flows through `await`, `BackgroundTasks`, and dependency injection in ways that synchronous analysis may not follow. Tools need to trace taint across `async`/`await` boundaries and through `Depends()` chains.
+
+---
+
+## Setting up FastAPI security scanning in CI
+
+```yaml
+# .github/workflows/security.yml
+name: FastAPI Security Scan
+on: [pull_request]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install scanning tools
+        run: pip install bandit semgrep skylos
+
+      - name: Skylos (framework-aware scan)
+        run: skylos app/ --danger --quality --ci
+
+      - name: Semgrep (Python security rules)
+        run: semgrep --config auto --config p/python app/ --error
+
+      - name: Bandit (broad sweep, tuned)
+        run: bandit -r app/ -c .bandit.yml --exit-zero
+```
+
+Note: Semgrep does not have a dedicated `p/fastapi` ruleset as of March 2026. Use `p/python` and `auto` config, which includes SQLAlchemy and general Python security rules. For FastAPI-specific coverage, you'll need custom rules or a framework-aware tool.
+
+---
+
+## The FastAPI security scanning checklist
+
+Scan these surfaces first in any FastAPI project:
+
+1. **Any endpoint that fetches a user-supplied URL** — SSRF via `httpx`, `requests`, or `aiohttp`
+2. **SQLAlchemy `text()` or raw asyncpg queries with string interpolation** — SQL injection
+3. **Background tasks that use subprocess or HTTP calls** — injection across task boundaries
+4. **File upload endpoints** — path traversal via `file.filename`, size limits, type validation
+5. **Endpoints with `Depends(get_current_user)` that perform admin actions** — wrong dependency = broken auth
+6. **`BaseSettings` with credential-like default values** — hardcoded secrets
+7. **Endpoints with "deprecated", "v1", or "debug" in the path or docstring** — dead route candidates
+8. **Any `subprocess` call with `shell=True`** — command injection
+
+```bash
+# Scan your FastAPI project now
+pip install skylos
+skylos app/ --danger --quality --table
+```
+
+---
+
+## Key takeaways
+
+1. **Pydantic validates shape, not intent.** `HttpUrl` confirms a string is a valid URL. It does not block SSRF. `float` accepts `Infinity` and `NaN`. Type validation is not security validation.
+
+2. **Background tasks are a blind spot.** Data flows from request handlers into `BackgroundTasks` and loses scrutiny. If a background task calls `subprocess` or an HTTP client, it needs the same taint analysis as the request handler.
+
+3. **`Depends()` makes auth composable — and easy to get wrong.** Using `Depends(get_current_user)` instead of `Depends(require_admin)` on a destructive endpoint is a one-character mistake with full-access consequences.
+
+4. **FastAPI routes are always live.** Unlike Django, there's no separate `urls.py` to decouple. If the decorator exists, the endpoint is reachable. Dead routes are immediately exploitable, not just technically present.
+
+5. **Async data flow challenges scanning tools.** Taint analysis across `await`, `BackgroundTasks.add_task()`, and `Depends()` chains requires tools that understand async Python — not just pattern matching.
+
+---
+
+*Scan your FastAPI project for these patterns: [Install Skylos](https://docs.skylos.dev/getting-started) — free, open source, runs locally.*
+
+---
+
+## Related
+
+- [Django Security Scanning: What Static Analysis Catches](/blog/django-security-scanning-what-static-analysis-catches)
+- [Finding Dead Code in Flask: Skylos vs Vulture Benchmark](/blog/flask-dead-code-case-study)
+- [AI-Generated Python Code Is Shipping Vulnerabilities](/blog/vibe-coding)
+- [Why Python SAST Tools Drown Teams in False Positives](/blog/sast-false-positives-what-works)
+- [Best Python Static Analysis Tools Compared (2026)](/blog/python-sast-comparison-2026)
+- [We Scanned 9 Popular Python Libraries](/blog/we-scanned-9-popular-python-libraries)

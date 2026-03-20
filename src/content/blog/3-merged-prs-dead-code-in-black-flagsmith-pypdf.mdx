@@ -1,0 +1,132 @@
+---
+title: "3 Merged PRs: Dead Code We Found in Black, Flagsmith, and pypdf"
+excerpt: "We ran Skylos on popular open source Python projects, submitted pull requests to remove dead code, and all three were merged by maintainers. Here's what we found, how the LLM verification agent worked, and what the maintainers said."
+publishedAt: "2026-03-17"
+updatedAt: "2026-03-17"
+author:
+  name: "Skylos team"
+  role: "Product engineering"
+  type: "Organization"
+whyThisExists: "We wanted to test Skylos findings against real maintainer review. Submitting PRs to well-maintained projects is the hardest validation you can do — if the maintainers merge it, the findings were real. This post documents what happened."
+methodology:
+  - "Ran `skylos . -a` and `skylos agent verify` on each repository."
+  - "Submitted PRs only for findings we were confident about — not everything the tool flagged."
+  - "Every PR linked here is public and was reviewed and merged by the project's own maintainers."
+tags: ["dead code", "python", "devtools"]
+keywords:
+  - dead code detection
+  - dead code removal python
+  - python static analysis
+  - skylos dead code
+  - black formatter dead code
+  - pypdf dead code
+  - flagsmith dead code
+  - open source contributions
+  - dead code pull requests
+  - python code cleanup
+  - LLM code verification
+  - AI dead code detection
+canonicalUrl: "/blog/3-merged-prs-dead-code-in-black-flagsmith-pypdf"
+---
+
+Static analysis tools produce findings. The question is always the same: are the findings real?
+
+Benchmarks help. Comparisons against other tools help. But the hardest test is submitting a pull request to a well-maintained open source project and seeing if the maintainer merges it or closes it.
+
+We did that three times. All three were merged.
+
+## The PRs
+
+| Project | Stars | PR | What was removed | Lines |
+|---------|-------|----|------------------|-------|
+| [Black](https://github.com/psf/black) | 39k+ | [#5041](https://github.com/psf/black/pull/5041) | 4 unused functions and classes | -24 |
+| [Flagsmith](https://github.com/Flagsmith/flagsmith) | 5k+ | [#6953](https://github.com/Flagsmith/flagsmith/pull/6953) | 10 unused classes, serializers, and exceptions | -56 |
+| [pypdf](https://github.com/py-pdf/pypdf) | 8k+ | [#3685](https://github.com/py-pdf/pypdf/pull/3685) | 5 unused constants and classes | -12 |
+
+Total: **19 dead code findings removed, 92 lines deleted, 15 files changed, 0 regressions.**
+
+Every PR passed CI. No functionality broke. The code was genuinely dead.
+
+## What Skylos Found
+
+### Black: Ghost Functions in the Parser
+
+Black is the most widely used Python formatter. Its codebase is tight and well-reviewed. We still found four things:
+
+- **`matches_grammar()`** in `parsing.py` — a utility function with zero callers anywhere in the codebase
+- **`lib2to3_unparse()`** in `parsing.py` — another utility function, also zero callers
+- **`is_function_or_class()`** in `nodes.py` — a predicate function that nothing calls
+- **`Deprecated`** in `mode.py` — a warning class that was never raised or referenced
+
+These are classic dead code patterns: helper functions that were written for a feature, the feature changed, and the helpers stayed behind. Grep confirms zero references. The maintainer (JelleZijlstra) merged it the same day.
+
+The only feedback was to remove the CHANGES.md entry — Black doesn't document internal cleanup in the changelog.
+
+### Flagsmith: 10 Unused Classes Across the API
+
+Flagsmith is a feature flag platform. Their Python API had more dead code than expected — 10 items across 10 files:
+
+- **`WebhookSendError`** — an exception class that was never raised or caught. The entire file was deleted.
+- **`WebhookURLSerializer`** — a serializer that no view ever used
+- **`ViewResponseDoesNotHaveStatus`** — another exception, never raised
+- **`ImproperlyConfiguredError`** — never raised. File deleted.
+- **`IdentitySerializerFull`** — a serializer with no references
+- **`BaseDetailedPermissionsSerializer`** — never imported by anything
+- **`UTMDataModel`** — a Pydantic model that was never instantiated
+- **`DispatchResponse`** — a response class that was never returned
+- **`OAuthError`** — an exception that was never raised
+- **`get_next_segment_priority()`** — a function with zero callers
+
+The pattern here is common in Django codebases: serializers, exceptions, and utility functions get created for features that evolve or get rewritten, and the old pieces stay behind because nothing breaks when dead code exists. It just sits there adding to grep noise and cognitive load.
+
+Merged by matthewelwell within a day.
+
+### pypdf: Reverse Encoding Dicts That Nothing Used
+
+pypdf is a pure-Python PDF library. The findings were small but clean:
+
+- **`FieldFlag`** in `constants.py` — an `IntFlag` class implementing Table 8.70 of the PDF spec. Fully defined, never imported or used anywhere.
+- **Four `_*_encoding_rev` dictionaries** in `_codecs/__init__.py` — reverse lookup dicts for Windows, Mac, Symbol, and ZapfDingbats encodings. All four were unused. (The similar `_pdfdoc_encoding_rev` was kept — it's used in `generic/_base.py` and exported in `__all__`.)
+
+The maintainer (stefan6419846) merged it quickly. No discussion needed — the code was clearly dead.
+
+## How We Found Them
+
+The workflow was two steps:
+
+**Step 1: Static scan.** We ran `skylos . -a` on each repository. This builds a full reference graph — every definition, every call site, every import — and flags symbols with zero inbound references. Framework-aware rules filter out false positives from Django views, pytest fixtures, FastAPI routes, and similar patterns.
+
+**Step 2: LLM verification.** We ran `skylos agent verify` with Anthropic's Claude Sonnet to double-check the static findings. The agent uses a 3-pass architecture:
+
+1. **Entry point discovery** — reads `pyproject.toml`, Dockerfiles, and CI configs to understand how the project is used
+2. **Batch verification** — groups findings, runs multi-strategy grep (method calls, string dispatch, `__all__`, type annotations, imports), reads surrounding source code, and asks the LLM to reason about whether each finding is truly dead
+3. **Survivor challenge** — any finding that only escaped through a heuristic gets a second look
+
+This filters out the false positives. Not everything Skylos flags is dead — some things are called via dynamic dispatch, string lookups, or framework magic. The verification agent catches those.
+
+For the PRs, we only submitted findings where both the static analysis and the LLM verification agreed the code was dead. Conservative, but that's how you get PRs merged instead of closed.
+
+## What This Means
+
+Dead code in well-maintained projects isn't a failure of the maintainers. It's a natural consequence of software evolution. Features change, code gets refactored, and the old pieces don't always get cleaned up because:
+
+1. **Dead code doesn't break tests.** It has zero callers, so removing it can't cause a regression.
+2. **Nobody's looking for it.** Code review catches bad code, not absent callers.
+3. **Grep is tedious.** Manually verifying that a function has zero references across a large codebase is boring work that humans skip.
+
+This is exactly what static analysis tools should handle. Find the candidates, verify them, and hand off a clean PR that maintainers can merge with confidence.
+
+## Try It
+
+```bash
+pip install skylos
+skylos . -a
+```
+
+If you want LLM-powered verification on top:
+
+```bash
+skylos agent verify . --provider anthropic
+```
+
+All three PRs were generated from Skylos output with no manual analysis beyond reading the diffs before submitting. The tool did the finding, the LLM did the verification, and the maintainers confirmed the results.

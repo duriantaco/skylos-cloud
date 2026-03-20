@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getEffectivePlan } from "@/lib/entitlements";
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, Target, FolderOpen, TrendingUp, Zap } from "lucide-react";
+import { BookOpen, Target, FolderOpen, TrendingUp, Zap, Bot } from "lucide-react";
 import DashboardUserMenu from "@/components/DashboardUserMenu";
 import dogImg from "../../../public/assets/favicon-96x96.png";
 
@@ -54,6 +54,7 @@ export default async function DashboardLayout({
               <NavLink href="/dashboard" icon={Target}>Mission Control</NavLink>
               <NavLink href="/dashboard/trends" icon={TrendingUp}>Trends</NavLink>
               <NavLink href="/dashboard/projects" icon={FolderOpen}>Projects</NavLink>
+              <NavLink href="/dashboard/agent-activity" icon={Bot}>Agent</NavLink>
             </div>
           </div>
 

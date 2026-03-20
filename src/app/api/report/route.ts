@@ -264,13 +264,14 @@ function normalizeIncomingReport(body: any) {
     commit_hash: commit_hash || "local",
     branch: branch || "main",
     actor: actor || "unknown",
-    tool: "skylos" as const,
+    tool: (body.tool || "skylos") as string,
     source: "skylos" as string,
     source_metadata: null as any[] | null,
     defense_score: body.defense_score || null,
     ops_score: body.ops_score || null,
     owasp_coverage: body.owasp_coverage || null,
     defense_findings: body.defense_findings || [],
+    defense_integrations: body.defense_integrations || [],
   }
 }
 
@@ -495,10 +496,11 @@ export async function POST(req: Request) {
 
     const body = await req.json()
     const normalized = normalizeIncomingReport(body)
-    const { summary, findings, commit_hash, branch, actor, tool, source, source_metadata, defense_score, ops_score, owasp_coverage, defense_findings } = normalized
+    const { summary, findings, commit_hash, branch, actor, tool, source, source_metadata, defense_score, ops_score, owasp_coverage, defense_findings, defense_integrations } = normalized
     const { is_forced } = body
     const analysis_mode = String(body.analysis_mode || "static");
     const ai_code = body.ai_code || null;
+    const provenance = body.provenance || null;
 
     if (tool === "sarif" && !caps.sarifEnabled) {
       // SARIF import is a Pro feature — scan accepted but SARIF-specific features disabled
@@ -810,6 +812,9 @@ export async function POST(req: Request) {
         override_reason: isWhitelisted ? `Inherited override` : null,
         ai_code_detected: !!ai_code?.detected,
         ai_code_stats: ai_code || null,
+        provenance_summary: provenance?.summary || null,
+        provenance_agent_count: provenance?.summary?.agent_count || 0,
+        provenance_confidence: provenance?.confidence || null,
         defense_score: defense_score || null,
         ops_score: ops_score || null,
         owasp_coverage: owasp_coverage || null,
@@ -861,10 +866,32 @@ export async function POST(req: Request) {
       await batchInsertFindings(supabase, dbRows);
     }
 
+    // --- AI Provenance: populate provenance_files table ---
+    if (provenance?.files && Object.keys(provenance.files).length > 0) {
+      try {
+        const provRows = Object.values(provenance.files).map((f: any) => ({
+          scan_id: scan.id,
+          project_id: project.id,
+          file_path: f.file_path,
+          agent_authored: !!f.agent_authored,
+          agent_name: f.agent_name || null,
+          agent_lines: f.agent_lines || [],
+          indicators: f.indicators || [],
+        }));
+        const PROV_BATCH = 500;
+        for (let i = 0; i < provRows.length; i += PROV_BATCH) {
+          const { error: provErr } = await supabase.from('provenance_files').insert(provRows.slice(i, i + PROV_BATCH));
+          if (provErr) console.error('Provenance insert error:', provErr.message);
+        }
+      } catch (e: any) {
+        console.error('Provenance insert failed:', e.message);
+      }
+    }
+
     // --- AI Defense: populate normalized tables if defense data present ---
     if (defense_score && typeof defense_score === 'object') {
       try {
-        // Insert aggregate defense score
+        // 1. Insert aggregate defense score
         const { error: dsErr } = await supabase.from('defense_scores').insert({
           scan_id: scan.id,
           project_id: project.id,
@@ -883,53 +910,97 @@ export async function POST(req: Request) {
         });
         if (dsErr) console.error('defense_scores insert failed:', dsErr.message);
 
-        // Insert defense findings (individual check results)
-        if (defense_findings && defense_findings.length > 0) {
-          if (defense_findings.length > 500) {
-            defense_findings.length = 500;
-          }
-          const defenseRows = defense_findings.map((f: any) => ({
+        // 2. Insert integrations FIRST (from CLI payload or derived from findings)
+        //    Build location -> integration_id map for findings FK.
+        const locationToIntegrationId = new Map<string, string>();
+
+        if (defense_integrations && defense_integrations.length > 0) {
+          // Use explicit integrations from CLI payload (includes real metadata)
+          const integrationRows = defense_integrations.map((integ: any) => ({
             scan_id: scan.id,
             project_id: project.id,
-            plugin_id: f.plugin_id || 'unknown',
-            category: f.category || 'defense',
-            severity: f.severity || 'medium',
-            weight: f.weight || 2,
-            passed: !!f.passed,
-            location: f.integration_location || f.location || null,
-            message: f.message || null,
-            owasp_llm: f.owasp_llm || null,
-            remediation: f.remediation || null,
+            provider: integ.provider || 'unknown',
+            integration_type: integ.integration_type || 'chat',
+            location: integ.location || 'unknown',
+            model: integ.model_value || integ.model || null,
+            tools_count: Array.isArray(integ.tools) ? integ.tools.length : (integ.tools_count || 0),
+            input_sources: integ.input_sources || [],
+            weighted_score: integ.weighted_score || 0,
+            weighted_max: integ.weighted_max || 0,
+            score_pct: integ.score_pct || 0,
+            risk_rating: integ.risk_rating || 'UNKNOWN',
           }));
-          const { error: dfErr } = await supabase.from('defense_findings').insert(defenseRows);
-          if (dfErr) console.error('defense_findings insert failed:', dfErr.message);
-        }
 
-        // Insert defense integrations (unique locations from findings)
-        const integrationLocations = new Map<string, any>();
-        for (const f of defense_findings) {
-          const loc = f.integration_location || f.location || 'unknown';
-          if (!integrationLocations.has(loc)) {
-            integrationLocations.set(loc, {
-              scan_id: scan.id,
-              project_id: project.id,
-              provider: f.provider || 'unknown',
-              integration_type: f.integration_type || 'chat',
-              location: loc,
-              model: f.model || null,
-              tools_count: 0,
-              input_sources: '[]',
-              weighted_score: 0,
-              weighted_max: 0,
-              score_pct: 0,
-              risk_rating: 'UNKNOWN',
-            });
+          const { data: insertedIntegs, error: diErr } = await supabase
+            .from('defense_integrations')
+            .insert(integrationRows)
+            .select('id, location');
+          if (diErr) {
+            console.error('defense_integrations insert failed:', diErr.message);
+          } else if (insertedIntegs) {
+            for (const row of insertedIntegs) {
+              locationToIntegrationId.set(row.location, row.id);
+            }
+          }
+        } else if (defense_findings && defense_findings.length > 0) {
+          // Fallback: derive unique integrations from findings (legacy payloads)
+          const uniqueLocations = new Map<string, any>();
+          for (const f of defense_findings) {
+            const loc = f.integration_location || f.location || 'unknown';
+            if (!uniqueLocations.has(loc)) {
+              uniqueLocations.set(loc, {
+                scan_id: scan.id,
+                project_id: project.id,
+                provider: 'unknown',
+                integration_type: 'chat',
+                location: loc,
+                model: null,
+                tools_count: 0,
+                input_sources: [],
+                weighted_score: 0,
+                weighted_max: 0,
+                score_pct: 0,
+                risk_rating: 'UNKNOWN',
+              });
+            }
+          }
+          if (uniqueLocations.size > 0) {
+            const { data: insertedIntegs, error: diErr } = await supabase
+              .from('defense_integrations')
+              .insert(Array.from(uniqueLocations.values()))
+              .select('id, location');
+            if (diErr) {
+              console.error('defense_integrations insert failed:', diErr.message);
+            } else if (insertedIntegs) {
+              for (const row of insertedIntegs) {
+                locationToIntegrationId.set(row.location, row.id);
+              }
+            }
           }
         }
-        if (integrationLocations.size > 0) {
-          await supabase.from('defense_integrations').insert(
-            Array.from(integrationLocations.values())
-          );
+
+        // 3. Insert defense findings WITH integration_id populated
+        if (defense_findings && defense_findings.length > 0) {
+          const capped = defense_findings.slice(0, 500);
+          const defenseRows = capped.map((f: any) => {
+            const loc = f.integration_location || f.location || null;
+            return {
+              scan_id: scan.id,
+              project_id: project.id,
+              integration_id: (loc && locationToIntegrationId.get(loc)) || null,
+              plugin_id: f.plugin_id || 'unknown',
+              category: f.category || 'defense',
+              severity: f.severity || 'medium',
+              weight: f.weight || 2,
+              passed: !!f.passed,
+              location: loc,
+              message: f.message || null,
+              owasp_llm: f.owasp_llm || null,
+              remediation: f.remediation || null,
+            };
+          });
+          const { error: dfErr } = await supabase.from('defense_findings').insert(defenseRows);
+          if (dfErr) console.error('defense_findings insert failed:', dfErr.message);
         }
       } catch (defErr: any) {
         // Defense insert failures are non-fatal — don't break the scan upload
