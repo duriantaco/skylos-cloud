@@ -28,6 +28,8 @@ export default function CityViewPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [deadFromFindings, setDeadFromFindings] = useState<Set<string>>(new Set())
+
   useEffect(() => {
     async function load() {
       const supabase = createClient()
@@ -44,6 +46,22 @@ export default function CityViewPage() {
         setError(fetchErr?.message ?? 'Scan not found')
         setLoading(false)
         return
+      }
+
+      // Also fetch dead code findings for this scan as fallback
+      const { data: deadFindings } = await supabase
+        .from('findings')
+        .select('message, file_path')
+        .eq('scan_id', scanId)
+        .eq('category', 'DEAD_CODE')
+
+      if (deadFindings?.length) {
+        const names = new Set<string>()
+        for (const f of deadFindings) {
+          const match = f.message?.match(/Dead code:\s*(.+)/)
+          if (match) names.add(match[1])
+        }
+        setDeadFromFindings(names)
       }
 
       setScan(data)
@@ -63,8 +81,8 @@ export default function CityViewPage() {
       dead?: boolean;
     }>
 
-    // Collect dead names
-    const deadNames = new Set<string>()
+    // Collect dead names from unused lists (if stored) and findings fallback
+    const deadNames = new Set<string>(deadFromFindings)
     for (const key of ['unused_functions', 'unused_imports', 'unused_classes', 'unused_variables', 'unused_parameters']) {
       const items = (result[key] ?? []) as { name?: string }[]
       for (const item of items) {
@@ -73,7 +91,7 @@ export default function CityViewPage() {
     }
 
     return buildTopologyFromScan(definitions, deadNames)
-  }, [scan])
+  }, [scan, deadFromFindings])
 
   if (loading) {
     return (
@@ -86,7 +104,7 @@ export default function CityViewPage() {
   if (error || !topology) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-950 text-gray-400 gap-4">
-        <div>{error ?? 'No definitions data in scan result'}</div>
+        <div>{error ?? 'No definitions data. Re-upload scan with latest skylos to enable City View.'}</div>
         <Link href={`/dashboard/scans/${scanId}`} className="text-blue-400 hover:underline">
           Back to scan
         </Link>

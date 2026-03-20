@@ -501,6 +501,7 @@ export async function POST(req: Request) {
     const analysis_mode = String(body.analysis_mode || "static");
     const ai_code = body.ai_code || null;
     const provenance = body.provenance || null;
+    const definitions = body.definitions || null;
 
     if (tool === "sarif" && !caps.sarifEnabled) {
       // SARIF import is a Pro feature — scan accepted but SARIF-specific features disabled
@@ -818,6 +819,7 @@ export async function POST(req: Request) {
         defense_score: defense_score || null,
         ops_score: ops_score || null,
         owasp_coverage: owasp_coverage || null,
+        result: definitions ? { definitions } : null,
         created_at: new Date().toISOString(),
       })
       .select()
