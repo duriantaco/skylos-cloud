@@ -1,6 +1,6 @@
 ---
-title: "Deadcode vs Vulture vs Skylos: Which Python Dead Code Tool Should You Use?"
-excerpt: "A practical comparison of deadcode, Vulture, and Skylos for Python dead code detection. Compare autofix support, false-positive handling, framework awareness, and CI workflow."
+title: "Deadcode vs Vulture vs Skylos: Dead Code Tools"
+excerpt: "Compare deadcode, Vulture, and Skylos for Python dead code detection. Autofix, false positives, framework awareness, and CI workflow compared."
 publishedAt: "2026-03-12"
 updatedAt: "2026-03-12"
 author:
@@ -27,7 +27,7 @@ keywords:
 canonicalUrl: "/compare/deadcode-vs-vulture-vs-skylos"
 ---
 
-# Deadcode vs Vulture vs Skylos: Which Python Dead Code Tool Should You Use?
+# Deadcode vs Vulture vs Skylos: Dead Code Tools Compared
 
 If your main goal is to find unused Python code, these are three of the most relevant options in 2026:
 
@@ -356,9 +356,26 @@ If you want the dead code scan to live inside broader Python analysis and CI, Sk
 
 ---
 
+## Try Skylos
+
+If you want framework-aware dead code detection plus security and quality in one tool:
+
+```bash
+pip install skylos
+skylos . --danger --quality
+```
+
+No signup, no config file, results in under 30 seconds. [View on PyPI](https://pypi.org/project/skylos/) | [Read the docs](https://docs.skylos.dev)
+
+---
+
 ## Related
 
+- [Semgrep vs Skylos](/compare/semgrep-vs-skylos)
+- [Bandit vs Skylos](/compare/bandit-vs-skylos)
+- [Snyk vs Skylos](/compare/snyk-vs-skylos)
+- [SonarQube vs Skylos](/compare/sonarqube-vs-skylos)
+- [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)
 - [How to Detect Dead Code in Python](/use-cases/detect-dead-code-python)
 - [Finding Dead Code in Flask: Skylos vs Vulture](/blog/flask-dead-code-case-study)
 - [Bandit vs Vulture vs Skylos](/blog/python-sast-comparison-2026)
-- [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)
