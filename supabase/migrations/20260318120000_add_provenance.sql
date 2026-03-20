@@ -28,7 +28,7 @@ CREATE POLICY provenance_files_service ON provenance_files FOR ALL TO service_ro
 CREATE POLICY provenance_files_org_read ON provenance_files FOR SELECT TO authenticated
   USING (project_id IN (
     SELECT p.id FROM projects p
-    JOIN organization_members om ON om.organization_id = p.org_id
+    JOIN organization_members om ON om.org_id = p.org_id
     WHERE om.user_id = auth.uid()
   ));
 
