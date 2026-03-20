@@ -184,6 +184,11 @@ export const metadata = {
     'bandit alternative',
     'codeql alternative python',
     'python security tools compared',
+    'snyk alternative python',
+    'sonarqube alternative python',
+    'vulture alternative',
+    'python dead code tools',
+    'best python sast tools 2026',
   ],
   openGraph: {
     title: 'Compare Python SAST Tools - Skylos',
