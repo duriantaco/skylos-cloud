@@ -1,6 +1,6 @@
 ---
-title: "How to Catch Hallucinated Imports and Phantom Calls in AI-Generated Python Code"
-excerpt: "AI coding tools generate functions that don't exist, import packages that aren't installed, and hardcode secrets. Here's how to detect these patterns before they reach production."
+title: "How to Verify AI-Generated Python Code and Catch Hallucinated Imports"
+excerpt: "Learn how to verify AI-generated Python code before merge. Catch hallucinated imports, phantom calls, hardcoded secrets, and disabled security controls before they reach production."
 publishedAt: "2026-03-12"
 updatedAt: "2026-03-12"
 author:
@@ -26,6 +26,8 @@ keywords:
   - ai generated code guardrails
   - python ai code scanner
   - cursor code quality
+  - verify ai generated python code
+  - ai code review python
 canonicalUrl: "/use-cases/ai-generated-code-security"
 keyTakeaways:
   - "AI-generated Python bugs often look believable because the names, imports, and flows are plausible even when they do not exist."
@@ -47,7 +49,9 @@ howToSteps:
     text: "Run static analysis and security checks before AI-generated code reaches the default branch."
 ---
 
-# How to Catch Hallucinated Imports and Phantom Calls in AI-Generated Python Code
+# How to Verify AI-Generated Python Code and Catch Hallucinated Imports
+
+If your team uses Cursor, Claude, Copilot, or similar tools, you need a repeatable way to **verify AI-generated Python code** before merge.
 
 Your team is writing more code faster than ever. Copilot, Claude, Cursor, and other AI assistants are generating hundreds of lines per day. Velocity is up.
 
@@ -167,6 +171,29 @@ A careful code reviewer would catch phantom function calls. But:
 - The generated code often looks plausible and well-structured
 - Reviewers focus on logic, not on verifying every import and function reference
 - In a team of 10, you'd need to catch these across dozens of PRs per day
+
+---
+
+## A practical workflow to verify AI-generated Python code
+
+If you want the shortest path to verifying AI-generated Python code:
+
+1. run a local scan for security and dead code
+2. find where LLM integrations actually exist
+3. score the AI-specific defenses before the PR merges
+
+The commands are straightforward:
+
+```bash
+pip install skylos
+skylos src/ --danger --quality
+skylos discover src/
+skylos defend src/
+```
+
+That gives you a local-first workflow before you move the same checks into GitHub Actions.
+
+If you want the pull-request workflow next, go to [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions).
 
 ---
 
@@ -412,6 +439,8 @@ skylos discover src/
 skylos defend src/
 ```
 
+If you want to compare scanners first, read [Bandit vs Skylos](/compare/bandit-vs-skylos) or [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026).
+
 ---
 
 ## Related
@@ -420,6 +449,7 @@ skylos defend src/
 - [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)
 - [How to Detect Dead Code in Python](/use-cases/detect-dead-code-python)
 - [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+- [How to Secure GitHub Actions for Python Repos](/use-cases/secure-github-actions-python)
 - [AI-Generated Python Code Is Shipping Vulnerabilities](/blog/vibe-coding)
 - [We Scanned 9 Popular Python Libraries](/blog/we-scanned-9-popular-python-libraries)
 

@@ -365,7 +365,7 @@ export default function SkylosHeroSandbox() {
               href="/docs"
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
             >
-              Read docs
+              Run your first scan
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

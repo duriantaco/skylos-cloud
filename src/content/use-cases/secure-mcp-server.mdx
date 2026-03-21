@@ -1,0 +1,294 @@
+---
+title: "How to Secure an MCP Server Before You Trust It With Your Code"
+excerpt: "MCP makes AI coding agents far more useful, but it also expands what they can read, call, and exfiltrate. Use this checklist to harden MCP servers before they touch your repo, shell, or secrets."
+publishedAt: "2026-03-21"
+updatedAt: "2026-03-21"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "MCP is now part of the default AI coding workflow in tools like Claude Code and Cursor, but most teams still treat MCP setup like a convenience feature instead of a security boundary."
+methodology:
+  - "Mapped this guide to current MCP client behavior documented by Anthropic, Cursor, and the Model Context Protocol specification."
+  - "Focused on controls that matter in real engineering workflows: permissions, roots, secrets, approval, transport choice, and post-change verification."
+  - "Connected the checklist to Skylos workflows teams can run locally or in CI before agent-generated changes merge."
+tags: ["security", "ai code", "python"]
+keywords:
+  - secure mcp server
+  - model context protocol security
+  - mcp security checklist
+  - claude code mcp security
+  - cursor mcp security
+  - mcp server permissions
+  - mcp prompt injection
+  - secure ai coding tools
+  - mcp server hardening
+  - model context protocol security best practices
+canonicalUrl: "/use-cases/secure-mcp-server"
+keyTakeaways:
+  - "MCP turns an AI assistant into a tool-using system, so the security boundary is no longer just the model prompt."
+  - "The safest default is a local, least-privileged server with explicit approval for sensitive actions and tightly scoped roots."
+  - "Skylos fits after tool use: scan the repo, scan the diff, and gate agent-generated changes before merge."
+faq:
+  - question: "Why is MCP riskier than plain chat-based coding assistance?"
+    answer: "Because MCP gives the assistant real capabilities: reading files, calling APIs, querying databases, or running shell-backed tools. That expands the blast radius from text generation to actual system interaction."
+  - question: "Should I use local stdio or remote HTTP MCP servers?"
+    answer: "Prefer local stdio for sensitive workflows whenever possible. Remote transports can be appropriate, but they need stronger authentication, transport security, and output review."
+  - question: "Does Skylos secure the MCP protocol itself?"
+    answer: "No. Skylos secures the code and changes around the workflow. Use MCP-native controls for permissions and transport, then use Skylos to catch insecure code, dead code, and AI-generated regressions before merge."
+howToSteps:
+  - name: "Minimize server privileges"
+    text: "Limit which files, tools, credentials, and APIs the MCP server can reach before connecting it to an agent."
+  - name: "Require review for sensitive actions"
+    text: "Keep approval on for destructive or data-sensitive tool calls instead of allowing broad unattended execution."
+  - name: "Verify generated changes"
+    text: "Run a local scan and a diff-aware scan before accepting or merging any code the agent changed through MCP."
+---
+
+# How to Secure an MCP Server Before You Trust It With Your Code
+
+MCP is useful because it lets an AI coding assistant do more than autocomplete text. It can read project files, call external tools, reach databases, and interact with systems your developers use every day.
+
+That is exactly why you should treat MCP as a **security boundary**, not a convenience setting.
+
+If an MCP-connected agent can touch your repo, shell, tickets, secrets, or internal APIs, the important question is no longer "Is the model smart?" It is:
+
+**What can this tool chain do when the prompt is wrong, the output is malicious, or the approval model is too loose?**
+
+This guide gives you a practical hardening checklist for MCP servers used in engineering workflows.
+
+---
+
+## What changes when you enable MCP
+
+Without MCP, an AI coding tool mostly produces text.
+
+With MCP, it can:
+
+- read files and project metadata
+- invoke tools with structured arguments
+- query systems outside the repo
+- receive large tool outputs that may contain sensitive data
+- take actions based on instructions embedded in repo content, tickets, docs, or tool responses
+
+In Anthropic and Cursor, MCP is explicitly designed to connect assistants to external tools and data sources. The official MCP specification also calls out security controls around authorization, roots, tool confirmation, validation, and output handling.
+
+That means your security posture depends on **both** the model and the tool surface you expose to it.
+
+---
+
+## The short checklist
+
+| Control | Why it matters |
+|---|---|
+| Prefer local `stdio` when possible | Smaller network and auth surface |
+| Limit roots and working directories | Reduces file exposure and path traversal risk |
+| Keep approval on for sensitive tools | Prevents silent high-impact actions |
+| Use environment variables for secrets | Avoids hardcoded tokens in checked-in config |
+| Audit and pin MCP servers | Third-party server code becomes part of your trust chain |
+| Validate and sanitize tool outputs | Prevents accidental leakage and prompt poisoning |
+| Verify all generated changes with static analysis | Catches insecure code and removed controls before merge |
+
+---
+
+## 1. Prefer the smallest transport that solves the problem
+
+If a workflow only needs local repo access, prefer a **local `stdio` server** over a remote networked server.
+
+Why:
+
+- fewer auth flows to maintain
+- less chance of accidental external exposure
+- simpler debugging and incident scope
+- easier local isolation
+
+Cursor's MCP docs support local `stdio`, SSE, and streamable HTTP. Use the more complex transports only when you genuinely need multi-user or remote access.
+
+If you do need remote transport:
+
+- require HTTPS
+- use short-lived credentials
+- rotate tokens
+- validate redirect URIs and OAuth configuration
+- log access to sensitive tools
+
+---
+
+## 2. Scope roots and file access aggressively
+
+The MCP spec's roots model exists for a reason: the client should expose only the paths the server actually needs.
+
+In practice:
+
+- expose the project root, not your home directory
+- do not mount shared secrets directories into project-scoped tooling
+- separate production infrastructure repos from application repos
+- avoid a single all-powerful server that sees everything
+
+If your agent can browse multiple roots, it can also blend instructions and data from multiple contexts. That makes accidental leakage and prompt poisoning easier.
+
+For AI coding, the safe default is:
+
+1. one repo
+2. one bounded working directory
+3. one job-specific tool set
+
+---
+
+## 3. Keep approval on for sensitive operations
+
+Both Claude Code and Cursor document approval controls for tool usage. Leave those controls enabled for actions such as:
+
+- shell-backed tools
+- database access
+- secret lookups
+- deployment systems
+- ticketing or production admin integrations
+- any tool that writes outside the repo
+
+Do **not** normalize broad auto-run until you have a tight allowlist and a clear audit trail.
+
+The common failure mode here is not a Hollywood-style compromise. It is a developer approving too much because the workflow is noisy, repetitive, and feels routine.
+
+If a tool can cause production impact, the approval step is part of the product, not friction to remove.
+
+---
+
+## 4. Treat MCP server code as part of your supply chain
+
+An MCP server is not just a connector. It is executable logic with:
+
+- its own dependencies
+- its own auth behavior
+- its own logging and error handling
+- its own assumptions about safe inputs and outputs
+
+Before adopting a third-party MCP server:
+
+- review its source
+- pin versions instead of tracking floating `main`
+- understand what environment variables it expects
+- verify what it logs
+- check whether it enforces auth, rate limits, and path boundaries
+
+If a server has access to customer data, billing systems, infra, or source code, give it the same review bar you would give an internal service with similar privilege.
+
+---
+
+## 5. Keep secrets out of checked-in MCP config
+
+Anthropic's project-scoped MCP config and Cursor's server definitions are convenient, but convenience is where teams accidentally commit credentials.
+
+Use environment-variable expansion instead of inline values:
+
+```json
+{
+  "mcpServers": {
+    "internal-tools": {
+      "command": "python",
+      "args": ["tools/mcp_server.py"],
+      "env": {
+        "API_BASE_URL": "${API_BASE_URL}",
+        "SERVICE_TOKEN": "${SERVICE_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+Also:
+
+- scope tokens to the minimum permissions required
+- prefer separate tokens per server, not one shared admin token
+- rotate credentials on server changes or team changes
+- never pass production secrets into experimental servers
+
+---
+
+## 6. Plan for prompt injection through tools and tool output
+
+Prompt injection is not limited to user chat messages.
+
+In an MCP workflow, the model can receive instructions from:
+
+- markdown files in the repo
+- issue tracker tickets
+- pasted logs
+- database records
+- design docs
+- tool responses
+
+That means an MCP server can become a delivery path for malicious or manipulative text, even if the transport itself is perfectly authenticated.
+
+Defensive defaults:
+
+- sanitize high-risk tool output before returning it
+- truncate oversized responses
+- remove secrets and tokens from logs and tool results
+- require confirmation before executing secondary actions derived from tool output
+- avoid "take whatever the tool returned and immediately act on it" workflows
+
+---
+
+## 7. Verify the code after the agent acts
+
+MCP controls help you constrain what the assistant can do. They do **not** prove the code changes are safe.
+
+That is where Skylos fits.
+
+For repo-level verification:
+
+```bash
+skylos . -a
+```
+
+For AI-generated PRs or local diffs:
+
+```bash
+skylos diff main..HEAD --danger
+```
+
+For LLM-integrated applications:
+
+```bash
+skylos defend .
+```
+
+This gives you three layers:
+
+1. **MCP controls** to bound the tool surface
+2. **approval controls** to review sensitive actions
+3. **static analysis and diff analysis** to catch insecure or regressive code before merge
+
+---
+
+## A practical setup for engineering teams
+
+If you want a default setup that is hard to regret, use this:
+
+1. Local `stdio` server when possible
+2. Project-scoped roots only
+3. Environment variables for credentials
+4. Approval required for high-impact tools
+5. Pinned server versions
+6. Skylos local scan before commit
+7. Skylos diff scan in CI for PRs
+
+That setup will not make MCP risk-free. It will make it **understandable, reviewable, and much harder to misuse by accident**.
+
+---
+
+## Where to go next
+
+- Need a repo-specific workflow for Claude Code? Read [How to Review Claude Code Output for Python Security Regressions](/use-cases/claude-code-security-review)
+- Need a Cursor-specific workflow? Read [How to Use Skylos as a Cursor Security Scanner for Python](/use-cases/cursor-security-scanner)
+- Need to catch removed decorators and missing checks in PRs? Read [How to Catch Removed Auth Checks and Security Regressions in AI-Generated PRs](/use-cases/ai-security-regressions-in-prs)
+
+## References
+
+- [Anthropic: Claude Code security](https://docs.anthropic.com/en/docs/claude-code/security)
+- [Anthropic: Claude Code MCP](https://docs.anthropic.com/en/docs/claude-code/mcp)
+- [Cursor: Model Context Protocol](https://docs.cursor.com/en/context/mcp)
+- [Model Context Protocol: roots security considerations](https://modelcontextprotocol.io/docs/concepts/roots)
+- [Model Context Protocol: authorization security considerations](https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization)
+

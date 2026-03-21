@@ -1,0 +1,201 @@
+---
+title: "How to Scan LLM Applications for Prompt Injection, Data Leaks, and Missing Guardrails"
+excerpt: "If your product calls LLMs, the risky part is not just the prompt. It is the surrounding system: tools, retrieval, output handling, tenant boundaries, and cost controls. This guide shows how to scan that surface."
+publishedAt: "2026-03-17"
+updatedAt: "2026-03-17"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "Most teams now understand that LLM applications need security review, but many still rely on prompt advice instead of scanning the actual application code and control flow around the model."
+methodology:
+  - "Structured around the code surfaces real LLM applications expose: prompts, retrieval, tool use, output handling, and data movement."
+  - "Aligned with current OWASP LLM and agentic-AI guidance, while keeping the recommendations implementation-focused."
+  - "Mapped each step to Skylos commands teams can adopt without adding a separate AI security platform."
+tags: ["security", "ai code", "python"]
+keywords:
+  - llm application security scanner
+  - prompt injection scanner
+  - llm security scanning
+  - owasp llm top 10 scanner
+  - agentic ai security
+  - rag security scanning
+  - prompt injection detection python
+  - ai app security checklist
+  - secure llm application
+  - skylos defend
+canonicalUrl: "/use-cases/llm-application-security-scanning"
+keyTakeaways:
+  - "The most important LLM-app risks live in application code around the model, not just in prompt text."
+  - "Discovery plus targeted AI-defense scanning is the right starting point for teams building chat, RAG, and agentic products."
+  - "Prompt injection, output misuse, and cross-tenant retrieval issues should be checked before every merge, not after launch."
+faq:
+  - question: "What parts of an LLM application should be scanned?"
+    answer: "Prompt construction, retrieval logic, tool-calling code, output handling, secrets, tenant boundaries, and rate or cost controls should all be reviewed."
+  - question: "Is prompt injection just a prompt-engineering problem?"
+    answer: "No. It becomes an application-security problem when model output or retrieved content can influence tools, data access, or user-visible actions."
+  - question: "Can static analysis really help with LLM applications?"
+    answer: "Yes. It is especially useful for tracing where untrusted input flows into prompts, tool calls, retrieval layers, or unsafe output handling."
+howToSteps:
+  - name: "Discover the AI surface"
+    text: "Find every file and integration point where your application calls or wraps an LLM."
+  - name: "Run targeted AI-defense scans"
+    text: "Check prompt injection exposure, output handling, tenant isolation, and missing controls around model calls."
+  - name: "Gate future changes"
+    text: "Add the same checks to pull requests so the AI surface stays protected as the product evolves."
+---
+
+# How to Scan LLM Applications for Prompt Injection, Data Leaks, and Missing Guardrails
+
+If your app uses LLMs, the model call is only one part of the security story.
+
+The real risk usually sits in the application logic around it:
+
+- what untrusted input reaches the prompt
+- what retrieved data enters context
+- what tools the model can influence
+- what happens to model output afterward
+- whether secrets, PII, or tenant data cross boundaries they should not cross
+
+That is why "just prompt better" is not a security program.
+
+You need to scan the surrounding code.
+
+---
+
+## The code surfaces that matter most
+
+| Surface | Common failure mode |
+|---|---|
+| Prompt construction | Untrusted input concatenated directly into instructions |
+| RAG / retrieval | Cross-tenant or over-broad context included in prompts |
+| Tool calling | Model output influences sensitive actions without enough review |
+| Output handling | Unsanitized or over-trusted responses reach users or systems |
+| Secrets and config | API keys, internal URLs, or fallback credentials leak into code |
+| Rate and cost controls | No practical limit on expensive or abusable model paths |
+
+If your codebase exposes any of those, treat it like application security work, not just AI experimentation.
+
+---
+
+## Start with discovery
+
+Before you secure an LLM application, find every place the model actually appears.
+
+Run:
+
+```bash
+skylos discover .
+```
+
+Use that output to map:
+
+- direct OpenAI, Anthropic, or other model SDK calls
+- prompt builder modules
+- retrieval and vector search integrations
+- tool wrappers
+- policy or moderation layers
+- output post-processing
+
+Teams are often surprised by how many indirect LLM entry points have accumulated in helper code, admin tools, and internal services.
+
+---
+
+## Then scan the AI-specific risks
+
+Run:
+
+```bash
+skylos defend .
+```
+
+This is the right step when you need to inspect:
+
+- prompt injection exposure
+- missing input validation
+- weak output sanitization
+- retrieval or tenant-isolation issues
+- missing PII filtering
+- weak cost or rate controls
+
+The point is not to prove the model is safe in some abstract sense. The point is to find **where the code around the model makes unsafe behavior possible**.
+
+---
+
+## Prompt injection is usually a systems problem
+
+Teams often talk about prompt injection like it starts and ends with a malicious sentence.
+
+In production, it is usually a flow problem:
+
+1. untrusted content enters the system
+2. the application forwards it into model context
+3. the model output influences a tool, decision, or response
+4. the app trusts that result too much
+
+If you break any one of those steps with good controls, the incident gets much smaller.
+
+That is why scanning should focus on **data flow and control boundaries**, not just prompt wording.
+
+---
+
+## What a secure default looks like
+
+For most LLM applications, the initial guardrails should include:
+
+- explicit input validation on user and retrieved content
+- clear separation between instructions and untrusted text
+- output sanitization before rendering or executing results
+- narrow tool permissions
+- tenant-aware retrieval boundaries
+- cost and rate limits on model paths
+- logging that avoids leaking secrets or personal data
+
+If you are using MCP-connected agents inside the product or engineering workflow, add the controls from [How to Secure an MCP Server Before You Trust It With Your Code](/use-cases/secure-mcp-server).
+
+---
+
+## Make it part of the merge workflow
+
+Once discovery and defense scans are in place, add the normal repo gate too:
+
+```bash
+skylos . -a
+skylos cicd init
+```
+
+That gives you:
+
+1. general static analysis
+2. AI-specific application checks
+3. a repeatable PR gate
+
+Without that third step, AI features tend to drift into a weaker state as new tools, prompts, and wrappers get added under delivery pressure.
+
+---
+
+## What to review manually after the scan
+
+Use the scan to narrow the review, then ask:
+
+- Can untrusted text influence a privileged tool call?
+- Can one tenant's context leak into another tenant's answer?
+- Can model output trigger a sensitive action without human confirmation?
+- Are retries, fallbacks, or debug paths bypassing policy checks?
+- Did a refactor remove rate limits, moderation, or PII filtering?
+
+That last question matters more than teams think. AI features often regress through cleanup changes, not just through brand-new implementation mistakes.
+
+---
+
+## Where to go next
+
+- Need to secure the AI coding workflow itself? Read [How to Secure an MCP Server Before You Trust It With Your Code](/use-cases/secure-mcp-server)
+- Need PR-focused regression detection? Read [How to Catch Removed Auth Checks and Security Regressions in AI-Generated PRs](/use-cases/ai-security-regressions-in-prs)
+- Need a narrower AI-code review starting point? Read [How to Catch Hallucinated Imports and Phantom Calls in AI-Generated Python Code](/use-cases/ai-generated-code-security)
+
+## References
+
+- [OWASP Agentic AI Top 10](https://genai.owasp.org/2025/12/09/owasp-top-10-for-agentic-applications-the-benchmark-for-agentic-security-in-the-age-of-autonomous-ai/)
+- [Anthropic: Claude Code MCP](https://docs.anthropic.com/en/docs/claude-code/mcp)
+

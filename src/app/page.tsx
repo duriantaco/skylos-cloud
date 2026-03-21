@@ -8,8 +8,8 @@ import { getGithubRepo, getSiteUrl } from '@/lib/site'
 import { ArrowRight, Terminal, Shield, AlertTriangle, Code2, GitBranch, Timer, Search, Check, Zap, Bug, BookOpen } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Skylos | Python Static Analysis, Security Scanner & Dead Code Detection',
-  description: 'Open source Python static analysis and security scanner for dead code, hardcoded secrets, GitHub Actions hardening, and AI-generated code review. Framework-aware for Django, Flask, FastAPI, and Pydantic.',
+  title: 'Skylos | AI Code Security for Python, Dead Code Detection & Security Scanning',
+  description: 'Open source Python static analysis for teams shipping AI-generated code. Catch dead code, hallucinated imports, risky patterns, removed auth, CSRF, or rate-limit controls, and add MCP guardrails before merge.',
   keywords: [
     'python static analysis tool',
     'python security scanner',
@@ -23,14 +23,20 @@ export const metadata: Metadata = {
     'python security scanner github actions',
     'secure github actions python',
     'python linting deprecated vscode',
+    'secure mcp server',
+    'claude code security review',
+    'cursor security scanner',
+    'github copilot security review',
+    'ai security regression detection',
+    'llm application security scanner',
     'FastAPI dead code detection',
     'Django security scanner',
     'Flask static analysis',
     'python CI security scanning',
   ],
   openGraph: {
-    title: 'Skylos — Python Static Analysis, Security Scanner & Dead Code Detection',
-    description: 'Open source Python static analysis and security scanner for dead code, secrets, GitHub Actions hardening, and AI-generated code review.',
+    title: 'Skylos — AI Code Security for Python',
+    description: 'Catch dead code, AI-generated mistakes, removed security controls, and MCP workflow risk before merge.',
     type: 'website',
   },
 }
@@ -232,6 +238,10 @@ export default async function Home() {
       q: 'Can I automate Python security checks in GitHub Actions?',
       a: 'Yes. Skylos is designed for CI/CD. You can use it to gate pull requests, ensuring no dead code or security vulnerabilities merge into your main branch.',
     },
+    {
+      q: 'Can Skylos review Claude Code or Cursor output?',
+      a: 'Yes. You can run Skylos locally before commit, scan diffs in pull requests, and use Skylos in AI-assisted workflows where Claude Code, Cursor, or other agents are generating Python changes.',
+    },
   ]
 
   // --- SEO: 3. JSON-LD for Rich Snippets ---
@@ -264,13 +274,13 @@ export default async function Home() {
     applicationCategory: 'SecurityApplication', 
     operatingSystem: 'Windows, macOS, Linux',
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-    description: 'A static analysis security tool (SAST) for finding risks and dead code in Python applications.',
+    description: 'Open source AI code security and static analysis for Python teams. Detect dead code, risky patterns, and removed security controls before merge.',
     url: siteUrl,
     featureList: [
-      'Secret Scanning',
-      'SQL Injection Detection',
-      'Dead Code Removal',
-      'CI/CD Quality Gate'
+      'Diff-aware security regression detection',
+      'Dead code detection for framework-heavy Python repositories',
+      'AI-generated code verification and risk checks',
+      'Local CLI scans and GitHub PR gates'
     ]
   }
 
@@ -320,22 +330,27 @@ export default async function Home() {
 
           {/* Hero Title - Clean & Professional */}
           <div className="relative max-w-5xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50/80 px-4 py-2 text-sm font-semibold text-blue-900 animate-fade-in-up [animation-delay:150ms]">
+              Built for teams shipping with Cursor, Copilot, and Claude Code
+            </div>
+
             <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.02] animate-fade-in-up">
-              <span className="block text-slate-900">Framework-aware</span>
+              <span className="block mt-6 text-slate-900">Catch what AI</span>
+              <span className="block mt-2 text-slate-900">writes wrong.</span>
               <span className="block mt-2 text-slate-900">
-                <span className="relative inline-block">
-                  Python
+                Catch what it
+                <span className="relative inline-block ml-3">
+                  silently removes.
                   <span className="absolute bottom-2 left-0 right-0 h-4 bg-blue-400/35 -z-10 -rotate-1"></span>
                 </span>
-                {' '}static analysis
               </span>
             </h1>
 
             {/* Enhanced Subtitle */}
             <p className="mt-8 text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto leading-relaxed animate-fade-in-up [animation-delay:200ms] font-medium">
-              Find dead code, security issues, and AI-generated code mistakes before merge.
+              Skylos is the open source Python security and static analysis tool for teams shipping AI-generated code.
               <br className="hidden sm:block" />
-              <span className="text-slate-500">Run locally, in GitHub Actions, or inside VS Code.</span>
+              <span className="text-slate-500">Find dead code, hallucinated imports, risky patterns, and removed auth, CSRF, or rate-limit controls before merge, and add guardrails around MCP-driven workflows.</span>
             </p>
 
             {/* Enhanced CTA Buttons */}
@@ -343,52 +358,66 @@ export default async function Home() {
               <Link
                 href="/docs"
                 className="group relative inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 px-10 py-5 text-lg font-bold text-white hover:shadow-2xl hover:shadow-slate-900/40 hover:scale-105 transition-all duration-300 overflow-hidden"
-                aria-label="Install Skylos CLI"
+                aria-label="Run your first Skylos scan"
               >
                 {/* Shimmer Effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
                 <span className="relative z-10 flex items-center gap-2">
-                  Install CLI
+                  Run your first scan
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </span>
               </Link>
 
               <Link
-                href="#example-output"
+                href="#proof"
                 className="group relative inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-white/80 backdrop-blur-sm px-10 py-5 text-lg font-bold text-slate-900 hover:border-slate-300 hover:bg-white hover:shadow-xl hover:scale-105 transition-all duration-300"
               >
-                See example output
+                See proof
                 <ArrowRight className="w-5 h-5 text-slate-400 group-hover:translate-x-1 group-hover:text-slate-900 transition-all" />
-              </Link>
-
-              <Link
-                href="/login"
-                className="group inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-8 py-4 text-base font-semibold text-slate-900 hover:border-slate-300 hover:bg-white transition-all"
-              >
-                Connect GitHub
-                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
 
             <div className="mt-6 flex justify-center animate-fade-in-up [animation-delay:500ms]">
               <CopyInstallButton command="pip install skylos" />
             </div>
+            <p className="mt-3 text-sm text-slate-500 animate-fade-in-up [animation-delay:550ms]">
+              Then run <code className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-slate-900">skylos . -a</code> on a repo you care about. No login required.
+            </p>
 
             {/* Trust Indicators */}
             <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm text-slate-500 animate-fade-in-up [animation-delay:600ms]">
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-500" />
-                <span>Open source CLI</span>
+                <span>Open source CLI, no signup required</span>
               </div>
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-amber-500" />
-                <span>Docs and quickstart live</span>
+                <span>Try locally first, then add PR gates</span>
               </div>
               <div className="flex items-center gap-2">
                 <GitBranch className="w-4 h-4 text-blue-500" />
-                <span>Local scans or GitHub PR gates</span>
+                <span>Framework-aware for Django, Flask, FastAPI, and Pydantic</span>
               </div>
             </div>
+
+            <Link
+              href="/blog/3-merged-prs-dead-code-in-black-flagsmith-pypdf"
+              className="mt-8 mx-auto flex max-w-4xl items-start gap-4 rounded-2xl border border-slate-200 bg-white/70 px-6 py-5 text-left shadow-lg shadow-slate-900/5 hover:border-slate-300 hover:shadow-xl transition-all animate-fade-in-up [animation-delay:650ms]"
+            >
+              <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
+                <GitBranch className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Maintainer-validated proof</div>
+                <p className="mt-2 text-base font-semibold text-slate-900">
+                  Merged cleanup PRs into Black, networkx, mitmproxy, pypdf, and Flagsmith.
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  This is stronger than a testimonial: maintainers reviewed the findings, merged the changes, and kept the code.
+                </p>
+              </div>
+              <ArrowRight className="mt-1 hidden h-5 w-5 shrink-0 text-slate-400 sm:block" />
+            </Link>
           </div>
 
           <div className="mt-16 md:mt-20" id="example-output">
@@ -412,17 +441,17 @@ export default async function Home() {
           </div>
 
           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
-            <a href="#benchmark" className="group rounded-2xl border border-slate-200 bg-white p-7 hover:border-slate-300 hover:shadow-xl transition-all">
-              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">FastAPI benchmark</div>
-              <div className="mt-4 text-4xl font-black text-slate-900">29/29</div>
-              <h3 className="mt-3 text-lg font-semibold text-slate-900">Seeded dead-code findings caught</h3>
+            <Link href="/blog/3-merged-prs-dead-code-in-black-flagsmith-pypdf" className="group rounded-2xl border border-slate-200 bg-white p-7 hover:border-slate-300 hover:shadow-xl transition-all">
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Maintainer validation</div>
+              <div className="mt-4 text-4xl font-black text-slate-900">5 repos</div>
+              <h3 className="mt-3 text-lg font-semibold text-slate-900">Merged cleanup PRs into real Python libraries</h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                FastAPI + Pydantic benchmark on Apple Silicon M3. Skylos reached 100% recall and 70.7% precision.
+                Black, networkx, mitmproxy, pypdf, and Flagsmith all merged findings generated from Skylos output.
               </p>
               <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
-                See benchmark <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                Review merged PR proof <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </span>
-            </a>
+            </Link>
 
             <Link href="/blog/flask-dead-code-case-study" className="group rounded-2xl border border-slate-200 bg-white p-7 hover:border-slate-300 hover:shadow-xl transition-all">
               <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Flask case study</div>
@@ -436,27 +465,27 @@ export default async function Home() {
               </span>
             </Link>
 
-            <Link href="/blog/we-scanned-9-popular-python-libraries" className="group rounded-2xl border border-slate-200 bg-white p-7 hover:border-slate-300 hover:shadow-xl transition-all">
-              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Repository scan</div>
-              <div className="mt-4 text-4xl font-black text-slate-900">9 repos</div>
-              <h3 className="mt-3 text-lg font-semibold text-slate-900">Scanned without cherry-picking</h3>
+            <Link href="/compare/bandit-vs-skylos" className="group rounded-2xl border border-slate-200 bg-white p-7 hover:border-slate-300 hover:shadow-xl transition-all">
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">9-repo benchmark</div>
+              <div className="mt-4 text-4xl font-black text-slate-900">98.1%</div>
+              <h3 className="mt-3 text-lg font-semibold text-slate-900">Recall on popular Python repos</h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                FastAPI, Flask, Pydantic, Requests, Rich and more: 1,800 security findings, 4,195 quality issues, and 730 dead code items.
+                Across 9 repositories with 350k+ combined stars, Skylos reached 98.1% recall with 220 false positives vs Vulture&apos;s 644.
               </p>
               <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
-                Review the scan <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                Compare the benchmark <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </span>
             </Link>
 
-            <Link href="/use-cases/ai-generated-code-security" className="group rounded-2xl border border-slate-200 bg-white p-7 hover:border-slate-300 hover:shadow-xl transition-all">
-              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">AI workflow</div>
-              <div className="mt-4 text-4xl font-black text-slate-900">13 checks</div>
-              <h3 className="mt-3 text-lg font-semibold text-slate-900">AI code risk coverage</h3>
+            <Link href="/compare/sonarqube-vs-skylos" className="group rounded-2xl border border-slate-200 bg-white p-7 hover:border-slate-300 hover:shadow-xl transition-all">
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Verification accuracy</div>
+              <div className="mt-4 text-4xl font-black text-slate-900">35/35</div>
+              <h3 className="mt-3 text-lg font-semibold text-slate-900">LLM verification matched Claude Code</h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                Catch hallucinated imports, phantom calls, hardcoded secrets, and missing AI safety controls before merge.
+                Real-world verification benchmark on pip-tools, tox, and mesa for findings you can trust before opening a PR.
               </p>
               <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
-                See AI workflow <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                See verification proof <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </span>
             </Link>
           </div>
@@ -468,10 +497,10 @@ export default async function Home() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
-              What Skylos checks
+              What teams use Skylos to catch
             </h2>
             <p className="mt-4 text-lg text-slate-600">
-              Framework-aware analysis for dead code, secrets, vulnerabilities, and AI-generated code mistakes.
+              The value is not generic linting. It is catching believable mistakes before they merge.
             </p>
           </div>
 
@@ -480,9 +509,9 @@ export default async function Home() {
               <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center mb-4">
                 <AlertTriangle className="w-6 h-6 text-red-600" aria-hidden="true" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">Vulnerability Scanner</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">Removed security controls</h3>
               <p className="text-slate-600 text-sm leading-relaxed">
-                Prevent <strong>SQL injection</strong>, XSS, and command injection attacks by catching unsafe patterns in your code.
+                Catch when refactors remove <strong>auth decorators</strong>, CSRF checks, rate limits, or other security controls that reviewers miss.
               </p>
             </article>
 
@@ -490,9 +519,9 @@ export default async function Home() {
               <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center mb-4">
                 <Shield className="w-6 h-6 text-amber-600" aria-hidden="true" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">Secret Detection</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">Hallucinated AI code</h3>
               <p className="text-slate-600 text-sm leading-relaxed">
-                Stop data leaks. Skylos finds <strong>hardcoded API keys</strong>, tokens, and passwords in your source code commits.
+                Find <strong>hallucinated imports</strong>, phantom calls, insecure defaults, and hardcoded secrets in AI-assisted code before merge.
               </p>
             </article>
 
@@ -500,9 +529,9 @@ export default async function Home() {
               <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center mb-4">
                 <Code2 className="w-6 h-6 text-blue-600" aria-hidden="true" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">Dead Code Removal</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">Dead code in real Python apps</h3>
               <p className="text-slate-600 text-sm leading-relaxed">
-                Clean your technical debt. Identify <strong>unused imports</strong>, functions, and unreachable variables automatically.
+                Reduce Vulture-style noise across <strong>Django, Flask, FastAPI, Pydantic, and pytest</strong> instead of maintaining giant ignore lists.
               </p>
             </article>
 
@@ -510,9 +539,9 @@ export default async function Home() {
               <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center mb-4">
                 <Terminal className="w-6 h-6 text-purple-600" aria-hidden="true" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">Quality Gate</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">Local scan to PR gate</h3>
               <p className="text-slate-600 text-sm leading-relaxed">
-                Enforce coding standards and reduce complexity with automated <strong>quality checks</strong> in your CI pipeline.
+                Start with <strong>skylos . -a</strong>. When it earns trust on a real repo, add <strong>skylos cicd init</strong> for repeatable GitHub enforcement.
               </p>
             </article>
           </div>
@@ -707,10 +736,10 @@ export default async function Home() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
-              Integrate in Seconds
+              Try it locally. Gate it in CI when it earns trust.
             </h2>
             <p className="mt-4 text-lg text-slate-600">
-              Build a secure DevSecOps pipeline in three steps.
+              The first run should take seconds. The second step is CI only after you see signal on a real repo.
             </p>
           </div>
           
@@ -725,7 +754,7 @@ export default async function Home() {
                   <span className="text-emerald-400">$</span> pip install skylos
                 </div>
                 <p className="mt-4 text-slate-600">
-                  Or connect GitHub for automated PR scanning.
+                  Start locally with no login, no repo connection, and no workflow changes.
                 </p>
               </div>
             </div>
@@ -735,15 +764,12 @@ export default async function Home() {
                 2
               </div>
               <div className="pt-8 pl-8">
-                <h3 className="text-xl font-semibold text-slate-900 mb-3">Run Analysis</h3>
+                <h3 className="text-xl font-semibold text-slate-900 mb-3">Run your first scan</h3>
                 <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm text-slate-300">
-                  <span className="text-emerald-400">$</span> skylos . --danger --quality --upload
+                  <span className="text-emerald-400">$</span> skylos . -a
                 </div>
                 <p className="mt-4 text-slate-600">
-                  Upload to the dashboard for gate status, suppressions, and history.
-                  <span className="block text-sm text-slate-500 mt-1">
-                    Local only: <span className="font-mono">skylos . --danger --quality</span>
-                  </span>
+                  Scan for dead code, security issues, and AI-generated regressions on a repo you already care about.
                 </p>
               </div>
             </div>
@@ -753,18 +779,12 @@ export default async function Home() {
                 3
               </div>
               <div className="pt-8 pl-8">
-                <h3 className="text-xl font-semibold text-slate-900 mb-3">Fix & Gate</h3>
-                <div className="bg-white rounded-xl border border-slate-200 p-4">
-                  <div className="flex items-center gap-2 text-sm">
-                    <GitBranch className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-600">PR #142</span>
-                    <span className="ml-auto px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium">
-                      ✓ Gate passed
-                    </span>
-                  </div>
+                <h3 className="text-xl font-semibold text-slate-900 mb-3">Add PR gates when ready</h3>
+                <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm text-slate-300">
+                  <span className="text-emerald-400">$</span> skylos cicd init
                 </div>
                 <p className="mt-4 text-slate-600">
-                  Block risky merges automatically.
+                  Generate GitHub Actions setup and block risky merges once the local scan is already useful.
                 </p>
               </div>
             </div>
@@ -780,7 +800,7 @@ export default async function Home() {
               Guides, Comparisons & Use Cases
             </h2>
             <p className="mt-4 text-lg text-slate-600">
-              Learn how Python teams use Skylos for security scanning, dead code detection, secure GitHub Actions, and AI-generated code review.
+              Learn how Python teams use Skylos for security scanning, dead code detection, secure GitHub Actions, MCP-connected AI agents, and diff-aware AI code review.
             </p>
           </div>
 
@@ -793,18 +813,23 @@ export default async function Home() {
               <h3 className="text-xl font-bold text-slate-900 mb-3">Use Cases</h3>
               <ul className="space-y-3 text-sm text-slate-600 mb-6">
                 <li>
-                  <Link href="/use-cases/detect-dead-code-python" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
-                    How to detect dead code in Python
+                  <Link href="/use-cases/secure-mcp-server" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Secure an MCP server before it touches your code
                   </Link>
                 </li>
                 <li>
-                  <Link href="/use-cases/ai-generated-code-security" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
-                    Catch hallucinated imports in AI code
+                  <Link href="/use-cases/ai-security-regressions-in-prs" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Catch removed auth checks in AI-generated PRs
                   </Link>
                 </li>
                 <li>
                   <Link href="/use-cases/secure-github-actions-python" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
                     Secure GitHub Actions for Python
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/use-cases/detect-dead-code-python" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    How to detect dead code in Python
                   </Link>
                 </li>
               </ul>
@@ -950,7 +975,7 @@ export default async function Home() {
                 </li>
               </ul>
               <Link href="/docs" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
-                Install locally <ArrowRight className="w-4 h-4" />
+                Run your first scan <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
 
@@ -1098,32 +1123,25 @@ export default async function Home() {
       <section className="py-24 bg-white">
         <div className="mx-auto max-w-4xl px-6 text-center">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
-            Try it locally first
+            Run it on one repo you care about
           </h2>
           <p className="mt-4 text-lg text-slate-600">
-            Run the CLI on a repo, then connect GitHub when you want PR gates and shared history.
+            Start locally with no login. If the findings are useful, add <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-base text-slate-900">skylos cicd init</code> to gate pull requests later.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Link
               href="/docs"
               className="group inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-4 text-base font-semibold text-white hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
             >
-              Install CLI
+              Run your first scan
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
 
             <Link
-              href="#proof"
+              href="/blog/3-merged-prs-dead-code-in-black-flagsmith-pypdf"
               className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-8 py-4 text-base font-semibold text-slate-900 hover:bg-slate-50 transition-all"
             >
-              See proof
-              <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <Link
-              href="/login"
-              className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-8 py-4 text-base font-semibold text-slate-900 hover:bg-white transition-all"
-            >
-              Connect GitHub
+              See maintainer proof
               <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>

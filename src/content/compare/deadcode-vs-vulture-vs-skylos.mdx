@@ -1,6 +1,6 @@
 ---
-title: "Deadcode vs Vulture vs Skylos: Dead Code Tools"
-excerpt: "Compare deadcode, Vulture, and Skylos for Python dead code detection. Autofix, false positives, framework awareness, and CI workflow compared."
+title: "Deadcode vs Vulture vs Skylos for Python Dead Code Detection"
+excerpt: "Compare deadcode, Vulture, and Skylos for Python dead code detection. See autofix, false positives, framework awareness, CI workflow, and when each tool fits."
 publishedAt: "2026-03-12"
 updatedAt: "2026-03-12"
 author:
@@ -45,15 +45,15 @@ faq:
     answer: "Only Skylos overlaps with security scanning. deadcode and Vulture focus on unused-code detection rather than Python security issues."
 ---
 
-# Deadcode vs Vulture vs Skylos: Dead Code Tools Compared
+# Deadcode vs Vulture vs Skylos for Python Dead Code Detection
 
-If your main goal is to find unused Python code, these are three of the most relevant options in 2026:
+If you are comparing **Python dead code detection tools**, these are three of the most relevant options in 2026:
 
 - **deadcode** for whole-codebase dead code detection with autofix
 - **Vulture** for dedicated dead code scanning with confidence scoring
 - **Skylos** for dead code detection plus framework awareness, security scanning, and CI workflow
 
-They overlap, but they are not the same kind of tool. The right choice depends on whether you want fast cleanup, lower false-positive friction, or a broader Python analysis stack.
+They overlap, but they are not the same kind of tool. The right choice depends on whether you want fast cleanup, lower false-positive friction, or a broader Python analysis stack that also covers security and CI.
 
 ---
 
@@ -374,6 +374,29 @@ If you want the dead code scan to live inside broader Python analysis and CI, Sk
 
 ---
 
+## What to do next on a real repo
+
+If you are still deciding between deadcode, Vulture, and Skylos, the cleanest next step is:
+
+1. run the tool on a repository you already maintain
+2. count the findings you would actually action
+3. compare how much time you would spend suppressing or reviewing noise
+
+If your repository is framework-heavy, read [Finding Dead Code in Flask: Skylos vs Vulture](/blog/flask-dead-code-case-study) next.
+
+If security also matters, move from this dead-code comparison to [Bandit vs Skylos](/compare/bandit-vs-skylos) or [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026).
+
+If you want the shortest possible proof check:
+
+```bash
+pip install skylos
+skylos . -a
+```
+
+That tells you more than another hour of tool research.
+
+---
+
 ## Try Skylos
 
 If you want framework-aware dead code detection plus security and quality in one tool:
@@ -397,3 +420,4 @@ No signup, no config file, results in under 30 seconds. [View on PyPI](https://p
 - [How to Detect Dead Code in Python](/use-cases/detect-dead-code-python)
 - [Finding Dead Code in Flask: Skylos vs Vulture](/blog/flask-dead-code-case-study)
 - [Bandit vs Vulture vs Skylos](/blog/python-sast-comparison-2026)
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)

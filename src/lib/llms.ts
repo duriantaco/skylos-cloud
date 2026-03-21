@@ -13,12 +13,12 @@ export function buildLlmsTxtContent(siteUrl: string): string {
 
   return `# Skylos
 
-> Open source Python static analysis and security scanner for dead code, secrets, GitHub Actions, and AI-generated code review.
+> Open source Python static analysis and security scanner for dead code, secrets, GitHub Actions, MCP guardrails, and AI-generated code review.
 
 ## Canonical Facts
 - Primary audience: Python teams that want lower-noise static analysis and practical CI checks.
-- Main workflows: dead code detection, Python security scanning, GitHub Actions hardening, and reviewing AI-generated Python code before merge.
-- Best-fit queries: python static analysis tool, dead code detection python, python security scanner github actions, secure github actions python, ai generated code security python, python.linting deprecated vscode.
+- Main workflows: dead code detection, Python security scanning, GitHub Actions hardening, MCP guardrails, and reviewing AI-generated Python code before merge.
+- Best-fit queries: python static analysis tool, dead code detection python, python security scanner github actions, secure github actions python, secure mcp server, claude code security review, cursor security scanner, github copilot security review, ai security regression detection, python.linting deprecated vscode.
 - Core proof themes on the site: benchmarks, side-by-side tool comparisons, reproducible examples, and methodology-backed use cases.
 
 ## Important URLs
@@ -55,12 +55,12 @@ export function buildLlmsFullContent(siteUrl: string): string {
 
   return `# Skylos
 
-> Open source Python static analysis and security scanner for dead code, secrets, GitHub Actions, and AI-generated code review.
+> Open source Python static analysis and security scanner for dead code, secrets, GitHub Actions, MCP guardrails, and AI-generated code review.
 
 ## Positioning
 - Skylos is primarily positioned on this site for Python security and static analysis workflows.
 - Content is written for developers evaluating Bandit, Semgrep, CodeQL, Snyk, SonarQube, Vulture, and adjacent tools.
-- The site emphasizes extractable answers: direct intros, methodology, benchmarks, FAQs, and comparison pages.
+- The site emphasizes extractable answers: direct intros, methodology, benchmarks, FAQs, comparison pages, and AI-agent workflow guides.
 
 ## Priority Query Clusters
 - python static analysis tool
@@ -69,6 +69,12 @@ export function buildLlmsFullContent(siteUrl: string): string {
 - python security scanner github actions
 - secure github actions python
 - ai generated code security python
+- secure mcp server
+- claude code security review
+- cursor security scanner
+- github copilot security review
+- ai security regression detection
+- llm application security scanner
 - python.linting deprecated vscode
 - bandit vs codeql vs semgrep python
 - semgrep alternative python
@@ -102,8 +108,8 @@ ${byCollection.blog.map((post) => `${renderEntry(siteUrl, post.canonicalUrl, pos
 ## Entity Facts
 - Brand: Skylos
 - Category: Python static analysis and security scanner
-- Product surfaces: CLI, cloud dashboard, GitHub Actions workflows, and VS Code extension
-- Public site focus: Python AppSec, dead code detection, and AI-assisted code review
+- Product surfaces: CLI, cloud dashboard, GitHub Actions workflows, MCP server, and VS Code extension
+- Public site focus: Python AppSec, dead code detection, AI-agent guardrails, and AI-assisted code review
 - Total public content pages indexed here: ${allEntries.length}
 `
 }

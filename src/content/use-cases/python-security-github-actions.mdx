@@ -1,8 +1,17 @@
 ---
-title: "Python Security Scanner for GitHub Actions: Automate SAST in CI/CD"
-excerpt: "How to add Python static analysis and security scanning to your GitHub Actions pipeline. Catch dead code, hardcoded secrets, SQL injection, and AI-generated code problems on every pull request."
+title: "Python Security Scanner for GitHub Actions: Scan Every Pull Request"
+excerpt: "Add a Python security scanner to GitHub Actions and scan every pull request. Catch dead code, hardcoded secrets, SQL injection, and AI-generated code problems before merge."
 publishedAt: "2026-03-12"
 updatedAt: "2026-03-12"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "This guide exists for teams that already use GitHub Actions and want the fastest path to scanning Python code on every pull request without stitching together multiple tools by hand."
+methodology:
+  - "Built from the existing Skylos CI workflow, GitHub Actions setup patterns, and related workflow-hardening guidance already in the repo."
+  - "Focused on the buyer intent behind the query: how to get a Python security scanner running in GitHub Actions quickly, then tighten the workflow over time."
+  - "Separated code scanning guidance from workflow-hardening guidance so each page matches a distinct search intent."
 tags: ["ci", "security", "python"]
 keywords:
   - python security scanner github actions
@@ -40,6 +49,8 @@ howToSteps:
 
 # Python Security Scanner for GitHub Actions
 
+If you are looking for a **Python security scanner for GitHub Actions**, the highest-leverage place to add it is the pull-request workflow.
+
 If you're running a Python project on GitHub and you don't have automated security scanning, every PR is a gamble. Hardcoded secrets, SQL injection patterns, dead code, and AI-generated bugs all slip through manual review.
 
 This guide shows you how to set up automated Python security and quality scanning in GitHub Actions using Skylos — from zero to PR-blocking quality gates in under 5 minutes.
@@ -57,6 +68,21 @@ Manual code review catches logic problems. It's bad at catching:
 - **AI-generated problems** — hallucinated imports, phantom function calls, disabled SSL verification
 
 These are exactly the patterns that static analysis is designed to catch automatically. Running it on every PR means nothing ships without being scanned.
+
+---
+
+## Local first, then GitHub Actions
+
+Even if the target workflow is GitHub Actions, the fastest sanity check is still local:
+
+```bash
+pip install skylos
+skylos . -a
+```
+
+If the findings are useful on a real repository, then move the same workflow into GitHub Actions with `skylos cicd init`.
+
+If you also need to secure the workflow itself, not just scan the code running inside it, read [How to Secure GitHub Actions for Python Repos](/use-cases/secure-github-actions-python).
 
 ---
 
@@ -376,8 +402,9 @@ That's it. Commit the workflow file, push, and every PR gets scanned.
 
 - [How to Secure GitHub Actions for Python Repos](/use-cases/secure-github-actions-python)
 - [How to detect dead code in Python](/use-cases/detect-dead-code-python)
+- [Bandit vs Skylos](/compare/bandit-vs-skylos)
 - [Semgrep vs Skylos for Python](/compare/semgrep-vs-skylos)
-- [How to catch AI-generated code problems](/use-cases/ai-generated-code-security)
+- [How to verify AI-generated Python code and catch hallucinated imports](/use-cases/ai-generated-code-security)
 - [Best Python SAST tools compared](/blog/python-sast-comparison-2026)
 
 *Skylos is open source. [View on GitHub](https://github.com/duriantaco/skylos) | [Docs](https://docs.skylos.dev) | [Install](https://pypi.org/project/skylos/)*

@@ -1,0 +1,227 @@
+---
+title: "How to Catch Removed Auth Checks and Security Regressions in AI-Generated PRs"
+excerpt: "The most dangerous AI-generated vulnerability is often not new code. It is a deleted decorator, dropped validation check, or missing middleware in a clean-looking refactor. Diff-aware scanning is how you catch it."
+publishedAt: "2026-03-18"
+updatedAt: "2026-03-18"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "Teams reviewing AI-generated pull requests still over-index on newly added code. In practice, many of the worst failures come from removed security controls in broad cleanup diffs."
+methodology:
+  - "Built from Skylos' diff-aware security model and the recurring categories of removed controls the product tracks."
+  - "Focused on Python web and service code, where deleted auth, validation, and rate-limit logic often survives tests long enough to reach production."
+  - "Structured as a merge workflow, not a theory piece, so teams can adopt it quickly."
+tags: ["security", "ai code", "ci"]
+keywords:
+  - ai security regression detection
+  - removed auth checks
+  - ai generated pr security
+  - secure ai generated pull requests
+  - diff aware security scan
+  - detect removed decorators python
+  - cursor security regression
+  - claude code security regression
+  - ai code review security
+  - detect removed rate limiting
+canonicalUrl: "/use-cases/ai-security-regressions-in-prs"
+keyTakeaways:
+  - "AI-generated PRs often create risk by deleting protections during refactors, not by adding obviously dangerous code."
+  - "Whole-repo scanning is useful, but diff-aware scanning is what exposes missing auth, validation, and middleware in the change itself."
+  - "This should be a PR gate, not a best-effort reviewer habit."
+faq:
+  - question: "Why don't tests catch these regressions reliably?"
+    answer: "Because deleted protections can sit outside the specific paths your tests exercise. A route may still return 200 in tests while silently losing permission, CSRF, or rate-limit enforcement in production behavior."
+  - question: "What kinds of controls are most often removed by AI refactors?"
+    answer: "Authentication decorators, permission checks, input validation, rate limits, CORS restrictions, CSRF protection, logging, and security middleware."
+  - question: "Is this only relevant for AI-generated code?"
+    answer: "No, but AI-generated refactors make the problem much more frequent because they produce larger structural changes faster than humans usually do."
+howToSteps:
+  - name: "Establish the repo baseline"
+    text: "Make sure you understand the current finding set before evaluating the new pull request."
+  - name: "Run a diff-aware scan"
+    text: "Scan the PR diff so removed controls surface as first-class findings instead of disappearing into the refactor."
+  - name: "Block the merge on regressions"
+    text: "Use CI to fail PRs that delete or weaken security-critical behavior."
+---
+
+# How to Catch Removed Auth Checks and Security Regressions in AI-Generated PRs
+
+If you review enough AI-generated pull requests, you start seeing the same pattern:
+
+The code is clean. The refactor is plausible. The diff is large. And the vulnerability is a **thing that is no longer there.**
+
+It is not always:
+
+- a new `eval()`
+- a new hardcoded secret
+- a blatantly dangerous SQL string
+
+Often it is:
+
+- a deleted `@login_required`
+- a missing permission branch
+- input validation that no longer runs
+- rate limiting that vanished during route cleanup
+- a middleware registration that quietly dropped out of the code path
+
+That is why AI PR review needs a **regression mindset**, not just an issue-spotting mindset.
+
+---
+
+## Why whole-repo scans are not enough
+
+A full scan is still useful. Run it:
+
+```bash
+skylos . -a
+```
+
+But a whole-tree scan answers:
+
+**"What problems exist in the repo right now?"**
+
+It does not answer the more urgent review question:
+
+**"What security control did this PR just remove?"**
+
+That requires diff-aware analysis.
+
+---
+
+## The kinds of regressions you should expect
+
+These are the categories worth treating as high-risk in AI-generated PRs:
+
+- auth decorators and permission checks
+- CSRF protections
+- rate limiting
+- input validation
+- output encoding
+- security headers
+- CORS restrictions
+- audit logging
+- cryptographic checks
+- security middleware registration
+
+Each one can disappear during an otherwise "reasonable" refactor.
+
+---
+
+## A concrete example
+
+This is the kind of diff that slips through when reviewers are tired:
+
+```python
+@login_required
+@rate_limit("10/m")
+def export_customer_data(request):
+    customer_id = request.GET["customer_id"]
+    return generate_export(customer_id)
+```
+
+becomes:
+
+```python
+def export_customer_data(request):
+    customer_id = request.GET["customer_id"]
+    return generate_export(customer_id)
+```
+
+The function still works.
+
+The tests may still pass.
+
+The route still exists.
+
+But the security model is not the same route anymore.
+
+---
+
+## The workflow that actually catches this
+
+### 1. Compare the PR to the real baseline
+
+Run:
+
+```bash
+skylos diff main..HEAD --danger
+```
+
+Now the deleted control is part of the finding set instead of disappearing into the refactor narrative.
+
+### 2. Review regressions before additions
+
+In AI-generated PRs, deleted protections deserve priority over newly added low-severity findings.
+
+The order should be:
+
+1. removed auth or permission logic
+2. removed validation or output safety
+3. removed rate limiting, CSRF, or middleware
+4. newly introduced dangerous sinks
+5. dead code and cleanup noise
+
+That ordering is how you avoid missing the serious issue because the diff also contains 200 lines of helper extraction.
+
+### 3. Gate the merge
+
+Once this works locally, put it in the shared workflow:
+
+```bash
+skylos cicd init
+```
+
+AI-assisted review gets worse when each engineer invents their own threshold. Make the rule systemic.
+
+---
+
+## Review prompts that work
+
+If humans are still doing part of the review, give them questions that match the failure mode:
+
+- What existing protection disappeared in this refactor?
+- Did any route or handler lose auth, permission, or rate-limit enforcement?
+- Did validation move in a way that now skips some code paths?
+- Did middleware or settings registration change?
+- Is any deleted code actually required for security or auditability?
+
+Those prompts are much better than generic "please check security" review culture.
+
+---
+
+## When to escalate a PR immediately
+
+Treat the PR as high-risk if it does any of the following:
+
+- rewrites auth, billing, admin, or export flows
+- touches decorators, middleware, or route registration
+- replaces multiple files with a single "simplified" abstraction
+- changes request parsing or serializer behavior
+- removes tests while refactoring the protected path
+
+These are exactly the places where AI assistants can optimize for neatness while degrading security intent.
+
+---
+
+## The fast default
+
+For teams shipping a lot of AI-generated code, this is the minimal reliable setup:
+
+```bash
+skylos . -a
+skylos diff main..HEAD --danger
+```
+
+Then enforce the diff scan in PRs.
+
+That alone catches a class of issues most teams still do not review for explicitly.
+
+---
+
+## Where to go next
+
+- Using Claude Code? Read [How to Review Claude Code Output for Python Security Regressions](/use-cases/claude-code-security-review)
+- Using Cursor? Read [How to Use Skylos as a Cursor Security Scanner for Python](/use-cases/cursor-security-scanner)
+- Need to secure the MCP layer too? Read [How to Secure an MCP Server Before You Trust It With Your Code](/use-cases/secure-mcp-server)
+

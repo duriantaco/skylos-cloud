@@ -153,17 +153,17 @@ export default function Navbar() {
         
 
         <div className="flex items-center gap-3">
-          <a
-            href="mailto:founder@skylos.dev"
+          <Link
+            href="/#proof"
             className="hidden sm:inline-flex items-center justify-center rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition"
           >
-            Book a Demo
-          </a>
+            See proof
+          </Link>
           <Link
             href="/docs"
             className="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition"
           >
-            Install CLI
+            Try locally
           </Link>
         </div>
       </div>

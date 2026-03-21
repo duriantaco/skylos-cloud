@@ -17,9 +17,9 @@ import {
 import dogImg from "../../../public/assets/favicon-96x96.png"
 
 export const metadata: Metadata = {
-  title: "VS Code Python Linter, Static Analysis & Security Scanner — Skylos",
+  title: "VS Code Python Linting Migration + AI Code Security — Skylos",
   description:
-    "Python static analysis and security scanning for VS Code. Detect dead code, secrets, and risky patterns, and migrate off deprecated python.linting settings with dedicated tool extensions.",
+    "Move off deprecated python.linting settings in VS Code without losing Python coverage. Detect dead code, secrets, risky patterns, and AI-generated mistakes with Skylos.",
   keywords: [
     "vscode python linter",
     "python.linting deprecated",
@@ -31,16 +31,16 @@ export const metadata: Metadata = {
     "python security scanner vscode",
   ],
   openGraph: {
-    title: "VS Code Python Linter, Static Analysis & Security Scanner — Skylos",
+    title: "VS Code Python Linting Migration + AI Code Security — Skylos",
     description:
-      "Python static analysis and security scanning in VS Code, including migration help for deprecated python.linting settings.",
+      "Move off deprecated python.linting settings in VS Code without losing Python coverage.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "VS Code Python Linter, Static Analysis & Security Scanner — Skylos",
+    title: "VS Code Python Linting Migration + AI Code Security — Skylos",
     description:
-      "Python static analysis and security scanning in VS Code, including migration help for deprecated python.linting settings.",
+      "Move off deprecated python.linting settings in VS Code without losing Python coverage.",
   },
   alternates: {
     canonical: "/vscode",
@@ -165,16 +165,16 @@ export default function VSCodePage() {
 
           <div className="flex items-center gap-3">
             <Link
-              href="https://docs.skylos.dev/"
+              href="/blog/python-linting-deprecated-vscode"
               className="hidden text-sm font-medium text-slate-600 hover:text-slate-900 transition sm:inline-flex"
             >
-              View docs
+              Read migration guide
             </Link>
             <Link
-              href="/login"
+              href="https://marketplace.visualstudio.com/items?itemName=oha.skylos-vscode-extension"
               className="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition"
             >
-              Get started
+              Install extension
             </Link>
           </div>
         </div>
@@ -186,14 +186,13 @@ export default function VSCodePage() {
           <Pill color="violet">VS Code Extension</Pill>
           
           <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 md:text-5xl lg:text-6xl">
-            Python linter and security scanner
+            Move off deprecated
             <br />
-            <span className="text-slate-400">for VS Code</span>
+            <span className="text-slate-400">`python.linting` without losing coverage</span>
           </h1>
           
           <p className="mt-5 max-w-2xl text-base text-slate-600 md:text-lg">
-            Real-time Python static analysis for dead code, secrets, and risky patterns. No save required. Type, pause,
-            and review AI-assisted fixes with a diff preview. Built to work alongside the dedicated linter extensions VS Code now recommends.
+            Skylos adds Python static analysis and security checks in VS Code for teams that already use Ruff, Pylint, or Mypy. Catch dead code, secrets, risky patterns, and AI-generated mistakes without relying on the old `python.linting.*` settings.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -205,11 +204,11 @@ export default function VSCodePage() {
               Install on VS Code
             </Link>
             <Link
-              href="https://github.com/duriantaco/skylos"
+              href="/blog/python-linting-deprecated-vscode"
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
             >
               <Code2 className="h-4 w-4" />
-              View on GitHub
+              Read migration guide
             </Link>
           </div>
 

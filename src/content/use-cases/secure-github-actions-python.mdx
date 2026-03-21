@@ -193,6 +193,23 @@ If you want the faster "set up the workflow for me" path, use the existing guide
 
 - [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
 
+## Local first, then harden CI
+
+Secure workflows are stronger when you validate the Python repo locally before you automate the same checks in GitHub Actions.
+
+Use one local scan to confirm the project is worth gating in CI:
+
+```bash
+pip install skylos
+skylos . -a
+```
+
+Then use the workflow hardening in this guide and the PR scanning setup in:
+
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+- [Bandit vs Skylos for Python Security Scanning](/compare/bandit-vs-skylos)
+- [Best Python SAST Tools in 2026](/compare/best-python-sast-tools-2026)
+
 ## A safer workflow layout for Python teams
 
 One pattern works well for most teams:
@@ -255,5 +272,5 @@ That gets you most of the real-world value quickly.
 ## Related pages
 
 - [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
-- [How to Catch Hallucinated Imports and Phantom Calls in AI-Generated Python Code](/use-cases/ai-generated-code-security)
+- [How to Verify AI-Generated Python Code and Catch Hallucinated Imports](/use-cases/ai-generated-code-security)
 - [Bandit vs CodeQL vs Semgrep for Python Security Scanning](/compare/bandit-vs-codeql-vs-semgrep-python)

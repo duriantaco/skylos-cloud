@@ -5,12 +5,13 @@ type EventType =
   | "project_created"
   | "login"
   | "dashboard_view"
-  | "finding_suppressed";
+  | "finding_suppressed"
+  | "marketing_page_view";
 
 export async function trackEvent(
   eventType: EventType,
   orgId?: string | null,
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ) {
   try {
     const { error } = await supabaseAdmin

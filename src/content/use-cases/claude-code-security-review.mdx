@@ -1,0 +1,204 @@
+---
+title: "How to Review Claude Code Output for Python Security Regressions"
+excerpt: "Claude Code's permission model is a strong start, but approved edits can still remove auth checks, relax validation, or introduce insecure shortcuts. This workflow adds static verification before those changes merge."
+publishedAt: "2026-03-20"
+updatedAt: "2026-03-20"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "Teams are increasingly using Claude Code for real repository changes, but most review processes still focus on whether the edit 'works' instead of whether it silently removed security controls."
+methodology:
+  - "Built around Anthropic's current Claude Code permission model, MCP configuration, and approval flow."
+  - "Focused on practical review failures we see in AI-assisted Python work: removed decorators, insecure defaults, dead paths, and plausible-looking but wrong code."
+  - "Mapped the review steps directly to Skylos CLI commands teams can run locally or in CI."
+tags: ["security", "ai code", "python"]
+keywords:
+  - claude code security review
+  - claude code security
+  - review claude code output
+  - claude code python security
+  - claude code static analysis
+  - ai coding assistant security review
+  - detect removed auth checks
+  - ai generated code regressions
+  - claude code mcp security
+  - python security scanner for claude code
+canonicalUrl: "/use-cases/claude-code-security-review"
+keyTakeaways:
+  - "Claude Code's built-in approvals help, but once an edit is accepted you still need repo-level verification."
+  - "The highest-risk Claude Code failures are usually regressions in existing security controls, not obviously malicious new code."
+  - "The fastest reliable workflow is local scan, diff scan, and CI gate."
+faq:
+  - question: "Is Claude Code safe enough on its own?"
+    answer: "It has strong permission controls, but those controls govern actions, not code quality or security correctness. You still need static verification on the changes it produces."
+  - question: "What should I look for first in Claude Code output?"
+    answer: "Start with removed decorators, weakened validation, hardcoded secrets, unsafe shell usage, and dead helper functions that make the diff look bigger than the real behavior change."
+  - question: "Should I review Claude Code changes differently from human changes?"
+    answer: "Yes. AI-generated diffs deserve extra attention on missing controls, fake or outdated APIs, and broad refactors that quietly remove protections."
+howToSteps:
+  - name: "Scan the current repo"
+    text: "Run a full local scan to establish the current security and dead-code baseline before accepting more AI changes."
+  - name: "Scan the diff"
+    text: "Use diff-aware analysis to catch removed auth, CSRF, rate limiting, and validation controls in the generated patch."
+  - name: "Gate in CI"
+    text: "Add the same checks to pull requests so accepted local edits still face a consistent merge barrier."
+---
+
+# How to Review Claude Code Output for Python Security Regressions
+
+Claude Code is safer than many people assume.
+
+Anthropic documents a permission-first model: read-only by default, explicit approval for commands and edits, scoped MCP configuration, and user-controlled approval behavior. That is a solid starting point.
+
+But once a developer approves the edit, the repo still has the same old problem:
+
+**Did the code change preserve the security properties you already depended on?**
+
+That question matters because Claude Code is especially good at broad refactors, helper extraction, and "cleanup" edits. Those are exactly the kinds of changes that can remove existing protections without throwing obvious errors.
+
+---
+
+## What Claude Code gets wrong in practice
+
+The most dangerous failures are usually not spectacular.
+
+They look like this:
+
+- `@login_required` disappears during a view refactor
+- request validation moves, then silently stops happening
+- `verify=False` gets added to make an API call "work"
+- a rate-limit decorator is dropped while simplifying a route
+- a helper function survives the refactor but nothing calls it anymore
+
+All of those can pass a superficial review because the code still looks coherent.
+
+---
+
+## The review workflow that scales
+
+### 1. Establish the local baseline
+
+Before you accept a large Claude Code patch, scan the repo:
+
+```bash
+skylos . -a
+```
+
+This catches:
+
+- insecure sinks and dangerous calls
+- hardcoded secrets
+- dead functions and unreachable helpers
+- framework-aware false positives that generic dead-code tools often mishandle
+
+If the repo already has noisy findings, fix or suppress them first. Otherwise every future AI-generated review turns into "is this old noise or new risk?"
+
+### 2. Scan the diff, not just the whole tree
+
+The core Claude Code review problem is often **removal**, not introduction.
+
+Run:
+
+```bash
+skylos diff main..HEAD --danger
+```
+
+This is the fast way to catch removed controls such as:
+
+- auth decorators
+- CSRF protection
+- rate limiting
+- permission checks
+- input validation
+- output encoding
+- security middleware
+
+If Claude Code rewrote a route, service, or middleware file, the diff scan matters more than a generic lint pass.
+
+### 3. If the app uses LLMs, review the AI surface too
+
+If the project includes prompt construction, RAG pipelines, or tool-calling code, run:
+
+```bash
+skylos defend .
+```
+
+This is where you catch:
+
+- prompt injection exposure
+- unsanitized model output handling
+- weak tenant isolation in retrieval flows
+- missing PII filtering
+- missing rate limits or cost controls on model calls
+
+Claude Code may not have written the original AI feature, but a refactor can still weaken it.
+
+---
+
+## The five things to inspect first
+
+| Risk | Why Claude Code is prone to it |
+|---|---|
+| Removed auth or permission checks | Broad refactors optimize for structure, not security intent |
+| Insecure convenience flags | AI often prefers "working now" over "safe in production" |
+| Dead paths after helper extraction | The agent leaves behind plausible but unused logic |
+| Fake or outdated APIs | The code looks valid even when the call is wrong for your dependency version |
+| MCP overreach | Project-scoped tools may give Claude broader reach than the task needs |
+
+---
+
+## A good review comment is concrete
+
+Do not review Claude Code output with vague comments like "double-check security."
+
+Better prompts and review rules look like:
+
+- "Any route that reads customer or billing data must preserve auth and permission checks."
+- "Do not remove request validation when moving logic into helpers."
+- "Do not add shell-backed subprocess calls for convenience."
+- "No hardcoded tokens, passwords, or internal hostnames."
+- "Flag deleted decorators or middleware in Python web routes."
+
+If you use GitHub Copilot code review alongside Claude Code, GitHub's current coding-guidelines feature is useful for some repository-level rules. But it is not a replacement for static analysis and diff scanning.
+
+---
+
+## A lightweight policy for Claude Code repos
+
+If a team is serious about using Claude Code in production repos, this is a sane default:
+
+1. Keep permission prompts on for commands and high-impact MCP tools
+2. Require local `skylos . -a` before commit
+3. Require `skylos diff main..HEAD --danger` on PRs
+4. Add `skylos defend .` for LLM-integrated apps
+5. Reject broad "cleanup" diffs with no explicit explanation of preserved security controls
+
+That gives you a workflow where the assistant can move fast without turning every refactor into a trust fall.
+
+---
+
+## Add the merge gate once
+
+After the local review works, put it in CI:
+
+```bash
+skylos cicd init
+```
+
+The point is consistency. If a developer accepts a Claude Code patch locally, the PR still has to survive the same gate in a shared workflow.
+
+---
+
+## Where to go next
+
+- Need to secure the tool layer itself? Read [How to Secure an MCP Server Before You Trust It With Your Code](/use-cases/secure-mcp-server)
+- Need a Cursor-specific workflow? Read [How to Use Skylos as a Cursor Security Scanner for Python](/use-cases/cursor-security-scanner)
+- Need diff-focused review guidance? Read [How to Catch Removed Auth Checks and Security Regressions in AI-Generated PRs](/use-cases/ai-security-regressions-in-prs)
+
+## References
+
+- [Anthropic: Claude Code security](https://docs.anthropic.com/en/docs/claude-code/security)
+- [Anthropic: Claude Code MCP](https://docs.anthropic.com/en/docs/claude-code/mcp)
+- [GitHub Docs: configuring coding guidelines for Copilot code review](https://docs.github.com/en/copilot/how-tos/agents/copilot-code-review/configuring-coding-guidelines)
+

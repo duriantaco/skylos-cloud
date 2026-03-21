@@ -1,0 +1,223 @@
+---
+title: "How to Use Skylos as a Cursor Security Scanner for Python"
+excerpt: "Cursor can write code quickly, call MCP tools, and run with approvals or auto-run. This workflow adds local scanning, pre-commit checks, and PR gating so speed does not turn into silent risk."
+publishedAt: "2026-03-19"
+updatedAt: "2026-03-19"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "Search demand around Cursor is now strong, but most advice stops at prompting tips. Teams need a concrete way to verify Cursor-generated Python changes before they spread through the repo."
+methodology:
+  - "Built around Cursor's current MCP model, approval flow, and transport options."
+  - "Focused on Python teams using Cursor for real implementation work, not toy examples."
+  - "Connected the workflow to Skylos checks that are fast enough for local use and strict enough for CI."
+tags: ["security", "ai code", "python"]
+keywords:
+  - cursor security scanner
+  - cursor code security
+  - cursor python security scanner
+  - cursor static analysis
+  - cursor ai code review
+  - cursor generated code security
+  - python security scanner cursor
+  - cursor mcp security
+  - secure cursor workflow
+  - cursor code review tool
+canonicalUrl: "/use-cases/cursor-security-scanner"
+keyTakeaways:
+  - "Cursor's approval and MCP controls help, but they do not prove the generated code is secure."
+  - "The most practical Cursor workflow is local scan before commit, diff-aware scan in PRs, and optional LLM-app scanning for agentic products."
+  - "Auto-run and remote MCP are convenience multipliers, so they need an equally serious verification layer."
+faq:
+  - question: "Can Skylos run fast enough for Cursor-driven development?"
+    answer: "Yes. Skylos is designed for local CLI use and PR gating, so it fits the short feedback loops teams want when coding with Cursor."
+  - question: "What should I scan first in Cursor-generated code?"
+    answer: "Start with security issues, dead code, hardcoded secrets, and removed controls in route or service refactors."
+  - question: "Do I need both local scanning and CI?"
+    answer: "Yes. Local scans give fast feedback, while CI prevents approved-but-risky changes from merging when the local review was rushed or inconsistent."
+howToSteps:
+  - name: "Run a local scan"
+    text: "Check the current tree for insecure code, secrets, and dead paths before you commit Cursor-generated edits."
+  - name: "Add a pre-commit hook"
+    text: "Make fast local scanning routine so you do not rely only on manual review when shipping AI-generated changes."
+  - name: "Gate the pull request"
+    text: "Use CI to re-run the checks and catch removed protections in the final diff."
+---
+
+# How to Use Skylos as a Cursor Security Scanner for Python
+
+Cursor is effective because it compresses the distance between idea and implementation.
+
+It can also compress the distance between **"this looks fine"** and **"we just merged a silent regression."**
+
+Cursor now supports MCP connections, multiple transports, approval flows, and even auto-run behavior. That is powerful. It also means your Python review workflow should assume the assistant can produce bigger, faster, and more operationally connected changes than autocomplete ever could.
+
+Skylos fits as the verification layer around that workflow.
+
+---
+
+## What a Cursor security scanner should catch
+
+A useful Cursor security workflow does not stop at "find one dangerous function."
+
+It should catch at least four classes of issues:
+
+1. **Insecure code patterns**
+   SQL injection, command execution, unsafe deserialization, disabled TLS verification, and similar risks.
+
+2. **Dead code**
+   AI tools often leave behind unused helpers, wrappers, and fallback branches after refactors.
+
+3. **Secrets**
+   Hardcoded keys, tokens, passwords, and internal endpoints often show up in generated examples and temporary fixes.
+
+4. **Regressions in existing protections**
+   The AI did not add a vulnerability from scratch. It removed or weakened the guardrail that used to be there.
+
+That fourth category is where many Cursor-heavy teams still have the weakest process.
+
+---
+
+## The practical workflow
+
+### 1. Run the local scan before you commit
+
+```bash
+skylos . -a
+```
+
+This gives you a fast read on:
+
+- security findings
+- dead code
+- hardcoded secrets
+- framework-aware issues in Django, Flask, FastAPI, Pydantic, pytest, and similar Python patterns
+
+For Cursor users, this is the simplest way to keep speed without trusting the draft blindly.
+
+### 2. Add a pre-commit hook
+
+If you already use `pre-commit`, add Skylos to the local flow:
+
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: skylos
+        name: skylos
+        entry: skylos . -a
+        language: system
+        pass_filenames: false
+```
+
+This is not about perfect enforcement. It is about making verification the default path instead of the exceptional one.
+
+### 3. Scan the PR diff
+
+When Cursor rewrites a handler, service, or policy module, the highest-risk change may be something it removed.
+
+Run:
+
+```bash
+skylos diff main..HEAD --danger
+```
+
+This is how you catch:
+
+- removed auth decorators
+- dropped validation
+- weakened CORS or CSRF checks
+- missing rate limiting
+- deleted audit or permission checks
+
+### 4. Gate the repository once
+
+After the local workflow feels stable:
+
+```bash
+skylos cicd init
+```
+
+That gives you a shared merge barrier instead of relying on whoever happened to run a local scan that day.
+
+---
+
+## Where Cursor-specific risk actually increases
+
+Cursor's docs make it clear that MCP tools can run locally or remotely, and the client can operate with tool approvals or more automated behavior.
+
+That means the risk surface grows when you combine:
+
+- remote MCP servers
+- broad tool access
+- auto-run habits
+- long tool outputs
+- large refactors generated from natural-language instructions
+
+If you use Cursor with MCP, pair it with two habits:
+
+1. keep approvals on for sensitive tools
+2. verify the resulting code with static analysis and diff analysis
+
+---
+
+## Cursor plus LLM-app code needs one more check
+
+If the project itself is an LLM application, run:
+
+```bash
+skylos defend .
+```
+
+This is the right follow-up when Cursor touches:
+
+- prompt construction
+- RAG retrieval layers
+- model routing
+- output handling
+- tool-calling logic
+- tenant or policy controls around AI features
+
+Cursor can help you ship these systems faster. It cannot certify that the architecture remains safe after a refactor.
+
+---
+
+## A lightweight review rubric for Cursor-generated Python code
+
+Use these review questions:
+
+- Did this change remove an existing security control?
+- Did the assistant add a secret, internal hostname, or debug convenience?
+- Does every new helper still have real callers?
+- Did route, middleware, or validation behavior change in a way the tests might not cover?
+- If MCP tools were involved, did the task require that level of access?
+
+If the answer to any of those is unclear, the scan should block the merge until you resolve it.
+
+---
+
+## Recommended default setup
+
+For a Python team using Cursor seriously, this is the setup that covers most failure modes:
+
+1. `skylos . -a` before commit
+2. `pre-commit` hook for routine scanning
+3. `skylos diff main..HEAD --danger` in PRs
+4. `skylos defend .` for LLM-powered products
+5. approval still enabled for high-impact MCP tools
+
+That is enough to make Cursor a lot safer without turning the workflow into enterprise theater.
+
+---
+
+## Where to go next
+
+- Need MCP hardening guidance? Read [How to Secure an MCP Server Before You Trust It With Your Code](/use-cases/secure-mcp-server)
+- Using Claude Code too? Read [How to Review Claude Code Output for Python Security Regressions](/use-cases/claude-code-security-review)
+- Need diff-focused review? Read [How to Catch Removed Auth Checks and Security Regressions in AI-Generated PRs](/use-cases/ai-security-regressions-in-prs)
+
+## References
+
+- [Cursor: Model Context Protocol](https://docs.cursor.com/en/context/mcp)
+
