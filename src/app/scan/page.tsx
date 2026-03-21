@@ -141,7 +141,7 @@ export default function ScanPage() {
             <div className="animate-fadeUp" style={{ animationDelay: "100ms" }}>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 mb-6">
                 <Shield className="w-3.5 h-3.5 text-blue-400" />
-                <span className="text-[11px] font-medium text-white/60">Free. No signup required.</span>
+                <span className="text-[11px] font-medium text-white/60">Free GitHub repo scanner. No signup required.</span>
               </div>
             </div>
 
@@ -149,14 +149,23 @@ export default function ScanPage() {
               className="animate-fadeUp text-4xl sm:text-5xl font-black tracking-tight leading-tight"
               style={{ animationDelay: "200ms" }}
             >
-              Scan My <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">Vibe Code</span>
+              Free GitHub Repo <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">Security Scan</span>
             </h1>
 
             <p
               className="animate-fadeUp text-base sm:text-lg text-white/50 mt-4 max-w-lg mx-auto leading-relaxed"
               style={{ animationDelay: "300ms" }}
             >
-              Paste a GitHub repo URL. Get a vibe code risk score in seconds.
+              Paste a public GitHub repo URL to scan Python code for dead code, hardcoded secrets,
+              SQL injection patterns, and code quality risks in under a minute.
+            </p>
+
+            <p
+              className="animate-fadeUp text-sm text-white/35 mt-3 max-w-2xl mx-auto leading-relaxed"
+              style={{ animationDelay: "350ms" }}
+            >
+              Built for Python repos, pull request triage, and AI-generated code that still needs a
+              real security and static analysis pass.
             </p>
 
             {/* Scan form */}
@@ -233,25 +242,56 @@ export default function ScanPage() {
 
             {/* Feature pills */}
             {!loading && !error && (
-              <div
-                className="animate-fadeUp mt-16 flex flex-wrap items-center justify-center gap-3"
-                style={{ animationDelay: "600ms" }}
-              >
-                {[
-                  "Dead Code",
-                  "Hardcoded Secrets",
-                  "SQL Injection",
-                  "Code Quality",
-                  "Dependency Risks",
-                ].map((label) => (
-                  <span
-                    key={label}
-                    className="px-3 py-1.5 text-[11px] font-medium text-white/40 bg-white/5 rounded-full border border-white/5"
-                  >
-                    {label}
-                  </span>
-                ))}
-              </div>
+              <>
+                <div
+                  className="animate-fadeUp mt-16 flex flex-wrap items-center justify-center gap-3"
+                  style={{ animationDelay: "600ms" }}
+                >
+                  {[
+                    "Dead Code",
+                    "Hardcoded Secrets",
+                    "SQL Injection",
+                    "Code Quality",
+                    "Dependency Risks",
+                  ].map((label) => (
+                    <span
+                      key={label}
+                      className="px-3 py-1.5 text-[11px] font-medium text-white/40 bg-white/5 rounded-full border border-white/5"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+
+                <div
+                  className="animate-fadeUp mt-10 max-w-3xl mx-auto rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm"
+                  style={{ animationDelay: "700ms" }}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/35">
+                    Learn More
+                  </p>
+                  <div className="mt-4 grid gap-3 text-left sm:grid-cols-3">
+                    <Link
+                      href="/use-cases/detect-dead-code-python"
+                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+                    >
+                      Detect dead code in Python
+                    </Link>
+                    <Link
+                      href="/use-cases/secure-github-actions-python"
+                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+                    >
+                      Secure GitHub Actions for Python repos
+                    </Link>
+                    <Link
+                      href="/use-cases/ai-generated-code-security"
+                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+                    >
+                      Review AI-generated Python code
+                    </Link>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}

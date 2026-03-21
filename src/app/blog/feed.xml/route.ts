@@ -1,55 +1,29 @@
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
+import { getCollectionEntries } from '@/lib/content';
 import { getSiteUrl } from '@/lib/site';
 
 export async function GET() {
   const siteUrl = getSiteUrl();
-  const postsDirectory = path.join(process.cwd(), 'src/content/blog');
+  const posts = getCollectionEntries('blog');
 
-  let items = '';
-
-  if (fs.existsSync(postsDirectory)) {
-    const posts = fs
-      .readdirSync(postsDirectory)
-      .filter((f) => f.endsWith('.mdx'))
-      .map((filename) => {
-        const filePath = path.join(postsDirectory, filename);
-        const fileContents = fs.readFileSync(filePath, 'utf8');
-        const { data } = matter(fileContents);
-        return {
-          slug: filename.replace('.mdx', ''),
-          title: data.title || '',
-          excerpt: data.excerpt || '',
-          publishedAt: data.publishedAt || '',
-          tags: (data.tags || []) as string[],
-        };
-      })
-      .sort(
-        (a, b) =>
-          new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-      );
-
-    items = posts
-      .map(
-        (post) => `    <item>
+  const items = posts
+    .map(
+      (post) => `    <item>
       <title><![CDATA[${post.title}]]></title>
-      <link>${siteUrl}/blog/${post.slug}</link>
-      <guid isPermaLink="true">${siteUrl}/blog/${post.slug}</guid>
+      <link>${new URL(post.canonicalUrl, siteUrl).toString()}</link>
+      <guid isPermaLink="true">${new URL(post.canonicalUrl, siteUrl).toString()}</guid>
       <description><![CDATA[${post.excerpt}]]></description>
       <pubDate>${new Date(post.publishedAt).toUTCString()}</pubDate>
-${post.tags.map((t) => `      <category>${t}</category>`).join('\n')}
+${post.tags.map((tag) => `      <category>${tag}</category>`).join('\n')}
     </item>`
-      )
-      .join('\n');
-  }
+    )
+    .join('\n');
 
   const feed = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Skylos Blog</title>
     <link>${siteUrl}/blog</link>
-    <description>Insights on Python security, static analysis, dead code detection, and developer tools.</description>
+    <description>Research-backed guides on Python security, GitHub Actions hardening, dead code detection, and AI-generated code review.</description>
     <language>en</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
     <atom:link href="${siteUrl}/blog/feed.xml" rel="self" type="application/rss+xml"/>

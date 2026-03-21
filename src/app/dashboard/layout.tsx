@@ -1,12 +1,33 @@
+import type { Metadata } from "next";
 // app/dashboard/layout.tsx
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { getEffectivePlan } from "@/lib/entitlements";
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, Target, FolderOpen, TrendingUp, Zap, Bot } from "lucide-react";
+import { BookOpen, Target, FolderOpen, TrendingUp, Zap, Bot, type LucideIcon } from "lucide-react";
 import DashboardUserMenu from "@/components/DashboardUserMenu";
 import dogImg from "../../../public/assets/favicon-96x96.png";
+
+export const metadata: Metadata = {
+  title: "Dashboard — Skylos",
+  description: "Manage Skylos projects, scans, policies, billing, and team activity.",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+
+type MemberOrganization = {
+  credits: number | null;
+  plan: string | null;
+  pro_expires_at: string | null;
+};
+
+function getMemberOrganization(value: MemberOrganization | MemberOrganization[] | null | undefined): MemberOrganization | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
 
 export default async function DashboardLayout({
   children,
@@ -14,7 +35,7 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
     return redirect("/login");
@@ -29,8 +50,9 @@ export default async function DashboardLayout({
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (member?.organizations) {
-    const org = member.organizations as any;
+  const org = getMemberOrganization(member?.organizations as MemberOrganization | MemberOrganization[] | null | undefined);
+
+  if (org) {
     credits = org.credits ?? 0;
     plan = getEffectivePlan({ plan: org.plan || "free", pro_expires_at: org.pro_expires_at });
   }
@@ -93,7 +115,7 @@ export default async function DashboardLayout({
   );
 }
 
-function NavLink({ href, icon: Icon, children }: { href: string; icon: any; children: React.ReactNode }) {
+function NavLink({ href, icon: Icon, children }: { href: string; icon: LucideIcon; children: React.ReactNode }) {
   return (
     <Link
       href={href}

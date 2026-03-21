@@ -1,10 +1,10 @@
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
 import Link from 'next/link';
 import Image from 'next/image';
 import dogImg from "../../../public/assets/favicon-96x96.png";
 import { ArrowRight, Calendar, GitCompareArrows } from 'lucide-react';
+import { getCollectionEntries } from '@/lib/content';
+import { getSiteUrl } from '@/lib/site';
+import { buildCollectionPageSchema } from '@/lib/structured-data';
 
 interface ComparisonPost {
   slug: string;
@@ -12,33 +12,6 @@ interface ComparisonPost {
   excerpt: string;
   publishedAt: string;
   tags: string[];
-}
-
-function getPosts(): ComparisonPost[] {
-  const postsDirectory = path.join(process.cwd(), 'src/content/compare');
-
-  if (!fs.existsSync(postsDirectory)) {
-    return [];
-  }
-
-  const filenames = fs.readdirSync(postsDirectory);
-
-  return filenames
-    .filter(filename => filename.endsWith('.mdx'))
-    .map(filename => {
-      const filePath = path.join(postsDirectory, filename);
-      const fileContents = fs.readFileSync(filePath, 'utf8');
-      const { data } = matter(fileContents);
-
-      return {
-        slug: filename.replace('.mdx', ''),
-        title: data.title,
-        excerpt: data.excerpt,
-        publishedAt: data.publishedAt,
-        tags: data.tags || [],
-      };
-    })
-    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 }
 
 const tagColors: Record<string, string> = {
@@ -51,11 +24,32 @@ const tagColors: Record<string, string> = {
 };
 
 export default function ComparePage() {
-  const posts = getPosts();
+  const siteUrl = getSiteUrl();
+  const posts = getCollectionEntries('compare').map<ComparisonPost>((post) => ({
+    slug: post.slug,
+    title: post.title,
+    excerpt: post.excerpt,
+    publishedAt: post.publishedAt,
+    tags: post.tags,
+  }));
+
+  const collectionSchema = buildCollectionPageSchema({
+    name: 'Skylos comparison hub',
+    description: 'Side-by-side comparisons of Bandit, Semgrep, CodeQL, Snyk, SonarQube, Vulture, and other Python static analysis tools.',
+    url: `${siteUrl}/compare`,
+    itemUrls: getCollectionEntries('compare').map((post) => ({
+      name: post.title,
+      url: new URL(post.canonicalUrl, siteUrl).toString(),
+    })),
+  });
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Navbar */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
+      />
+
       <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5 font-bold text-lg tracking-tight text-slate-900">
@@ -79,6 +73,9 @@ export default function ComparePage() {
             <Link href="/compare" className="text-sm text-slate-900 font-medium">
               Compare
             </Link>
+            <Link href="/use-cases" className="text-sm text-slate-500 hover:text-slate-900 transition">
+              Use Cases
+            </Link>
             <Link href="/docs" className="text-sm text-slate-500 hover:text-slate-900 transition">
               Docs
             </Link>
@@ -92,7 +89,6 @@ export default function ComparePage() {
         </div>
       </nav>
 
-      {/* Hero */}
       <div className="border-b border-slate-200 bg-gradient-to-b from-white to-slate-50">
         <div className="max-w-4xl mx-auto px-6 py-20 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-violet-50 border border-violet-200 text-violet-700 text-sm font-medium mb-6">
@@ -100,15 +96,14 @@ export default function ComparePage() {
             Tool Comparisons
           </div>
           <h1 className="text-5xl md:text-6xl font-bold text-slate-900 mb-5">
-            Compare Python SAST Tools
+            Compare Python SAST and Code Scanning Tools
           </h1>
-          <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            Honest, side-by-side comparisons of Python static analysis and security tools. See where each tool is stronger.
+          <p className="text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
+            Honest comparison pages for Bandit, CodeQL, Semgrep, Snyk, SonarQube, Vulture, and adjacent Python security and dead-code tooling.
           </p>
         </div>
       </div>
 
-      {/* Posts */}
       <div className="max-w-7xl mx-auto px-6 py-12">
         {posts.length === 0 ? (
           <div className="bg-white border border-slate-200 border-dashed rounded-xl p-12 text-center">
@@ -177,22 +172,20 @@ export default function ComparePage() {
 
 export const metadata = {
   title: 'Compare Python SAST Tools - Skylos',
-  description: 'Side-by-side comparisons of Python static analysis tools. Semgrep vs Skylos, CodeQL vs Skylos, Bandit vs Skylos, and more.',
+  description: 'Side-by-side comparisons of Python static analysis and code scanning tools including Bandit, CodeQL, Semgrep, Snyk, SonarQube, and Vulture.',
   keywords: [
     'python sast comparison',
-    'semgrep alternative',
-    'bandit alternative',
+    'bandit vs codeql vs semgrep python',
+    'semgrep alternative python',
     'codeql alternative python',
-    'python security tools compared',
     'snyk alternative python',
     'sonarqube alternative python',
-    'vulture alternative',
-    'python dead code tools',
+    'vulture alternative python',
     'best python sast tools 2026',
   ],
   openGraph: {
     title: 'Compare Python SAST Tools - Skylos',
-    description: 'Honest comparisons of Python static analysis and security tools.',
+    description: 'Honest comparisons of Python static analysis and code scanning tools.',
     type: 'website',
   },
   alternates: {

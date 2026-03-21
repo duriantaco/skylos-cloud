@@ -1,0 +1,259 @@
+---
+title: "How to Secure GitHub Actions for Python Repos"
+excerpt: "Secure GitHub Actions for Python by pinning third-party actions, locking down GITHUB_TOKEN permissions, using OIDC, and scanning every pull request for Python security issues."
+publishedAt: "2026-03-21"
+updatedAt: "2026-03-21"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "The existing GitHub Actions page in the repo focuses on Python scanning. This guide targets a related but distinct search intent: securing the workflow itself so the CI pipeline does not become the weak link."
+methodology:
+  - "Reviewed GitHub's current security guidance for GitHub Actions, especially action pinning, token permissions, and OIDC-based cloud auth."
+  - "Mapped those controls to the specific workflows Python teams usually run: test, lint, build, deploy, and PR scanning."
+  - "Kept the recommendations limited to controls teams can apply quickly without redesigning their entire CI/CD system."
+tags: ["ci", "security", "python"]
+keywords:
+  - secure github actions python
+  - github actions security python
+  - python github actions hardening
+  - pin actions full length sha
+  - github token permissions least privilege
+  - github actions oidc python
+  - python ci security
+  - python security scanner github actions
+  - secure python ci pipeline
+  - github actions supply chain security python
+canonicalUrl: "/use-cases/secure-github-actions-python"
+keyTakeaways:
+  - "Pin third-party actions to a full-length commit SHA if you want immutability instead of trusting a moving tag."
+  - "Treat `GITHUB_TOKEN` permissions as deny-by-default and only grant what the workflow step really needs."
+  - "Use OIDC for cloud authentication instead of long-lived secrets whenever the provider supports it."
+  - "Separate privileged deploy workflows from untrusted pull-request workflows, then scan Python code on every PR."
+faq:
+  - question: "Do I need to pin every GitHub Action by commit SHA?"
+    answer: "You should pin third-party actions by full-length commit SHA when the workflow matters for security or deployment. That is the only immutable form GitHub documents."
+  - question: "Is `permissions: read-all` good enough?"
+    answer: "Usually no. Safer workflows explicitly scope only the permissions they need, such as contents: read and id-token: write, instead of broad defaults."
+  - question: "Should Python security scanning run on every pull request?"
+    answer: "Yes. PR-time scanning is the simplest place to catch dangerous patterns, hardcoded secrets, and AI-generated regressions before merge."
+howToSteps:
+  - name: "Pin and minimize"
+    text: "Pin third-party actions by full SHA and remove any permissions or secrets the job does not need."
+  - name: "Split trusted from untrusted"
+    text: "Keep public or contributor PR workflows unprivileged, and reserve deploy credentials for tightly scoped trusted workflows."
+  - name: "Scan every PR"
+    text: "Run Python static analysis and security checks on every pull request so workflow hardening and code hardening happen together."
+---
+
+If you run Python code in GitHub Actions, you have **two** things to secure:
+
+1. the Python code in the repository
+2. the workflow that executes it
+
+Most teams only think about the first one.
+
+GitHub's current security guidance is clear on the second: pin actions immutably, restrict `GITHUB_TOKEN` permissions, and prefer OIDC over long-lived cloud secrets. That matters for Python teams because your CI usually has access to:
+
+- repository contents
+- secrets
+- deployment credentials
+- package publish permissions
+
+If the workflow is weak, the code scan is not enough.
+
+## The short version
+
+For a Python repo, the minimum strong baseline is:
+
+- pin third-party actions by **full-length commit SHA**
+- set explicit `permissions`
+- use **OIDC** for cloud auth where possible
+- avoid privileged behavior on untrusted PRs
+- run Python static analysis on every PR
+
+## Step 1: Pin third-party actions by full SHA
+
+GitHub documents full-length commit SHA pinning as the immutable option. Tags like `@v4` are convenient, but they are still movable references.
+
+This is the safer pattern:
+
+```yaml
+steps:
+  - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  - uses: actions/setup-python@42375524d7b3f331cfa0bf3d4e21d0d3e1df3630
+```
+
+That looks noisier than:
+
+```yaml
+- uses: actions/checkout@v4
+```
+
+but it gives you immutability.
+
+Practical rule:
+
+- first-party GitHub actions are lower risk than random third-party actions
+- third-party actions should be pinned first
+- deploy, release, and permission-bearing workflows deserve the strictest pinning
+
+## Step 2: Lock down `GITHUB_TOKEN` permissions
+
+Do not let GitHub pick a broader default than your job actually needs.
+
+For most PR scanning jobs, this is a better baseline:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+```
+
+If the job does not comment on pull requests, you may not even need `pull-requests: write`.
+
+If the job needs cloud federation via OIDC:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+```
+
+That is the right mental model: **grant permissions per workflow purpose**, not once at the repo level and forget about it.
+
+## Step 3: Prefer OIDC over long-lived cloud secrets
+
+If your deploy job still uses a static AWS, GCP, or Azure credential stored in GitHub secrets, you are taking on unnecessary risk.
+
+OIDC improves this by letting GitHub mint short-lived credentials for a specific workflow run. That means:
+
+- less secret sprawl
+- easier rotation
+- tighter trust boundaries
+
+This is especially useful for Python services that deploy frequently from CI.
+
+## Step 4: Keep untrusted PRs away from privileged workflows
+
+This is where many teams accidentally create dangerous paths.
+
+Rules of thumb:
+
+- do not mix public PR execution with deploy credentials
+- treat `pull_request_target` very carefully
+- do not check out and execute untrusted code in a privileged context
+
+If you need comments, labels, or metadata handling on PRs, split that from the workflow that has real credentials.
+
+## Step 5: Scan Python code on every PR
+
+Workflow hardening is not enough. You still need to scan the Python code itself.
+
+That means checking for:
+
+- hardcoded secrets
+- risky shell or subprocess usage
+- SQL injection patterns
+- weak crypto or unsafe deserialization
+- dead code that expands your attack surface
+- AI-generated code that looks plausible but is wrong
+
+The easiest place to do that is the pull-request workflow:
+
+```yaml
+name: python-security
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Skylos
+        run: pip install skylos
+
+      - name: Scan Python code
+        run: skylos . --danger --secrets --quality --gate
+```
+
+If you want the faster "set up the workflow for me" path, use the existing guide here:
+
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+
+## A safer workflow layout for Python teams
+
+One pattern works well for most teams:
+
+### Workflow A: Unprivileged PR scan
+
+Purpose:
+
+- test
+- lint
+- type check
+- scan code
+- annotate or comment if needed
+
+Permissions:
+
+- `contents: read`
+- maybe `pull-requests: write`
+
+No deploy secrets.
+
+### Workflow B: Trusted deploy
+
+Purpose:
+
+- build and deploy from trusted branches only
+
+Permissions:
+
+- minimal deploy permissions
+- OIDC if available
+
+No execution of untrusted PR code.
+
+That split removes a lot of accidental risk.
+
+## Where Skylos fits
+
+Skylos is not the replacement for GitHub's workflow hardening guidance. It complements it.
+
+Use GitHub's security controls to secure the workflow, and use Skylos to secure the Python code moving through that workflow.
+
+That combination is stronger than either one alone:
+
+- GitHub hardening reduces CI supply-chain and credential risk
+- Skylos reduces application and code-review risk
+
+## Recommended baseline for a Python repo
+
+If you want the practical version:
+
+1. pin third-party actions by SHA
+2. add explicit `permissions`
+3. move cloud auth to OIDC
+4. keep privileged jobs separate from untrusted PR execution
+5. scan every PR for Python security and dead code
+
+That gets you most of the real-world value quickly.
+
+## Related pages
+
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+- [How to Catch Hallucinated Imports and Phantom Calls in AI-Generated Python Code](/use-cases/ai-generated-code-security)
+- [Bandit vs CodeQL vs Semgrep for Python Security Scanning](/compare/bandit-vs-codeql-vs-semgrep-python)

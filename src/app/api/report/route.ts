@@ -66,7 +66,7 @@ async function batchInsertFindings(
 }
 
 
-export async function createOrUpdateIssueGroups(
+async function createOrUpdateIssueGroups(
   supabase: SupabaseClient,
   args: {
     orgId: string;

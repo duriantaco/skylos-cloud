@@ -1,0 +1,224 @@
+---
+title: "Bandit vs CodeQL vs Semgrep for Python Security Scanning"
+excerpt: "Bandit, CodeQL, and Semgrep all scan Python, but they solve different problems. This comparison covers rule depth, customization, GitHub fit, and where each tool is strongest."
+publishedAt: "2026-03-21"
+updatedAt: "2026-03-21"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "This is a high-intent comparison query for Python teams choosing a security scanner. The goal is not to force one answer but to separate the three tools by how they actually fit day-to-day Python workflows."
+methodology:
+  - "Reviewed the current public documentation for Bandit, GitHub CodeQL, and Semgrep with a Python-team lens."
+  - "Compared them on setup model, rule model, dataflow depth, customization, GitHub fit, and day-to-day developer experience."
+  - "Added Skylos only as a 'where it fits' section instead of pretending this page is just another product pitch."
+tags: ["comparison", "security", "python", "sast"]
+keywords:
+  - bandit vs codeql vs semgrep python
+  - bandit vs semgrep python
+  - codeql vs semgrep python
+  - best python security scanner
+  - python sast tools comparison
+  - python code scanning tools
+  - bandit alternative python
+  - semgrep alternative python
+  - codeql python security
+  - python security scanner comparison
+canonicalUrl: "/compare/bandit-vs-codeql-vs-semgrep-python"
+comparedItems:
+  - Bandit
+  - CodeQL
+  - Semgrep
+  - Skylos
+keyTakeaways:
+  - "Choose Bandit when you want the smallest, simplest Python security linter with low setup friction."
+  - "Choose CodeQL when GitHub-native code scanning and deeper dataflow analysis matter more than setup simplicity."
+  - "Choose Semgrep when custom rules, broad language coverage, and faster security policy iteration matter most."
+  - "Choose Skylos alongside or instead when your scope includes dead code, AI-generated code review, and Python-specific workflow coverage beyond traditional SAST."
+faq:
+  - question: "Which tool is easiest to add to a small Python repo?"
+    answer: "Bandit is usually the easiest starting point. It is lightweight, Python-only, and straightforward to run in CI."
+  - question: "Which tool is best if I already live in GitHub code scanning?"
+    answer: "CodeQL is the natural fit if GitHub code scanning is already part of your workflow and you want GitHub-native query suites and SARIF integration."
+  - question: "Which tool is best for custom security rules?"
+    answer: "Semgrep is usually the strongest choice when you want to write and iterate on custom rules quickly across multiple repositories."
+---
+
+If you are comparing **Bandit vs CodeQL vs Semgrep** for Python, the first thing to know is that these tools are not interchangeable.
+
+They overlap, but the real choice is about workflow:
+
+- **Bandit** is the simplest Python-first security linter
+- **CodeQL** is the deepest GitHub-native code scanning option in this set
+- **Semgrep** is the most flexible when you want to write or tune custom rules quickly
+
+That is the practical answer.
+
+## The short version
+
+| | Bandit | CodeQL | Semgrep |
+| --- | --- | --- | --- |
+| **Best for** | Lightweight Python security linting | GitHub-native code scanning with richer dataflow | Custom rules and broad security policy coverage |
+| **Languages** | Python | Many languages via GitHub CodeQL packs | Many languages |
+| **Python setup friction** | Low | Medium to high | Low to medium |
+| **Customization** | Low | Medium | High |
+| **GitHub fit** | Good, but external | Excellent | Good |
+| **Dead code detection** | No | No | No |
+| **Best team shape** | Small Python team | GitHub-heavy engineering org | Security-conscious team that writes custom rules |
+
+## What each tool is really trying to do
+
+### Bandit
+
+[Bandit](https://bandit.readthedocs.io/en/latest/) is the classic Python security linter. It runs fast, focuses on Python AST patterns, and is easy to understand.
+
+Good fit when:
+
+- you want a fast first pass for obvious risky patterns
+- your repo is Python-only
+- you do not want to invest in a richer rule platform yet
+
+Less ideal when:
+
+- you need deeper dataflow
+- you want dead-code detection too
+- you need strong custom rule authoring
+
+### CodeQL
+
+[CodeQL on GitHub](https://docs.github.com/en/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning-with-codeql) is the most GitHub-native option here. If your team already uses GitHub Advanced Security or relies heavily on GitHub code scanning, CodeQL fits naturally.
+
+Good fit when:
+
+- GitHub is your system of record for security findings
+- you want query suites and richer code-scanning depth
+- you are willing to accept more setup and tuning
+
+Less ideal when:
+
+- you want the simplest setup possible
+- you are not centered around GitHub
+- you need a dead-code or AI-code workflow, not just code scanning
+
+### Semgrep
+
+[Semgrep](https://semgrep.dev/docs/) is strongest when the security team or platform team wants to encode policies quickly and iterate on them often.
+
+Good fit when:
+
+- you want custom rules
+- you have multiple languages
+- you want broad control over how findings are defined
+
+Less ideal when:
+
+- you want a narrow, out-of-the-box Python-only tool
+- you want dead-code detection included
+- you do not have bandwidth to maintain custom rule logic
+
+## Where they differ most for Python teams
+
+### 1. Setup model
+
+Bandit is the quickest to install:
+
+```bash
+pip install bandit
+bandit -r .
+```
+
+Semgrep is still fairly quick, especially for a default ruleset:
+
+```bash
+pip install semgrep
+semgrep --config p/python .
+```
+
+CodeQL is more workflow-heavy because it is usually adopted through GitHub code scanning, query packs, and SARIF-based reporting.
+
+That does not make CodeQL worse. It makes it a better fit for teams already operating at that layer.
+
+### 2. Rule model
+
+Bandit is mostly built around Python-specific security checks.
+
+Semgrep is built around a flexible pattern and rule model.
+
+CodeQL is built around a query model that is more powerful than simple pattern matching, but it also asks more from the team running it.
+
+In plain English:
+
+- Bandit is easiest
+- Semgrep is easiest to customize
+- CodeQL is deepest, but also heaviest
+
+### 3. GitHub workflow fit
+
+If your team already wants findings to live inside GitHub code scanning, CodeQL has the strongest story.
+
+If you just want a Python security scan in CI, Bandit and Semgrep are faster to adopt.
+
+If you want PR checks plus dead code plus AI-generated code review, none of these tools alone fully cover that workflow.
+
+## What they miss
+
+This is the part most comparison pages skip.
+
+Bandit, CodeQL, and Semgrep all answer the "security scanning" question. None of them is built around:
+
+- framework-aware dead-code detection
+- reviewing AI-generated Python code for hallucinated imports or phantom calls
+- a combined workflow where dead code, secrets, risky patterns, and CI hardening sit together
+
+If those are part of your actual requirement, your decision is not just "Bandit or Semgrep or CodeQL." The requirement changed.
+
+## Which one should you choose?
+
+### Choose Bandit if:
+
+- your team is small
+- you want a Python-native security linter fast
+- you are okay with a narrower scope
+
+### Choose CodeQL if:
+
+- GitHub code scanning is already part of your engineering workflow
+- you want GitHub-native query suites and reporting
+- your team can support the heavier setup model
+
+### Choose Semgrep if:
+
+- you want to write custom rules
+- you need broad multi-language coverage
+- security policy iteration matters more than minimal setup
+
+## Where Skylos fits
+
+Skylos is not a substitute for every CodeQL or Semgrep use case.
+
+It fits when the Python team cares about:
+
+- dead code
+- secrets
+- risky patterns
+- AI-generated code review
+- GitHub Actions workflow alignment
+
+That means Skylos often sits in a different comparison bucket: not just "security scanner," but "Python analysis workflow."
+
+Related pages in this repo:
+
+- [Bandit vs Skylos](/compare/bandit-vs-skylos)
+- [Semgrep vs Skylos](/compare/semgrep-vs-skylos)
+- [Best Python Static Analysis Tools Compared](/blog/python-sast-comparison-2026)
+- [How to Secure GitHub Actions for Python Repos](/use-cases/secure-github-actions-python)
+
+## The final recommendation
+
+If you want the simplest answer:
+
+- start with **Bandit** for lightweight Python security linting
+- choose **CodeQL** if GitHub-native code scanning is the center of your workflow
+- choose **Semgrep** if custom rule authoring is the deciding factor
+
+Then reassess whether your actual need also includes dead code, AI-generated code review, or Python-specific workflow coverage. If it does, the comparison should widen beyond traditional SAST alone.

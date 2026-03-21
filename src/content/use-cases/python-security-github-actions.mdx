@@ -18,6 +18,24 @@ keywords:
   - CI CD python security
   - python code scanning github
 canonicalUrl: "/use-cases/python-security-github-actions"
+keyTakeaways:
+  - "GitHub Actions is the easiest place to enforce Python security checks because every pull request already passes through it."
+  - "Dead code, secrets, injection patterns, and AI-generated regressions are all better caught at PR time than during human review."
+  - "You can start with one generated workflow, then tighten permissions and action pinning as the pipeline matures."
+faq:
+  - question: "Should Python security scanning run on every pull request?"
+    answer: "Yes. Pull requests are the highest-leverage checkpoint because they stop risky changes before merge."
+  - question: "Do I need more than Bandit in GitHub Actions?"
+    answer: "Usually yes if you also care about dead code, framework-aware analysis, secrets, and AI-generated code problems."
+  - question: "What is the difference between this guide and securing GitHub Actions itself?"
+    answer: "This page is about scanning Python code inside GitHub Actions. A separate workflow-hardening guide covers pinning actions, token permissions, OIDC, and supply-chain risk in the CI system itself."
+howToSteps:
+  - name: "Generate or add a workflow"
+    text: "Create a pull-request workflow that installs the scanner and runs Python security checks on every branch update."
+  - name: "Enable blocking behavior"
+    text: "Use gating so risky findings fail the job instead of being treated as advisory noise."
+  - name: "Expand coverage over time"
+    text: "Start with security and dead code, then add secrets, quality, and workflow hardening once the baseline is stable."
 ---
 
 # Python Security Scanner for GitHub Actions
@@ -356,6 +374,7 @@ That's it. Commit the workflow file, push, and every PR gets scanned.
 
 ## Related guides
 
+- [How to Secure GitHub Actions for Python Repos](/use-cases/secure-github-actions-python)
 - [How to detect dead code in Python](/use-cases/detect-dead-code-python)
 - [Semgrep vs Skylos for Python](/compare/semgrep-vs-skylos)
 - [How to catch AI-generated code problems](/use-cases/ai-generated-code-security)

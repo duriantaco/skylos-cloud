@@ -30,5 +30,7 @@ export function getGithubRepo(): string | null {
     return null
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) 
     return null
+  if (repo === 'owner/repo' || repo === 'username/repo')
+    return null
   return repo
 }

@@ -27,6 +27,24 @@ keywords:
   - python ai code scanner
   - cursor code quality
 canonicalUrl: "/use-cases/ai-generated-code-security"
+keyTakeaways:
+  - "AI-generated Python bugs often look believable because the names, imports, and flows are plausible even when they do not exist."
+  - "Hallucinated imports can turn into supply-chain risk if a developer installs a package just to satisfy the import."
+  - "The best place to catch these issues is before merge, not after runtime errors show up in production."
+faq:
+  - question: "What is a hallucinated import?"
+    answer: "A hallucinated import is an import statement for a package or symbol that does not actually exist in your environment or codebase."
+  - question: "Why is AI-generated Python code risky even when tests pass?"
+    answer: "Tests cover only the paths they exercise. AI-generated code can still hide dead paths, insecure defaults, fake APIs, or missing security controls outside the tested path."
+  - question: "Should I review AI-generated code differently from human-written code?"
+    answer: "Yes. In addition to normal review, explicitly check whether imports, function calls, libraries, and security controls are real and actually connected."
+howToSteps:
+  - name: "Scan for nonexistent references"
+    text: "Check imports, function calls, and object methods that look valid but do not exist in the real project."
+  - name: "Review security-sensitive defaults"
+    text: "Look for disabled verification, hardcoded secrets, fake auth checks, and risky convenience code."
+  - name: "Add a pre-merge AI review gate"
+    text: "Run static analysis and security checks before AI-generated code reaches the default branch."
 ---
 
 # How to Catch Hallucinated Imports and Phantom Calls in AI-Generated Python Code

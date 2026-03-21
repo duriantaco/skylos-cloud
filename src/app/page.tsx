@@ -5,11 +5,11 @@ import Navbar from '@/components/Navbar'
 import CopyInstallButton from '@/components/CopyInstallButton'
 import SkylosHeroSandbox from '@/components/SkylosHeroSandbox'
 import { getGithubRepo, getSiteUrl } from '@/lib/site'
-import { ArrowRight, Terminal, Shield, AlertTriangle, Code2, GitBranch, Timer, Search, Check, Zap, Bug } from 'lucide-react'
+import { ArrowRight, Terminal, Shield, AlertTriangle, Code2, GitBranch, Timer, Search, Check, Zap, Bug, BookOpen } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Skylos | Python Security Scanner, Dead Code Detection & Static Analysis',
-  description: 'Open source Python SAST tool that finds dead code, hardcoded secrets, SQL injection, and AI-generated code problems. Framework-aware analysis for Django, Flask, FastAPI, and Pydantic. Runs in CLI, CI/CD, and GitHub Actions.',
+  title: 'Skylos | Python Static Analysis, Security Scanner & Dead Code Detection',
+  description: 'Open source Python static analysis and security scanner for dead code, hardcoded secrets, GitHub Actions hardening, and AI-generated code review. Framework-aware for Django, Flask, FastAPI, and Pydantic.',
   keywords: [
     'python static analysis tool',
     'python security scanner',
@@ -19,16 +19,18 @@ export const metadata: Metadata = {
     'vulture alternative',
     'semgrep alternative python',
     'bandit alternative',
-    'AI generated code scanner',
-    'python GitHub Action security',
+    'ai generated code security python',
+    'python security scanner github actions',
+    'secure github actions python',
+    'python linting deprecated vscode',
     'FastAPI dead code detection',
     'Django security scanner',
     'Flask static analysis',
     'python CI security scanning',
   ],
   openGraph: {
-    title: 'Skylos — Python Security Scanner & Dead Code Detection',
-    description: 'Open source SAST tool for Python. Finds dead code, secrets, SQL injection, and AI code problems. Framework-aware. CI/CD ready.',
+    title: 'Skylos — Python Static Analysis, Security Scanner & Dead Code Detection',
+    description: 'Open source Python static analysis and security scanner for dead code, secrets, GitHub Actions hardening, and AI-generated code review.',
     type: 'website',
   },
 }
@@ -211,6 +213,7 @@ export default async function Home() {
   const siteUrl = getSiteUrl()
   const DISCORD_URL = process.env.NEXT_PUBLIC_DISCORD_URL || "https://discord.gg/Hm5KQMzyrR"
   const docsUrl = 'https://docs.skylos.dev/'
+  const rulesReferenceUrl = 'https://docs.skylos.dev/rules-reference'
 
   const faq = [
     {
@@ -777,11 +780,11 @@ export default async function Home() {
               Guides, Comparisons & Use Cases
             </h2>
             <p className="mt-4 text-lg text-slate-600">
-              Learn how Python teams use Skylos for security scanning, dead code detection, and AI code quality.
+              Learn how Python teams use Skylos for security scanning, dead code detection, secure GitHub Actions, and AI-generated code review.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-8">
             {/* Use Cases */}
             <div className="rounded-2xl border border-slate-200 bg-white p-8 hover:border-slate-300 hover:shadow-lg transition-all">
               <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-5">
@@ -800,8 +803,8 @@ export default async function Home() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/use-cases/python-security-github-actions" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
-                    Python security scanner for GitHub Actions
+                  <Link href="/use-cases/secure-github-actions-python" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Secure GitHub Actions for Python
                   </Link>
                 </li>
               </ul>
@@ -818,8 +821,8 @@ export default async function Home() {
               <h3 className="text-xl font-bold text-slate-900 mb-3">Tool Comparisons</h3>
               <ul className="space-y-3 text-sm text-slate-600 mb-6">
                 <li>
-                  <Link href="/compare/deadcode-vs-vulture-vs-skylos" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
-                    Deadcode vs Vulture vs Skylos
+                  <Link href="/compare/bandit-vs-codeql-vs-semgrep-python" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Bandit vs CodeQL vs Semgrep for Python
                   </Link>
                 </li>
                 <li>
@@ -846,8 +849,8 @@ export default async function Home() {
               <h3 className="text-xl font-bold text-slate-900 mb-3">Latest from the Blog</h3>
               <ul className="space-y-3 text-sm text-slate-600 mb-6">
                 <li>
-                  <Link href="/blog/vibe-coding" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
-                    AI-generated code is shipping vulnerabilities
+                  <Link href="/blog/python-linting-deprecated-vscode" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    `python.linting` is deprecated in VS Code
                   </Link>
                 </li>
                 <li>
@@ -864,6 +867,33 @@ export default async function Home() {
               <Link href="/blog" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-900 hover:gap-2 transition-all">
                 All articles <ArrowRight className="w-4 h-4" />
               </Link>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 hover:border-slate-300 hover:shadow-lg transition-all">
+              <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center mb-5">
+                <BookOpen className="w-6 h-6 text-amber-700" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">Docs & Reference</h3>
+              <ul className="space-y-3 text-sm text-slate-600 mb-6">
+                <li>
+                  <a href={docsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Install Skylos and run your first scan
+                  </a>
+                </li>
+                <li>
+                  <a href={rulesReferenceUrl} target="_blank" rel="noopener noreferrer" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Browse the Skylos rules reference
+                  </a>
+                </li>
+                <li>
+                  <Link href="/vscode" className="hover:text-slate-900 transition underline decoration-slate-300 hover:decoration-slate-900">
+                    Set up Skylos in VS Code
+                  </Link>
+                </li>
+              </ul>
+              <a href={docsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-900 hover:gap-2 transition-all">
+                Read the docs <ArrowRight className="w-4 h-4" />
+              </a>
             </div>
           </div>
         </div>

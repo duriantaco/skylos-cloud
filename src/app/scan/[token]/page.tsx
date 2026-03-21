@@ -69,6 +69,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `Skylos Scan Report — ${projectName}`,
     description: `Quality Gate ${status}. ${totalFindings} finding(s) detected. Scanned with Skylos — free code security for your team.`,
+    robots: {
+      index: false,
+      follow: false,
+    },
     openGraph: {
       title: `Skylos Scan Report — ${projectName}`,
       description: `Quality Gate ${status}. ${totalFindings} finding(s) detected.`,

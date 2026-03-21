@@ -1,10 +1,10 @@
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
 import Link from 'next/link';
 import Image from 'next/image';
 import dogImg from "../../../public/assets/favicon-96x96.png";
 import { ArrowRight, Calendar, Shield } from 'lucide-react';
+import { getCollectionEntries } from '@/lib/content';
+import { getSiteUrl } from '@/lib/site';
+import { buildCollectionPageSchema } from '@/lib/structured-data';
 
 interface UseCasePost {
   slug: string;
@@ -12,33 +12,6 @@ interface UseCasePost {
   excerpt: string;
   publishedAt: string;
   tags: string[];
-}
-
-function getPosts(): UseCasePost[] {
-  const postsDirectory = path.join(process.cwd(), 'src/content/use-cases');
-
-  if (!fs.existsSync(postsDirectory)) {
-    return [];
-  }
-
-  const filenames = fs.readdirSync(postsDirectory);
-
-  return filenames
-    .filter(filename => filename.endsWith('.mdx'))
-    .map(filename => {
-      const filePath = path.join(postsDirectory, filename);
-      const fileContents = fs.readFileSync(filePath, 'utf8');
-      const { data } = matter(fileContents);
-
-      return {
-        slug: filename.replace('.mdx', ''),
-        title: data.title,
-        excerpt: data.excerpt,
-        publishedAt: data.publishedAt,
-        tags: data.tags || [],
-      };
-    })
-    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 }
 
 const tagColors: Record<string, string> = {
@@ -51,11 +24,33 @@ const tagColors: Record<string, string> = {
 };
 
 export default function UseCasesPage() {
-  const posts = getPosts();
+  const siteUrl = getSiteUrl();
+  const content = getCollectionEntries('use-cases');
+  const posts = content.map<UseCasePost>((post) => ({
+    slug: post.slug,
+    title: post.title,
+    excerpt: post.excerpt,
+    publishedAt: post.publishedAt,
+    tags: post.tags,
+  }));
+
+  const collectionSchema = buildCollectionPageSchema({
+    name: 'Skylos use cases',
+    description: 'Practical guides for Python dead code detection, AI-generated code review, GitHub Actions hardening, and static analysis workflows.',
+    url: `${siteUrl}/use-cases`,
+    itemUrls: content.map((post) => ({
+      name: post.title,
+      url: new URL(post.canonicalUrl, siteUrl).toString(),
+    })),
+  });
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Navbar */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
+      />
+
       <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5 font-bold text-lg tracking-tight text-slate-900">
@@ -95,7 +90,6 @@ export default function UseCasesPage() {
         </div>
       </nav>
 
-      {/* Hero */}
       <div className="border-b border-slate-200 bg-gradient-to-b from-white to-slate-50">
         <div className="max-w-4xl mx-auto px-6 py-20 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium mb-6">
@@ -103,15 +97,14 @@ export default function UseCasesPage() {
             Use Cases
           </div>
           <h1 className="text-5xl md:text-6xl font-bold text-slate-900 mb-5">
-            What You Can Do with Skylos
+            Python Security and Static Analysis Use Cases
           </h1>
-          <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            Practical guides for detecting dead code, finding security vulnerabilities, and scanning AI-generated Python code.
+          <p className="text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
+            Step-by-step guides for dead code detection, secure GitHub Actions workflows, and reviewing AI-generated Python code before it reaches production.
           </p>
         </div>
       </div>
 
-      {/* Posts */}
       <div className="max-w-7xl mx-auto px-6 py-12">
         {posts.length === 0 ? (
           <div className="bg-white border border-slate-200 border-dashed rounded-xl p-12 text-center">
@@ -178,17 +171,17 @@ export default function UseCasesPage() {
 
 export const metadata = {
   title: 'Use Cases - Skylos',
-  description: 'How to detect dead code, find security vulnerabilities, and scan AI-generated Python code with Skylos.',
+  description: 'Practical Python guides for dead code detection, secure GitHub Actions, AI-generated code review, and static analysis workflows.',
   keywords: [
     'detect dead code python',
-    'python security scanner',
-    'ai generated code scanner',
+    'python security scanner github actions',
+    'secure github actions python',
+    'ai generated code security python',
     'python static analysis use cases',
-    'hallucinated imports detection',
   ],
   openGraph: {
     title: 'Use Cases - Skylos',
-    description: 'Practical guides for Python static analysis, security scanning, and AI code quality.',
+    description: 'Practical guides for Python static analysis, GitHub Actions security, and AI code review.',
     type: 'website',
   },
   alternates: {

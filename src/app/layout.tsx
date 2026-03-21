@@ -4,6 +4,7 @@ import Script from 'next/script'
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { getSiteUrl } from '@/lib/site'
+import { buildWebsiteSchema } from '@/lib/structured-data'
 import './globals.css'; // kept only one instance
 
 const siteUrl = getSiteUrl()
@@ -22,20 +23,22 @@ export const metadata: Metadata = {
     template: '%s | Skylos',
   },
   description:
-    'Open source Python SAST tool that finds dead code, hardcoded secrets, SQL injection, and AI-generated code problems. Runs locally, in CI/CD, and as a GitHub Action.',
+    'Open source Python static analysis and security scanner for dead code, hardcoded secrets, GitHub Actions, and AI-generated code review.',
   applicationName: 'Skylos',
+  category: 'developer tools',
   keywords: [
     'python static analysis',
     'python SAST',
     'python security scanner',
     'dead code detection python',
     'python secrets scanner',
-    'AI generated code scanner',
+    'python security scanner github actions',
+    'secure github actions python',
+    'AI generated code security python',
     'semgrep alternative python',
     'vulture alternative',
     'python code quality',
-    'GitHub Action python security',
-    'devsecops python',
+    'python linting deprecated vscode',
   ],
   alternates: {
     canonical: siteUrl,
@@ -47,16 +50,16 @@ export const metadata: Metadata = {
     type: 'website',
     url: siteUrl,
     siteName: 'Skylos',
-    title: 'Skylos — Python Static Analysis & Security Scanner',
+    title: 'Skylos — Python Static Analysis, Security Scanner & Dead Code Detection',
     description:
-      'Open source Python SAST tool. Detect dead code, secrets, SQL injection, and AI code problems. Run locally or in CI.',
+      'Open source Python static analysis and security scanner for dead code, secrets, GitHub Actions, and AI-generated code review.',
     images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Skylos — Python Static Analysis Tool' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Skylos — Python Static Analysis & Security Scanner',
+    title: 'Skylos — Python Static Analysis, Security Scanner & Dead Code Detection',
     description:
-      'Open source Python SAST tool. Detect dead code, secrets, SQL injection, and AI code problems. Run locally or in CI.',
+      'Open source Python static analysis and security scanner for dead code, secrets, GitHub Actions, and AI-generated code review.',
     images: ['/og.png'],
   },
   robots: {
@@ -71,10 +74,6 @@ export const metadata: Metadata = {
     },
   },
   icons: { icon: '/assets/favicon-96x96.png' },
-  // TODO: Add your Google Search Console verification code here
-  // verification: {
-  //   google: 'YOUR_GSC_VERIFICATION_CODE',
-  // },
 }
 
 const organizationJsonLd = {
@@ -97,6 +96,12 @@ const organizationJsonLd = {
   },
 }
 
+const websiteJsonLd = buildWebsiteSchema({
+  siteUrl,
+  name: 'Skylos',
+  description: 'Open source Python static analysis and security scanner for dead code, GitHub Actions, and AI-generated code review.',
+})
+
 export default function RootLayout({
   children,
 }: {
@@ -109,6 +114,11 @@ export default function RootLayout({
           id="ld-organization"
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
+        <Script
+          id="ld-website"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
         />
         {children}
       </body>

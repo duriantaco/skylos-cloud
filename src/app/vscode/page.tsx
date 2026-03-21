@@ -17,27 +17,30 @@ import {
 import dogImg from "../../../public/assets/favicon-96x96.png"
 
 export const metadata: Metadata = {
-  title: "VS Code Python Linter & Security Scanner — Skylos",
+  title: "VS Code Python Linter, Static Analysis & Security Scanner — Skylos",
   description:
-    "Python static analysis and security scanner for VS Code. Detect dead code, secrets, and risky patterns as you type, with AI-assisted fixes and diff previews.",
+    "Python static analysis and security scanning for VS Code. Detect dead code, secrets, and risky patterns, and migrate off deprecated python.linting settings with dedicated tool extensions.",
   keywords: [
     "vscode python linter",
+    "python.linting deprecated",
+    "python linting deprecated vscode",
+    "vs code python linting",
     "ai code review vscode",
     "python static analysis extension",
     "dead code detection vscode",
     "python security scanner vscode",
   ],
   openGraph: {
-    title: "VS Code Python Linter & Security Scanner — Skylos",
+    title: "VS Code Python Linter, Static Analysis & Security Scanner — Skylos",
     description:
-      "Python static analysis and security scanning in VS Code. Detect dead code, secrets, and risky patterns as you type.",
+      "Python static analysis and security scanning in VS Code, including migration help for deprecated python.linting settings.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "VS Code Python Linter & Security Scanner — Skylos",
+    title: "VS Code Python Linter, Static Analysis & Security Scanner — Skylos",
     description:
-      "Python static analysis and security scanning in VS Code. Detect dead code, secrets, and risky patterns as you type.",
+      "Python static analysis and security scanning in VS Code, including migration help for deprecated python.linting settings.",
   },
   alternates: {
     canonical: "/vscode",
@@ -190,7 +193,7 @@ export default function VSCodePage() {
           
           <p className="mt-5 max-w-2xl text-base text-slate-600 md:text-lg">
             Real-time Python static analysis for dead code, secrets, and risky patterns. No save required. Type, pause,
-            and review AI-assisted fixes with a diff preview.
+            and review AI-assisted fixes with a diff preview. Built to work alongside the dedicated linter extensions VS Code now recommends.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -224,6 +227,34 @@ export default function VSCodePage() {
             </div>
           ))}
         </div>
+    </section>
+
+    <section className="mx-auto max-w-7xl px-6 pb-16">
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 md:p-10">
+        <Pill color="emerald">VS Code Migration</Pill>
+        <h2 className="mt-3 text-2xl font-bold text-slate-900 md:text-3xl">
+          `python.linting` is deprecated in VS Code
+        </h2>
+        <p className="mt-4 max-w-3xl text-slate-600">
+          VS Code now pushes Python teams toward dedicated tool extensions instead of the old `python.linting.*` settings.
+          Skylos fits that newer workflow as a Python static-analysis and security layer that complements Ruff, Pylint, and Mypy rather than replacing them.
+        </p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <Link
+            href="/blog/python-linting-deprecated-vscode"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition"
+          >
+            Read the migration guide
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link
+            href="https://code.visualstudio.com/docs/python/linting"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+          >
+            View VS Code docs
+          </Link>
+        </div>
+      </div>
     </section>
 
     {/* Demo / Screenshot */}

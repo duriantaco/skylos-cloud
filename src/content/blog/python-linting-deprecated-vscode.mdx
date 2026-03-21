@@ -1,0 +1,204 @@
+---
+title: "`python.linting` Is Deprecated in VS Code: What Python Teams Should Use Now"
+excerpt: "VS Code deprecated the old python.linting settings in favor of dedicated tool extensions. Here is the practical replacement stack for Ruff, Pylint, Mypy, and Python security scanning."
+publishedAt: "2026-03-21"
+updatedAt: "2026-03-21"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "The Skylos VS Code page is already getting impressions, and the migration away from python.linting is real search intent. This guide answers that exact migration question and explains where a security/static-analysis layer fits."
+methodology:
+  - "Reviewed the current VS Code Python linting documentation and the extension-based workflow Microsoft now recommends."
+  - "Mapped the old python.linting intent to the modern Python editor stack: Ruff or Pylint for linting, Mypy for type checking, and Skylos for dead code and security analysis."
+  - "Kept the recommendations intentionally practical so a Python team can change settings, extensions, and CI in one pass."
+tags: ["devtools", "python"]
+keywords:
+  - python.linting deprecated
+  - python linting deprecated vscode
+  - vs code python linting
+  - vscode python linter
+  - python linting extension vscode
+  - ruff vscode python
+  - pylint vscode python
+  - mypy vscode extension
+  - python static analysis vscode
+  - python security scanner vscode
+canonicalUrl: "/blog/python-linting-deprecated-vscode"
+keyTakeaways:
+  - "The old `python.linting.*` settings are deprecated; VS Code now expects dedicated tool extensions."
+  - "Use Ruff or Pylint for linting, Mypy for type checking, and a separate static-analysis/security layer for dead code and security issues."
+  - "Skylos fits alongside a linter. It does not replace Ruff or Pylint; it covers dead code, secrets, and risky patterns those tools do not target."
+faq:
+  - question: "What replaces `python.linting.enabled` in VS Code?"
+    answer: "Dedicated extensions replace it. The current VS Code guidance is to install the tool-specific extension you actually want, such as Ruff or Pylint, instead of relying on the old Python extension linting settings."
+  - question: "Should I choose Ruff or Pylint?"
+    answer: "Ruff is usually the best default for fast linting and broad adoption. Pylint is still useful when you want deeper, opinionated linting rules. Many teams standardize on Ruff first and only add Pylint if they need it."
+  - question: "Does a linter replace Python security scanning?"
+    answer: "No. Linters focus on style, correctness, and maintainability. They do not replace security scanning, dead-code detection, CI hardening, or AI-generated code review."
+howToSteps:
+  - name: "Remove deprecated linting settings"
+    text: "Delete the old python.linting settings from workspace or user settings so VS Code is no longer configured around a deprecated path."
+  - name: "Install dedicated Python tool extensions"
+    text: "Pick the linter and type checker you actually want, such as Ruff or Pylint plus Mypy, and let each extension own its part of the workflow."
+  - name: "Add static analysis and security checks"
+    text: "Use Skylos in VS Code and CI for dead code, secrets, risky patterns, and AI-generated code review that lint-only setups do not cover."
+---
+
+If you still have `python.linting.*` in your VS Code settings, you are on the old path.
+
+Microsoft's current [Python linting documentation for VS Code](https://code.visualstudio.com/docs/python/linting) pushes teams toward **dedicated tool extensions** instead of the older linting settings baked into the Python extension. In practice, that means:
+
+- pick a real linter extension such as Ruff or Pylint
+- add a type checker separately if you need one
+- keep security scanning and dead-code analysis as a separate layer
+
+That is the short answer.
+
+## What changed in VS Code
+
+The old model looked like this:
+
+```json
+{
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": true
+}
+```
+
+That model is deprecated. The newer model is extension-based. Instead of toggling one giant `python.linting` switch, you install the tool-specific extension you actually want and configure that tool directly.
+
+That is a better model for Python teams because it separates concerns:
+
+- linting stays with the linter
+- type checking stays with the type checker
+- formatting stays with the formatter
+- security and static analysis stay with security/static-analysis tools
+
+## The practical replacement stack
+
+For most Python teams, the modern VS Code stack looks like this:
+
+| Need | Best default | What it catches | What it misses |
+| --- | --- | --- | --- |
+| Fast linting | Ruff | Unused imports, style issues, many common correctness checks | Security issues, framework-aware dead code, CI workflow risk |
+| Opinionated linting | Pylint | Broader rule coverage, more configurable lint-style checks | Same gap: not a security scanner or dead-code workflow tool |
+| Type checking | Mypy | Type contract errors, missing annotations, invalid unions | Security issues, secrets, unreachable or dead app code |
+| Static analysis + security | Skylos | Dead code, hardcoded secrets, risky patterns, AI-generated code review | Not a formatter; does not replace Ruff/Pylint |
+
+The easiest mental model is:
+
+- Ruff or Pylint keeps the editor clean
+- Mypy keeps types honest
+- Skylos catches **security and analysis problems that linting does not solve**
+
+## Recommended settings pattern
+
+You do not need a giant settings file. Keep it small and explicit.
+
+```json
+{
+  "editor.formatOnSave": true,
+  "python.analysis.typeCheckingMode": "basic",
+  "ruff.lint.run": "onType"
+}
+```
+
+Then let your actual extensions do the work:
+
+- Ruff extension for linting
+- Mypy extension if you want local type feedback
+- Skylos extension for dead code, security scanning, and AI-assisted review
+
+## What a linter does not replace
+
+This is where teams get confused.
+
+If you search for `vscode python linter`, many results make it sound like one tool should handle everything. That is not how the Python toolchain works.
+
+A linter does **not** replace:
+
+- dead-code detection across a real codebase
+- secret scanning
+- risky-pattern detection like `eval`, unsafe pickle usage, or weak cryptography
+- GitHub Actions hardening
+- review of AI-generated code that looks plausible but references things that do not exist
+
+Those are different workflows.
+
+If your current setup is only "Ruff in the editor," you still need a CI and security layer.
+
+## Where Skylos fits in the VS Code workflow
+
+Skylos is not a replacement for Ruff or Pylint. It is the layer you add when the question changes from:
+
+> "Is this file lint-clean?"
+
+to:
+
+> "Is this code safe, reachable, and worth merging?"
+
+That matters most when your codebase has:
+
+- Django, Flask, or FastAPI conventions
+- AI-generated code in pull requests
+- dead endpoints, unused helpers, or unreachable glue code
+- a need to run the same checks locally and in GitHub Actions
+
+The VS Code page in this repo already covers the extension itself:
+
+- [VS Code Python linter and security scanner](/vscode)
+
+If you want the broader CI workflow after the editor pass, pair it with:
+
+- [How to Secure GitHub Actions for Python Repos](/use-cases/secure-github-actions-python)
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+
+## Suggested migration paths
+
+### For small teams
+
+Use:
+
+- Ruff
+- basic type checking
+- Skylos in CI
+
+This is enough for most teams shipping Python APIs or internal services.
+
+### For stricter Python teams
+
+Use:
+
+- Ruff
+- Mypy
+- Skylos in VS Code and CI
+
+This gives you quick editor feedback plus deeper scan coverage before merge.
+
+### For legacy codebases
+
+Use:
+
+- Ruff or Pylint for incremental lint cleanup
+- Skylos for dead code and security scanning
+- CI gating for only new issues at first
+
+That avoids trying to "fix the whole repo" in one sprint.
+
+## The short recommendation
+
+If you are migrating off deprecated VS Code Python linting settings today:
+
+1. Remove `python.linting.*`
+2. Install Ruff or Pylint intentionally
+3. Add Mypy only if you are ready to maintain type quality
+4. Add Skylos for security, dead code, and AI-generated code review
+
+That stack matches how VS Code now expects Python tooling to work.
+
+## Related pages
+
+- [VS Code Python linter and security scanner](/vscode)
+- [How to Secure GitHub Actions for Python Repos](/use-cases/secure-github-actions-python)
+- [Best Python Static Analysis Tools Compared](/blog/python-sast-comparison-2026)
