@@ -49,7 +49,8 @@ function pickRelatedEntries(
 
   return getCollectionStaticParams(collection)
     .map(({ slug }) => getContentEntry(collection, slug))
-    .filter((entry): entry is NonNullable<ReturnType<typeof getContentEntry>> => Boolean(entry) && entry.slug !== currentSlug)
+    .filter((entry): entry is NonNullable<ReturnType<typeof getContentEntry>> => Boolean(entry))
+    .filter((entry) => entry.slug !== currentSlug)
     .map((entry) => ({
       entry,
       score: entry.tags.filter((tag) => normalizedTags.includes(tag.toLowerCase())).length,
