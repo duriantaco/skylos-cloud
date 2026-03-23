@@ -51,17 +51,17 @@ const FEATURES = [
   {
     icon: Eye,
     title: "Real-time AI Analysis",
-    desc: "Detects bugs as you type — no save required. Just pause and the AI reviews your code.",
+    desc: "Detects dead code and security issues as you type — powered by Skylos static analysis with optional AI verification.",
   },
   {
     icon: Sparkles,
-    title: "One-Click Fixes",
-    desc: "CodeLens buttons appear on error lines. Click 'Fix with AI' and review the diff before applying.",
+    title: "Inline Diagnostics",
+    desc: "Issues appear inline with severity and context. Review findings without leaving your editor.",
   },
   {
     icon: Cpu,
-    title: "GPT-4 or Claude",
-    desc: "Choose your AI provider. Works with OpenAI and Anthropic — use whichever you prefer.",
+    title: "Optional AI Verification",
+    desc: "Enable LLM-powered verification for deeper analysis. Works with OpenAI and Anthropic API keys.",
   },
   {
     icon: Zap,
@@ -137,9 +137,6 @@ export default function VSCodePage() {
               />
             </div>
             <span className="text-lg font-semibold text-slate-900">Skylos</span>
-            <span className="ml-1 rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">
-              Beta
-            </span>
           </Link>
 
           <div className="hidden items-center gap-2 text-sm text-slate-600 md:flex">
@@ -359,7 +356,7 @@ export default function VSCodePage() {
                 </div>
                 <div className="flex items-start gap-2">
                   <CheckCircle className="h-4 w-4 text-violet-500 mt-0.5 shrink-0" />
-                  <span>Choose GPT-4 or Claude — your API key</span>
+                  <span>Optional AI verification — bring your own API key</span>
                 </div>
               </div>
             </div>

@@ -109,9 +109,6 @@ export default async function BlogPost({ params }: Props) {
                 className="h-8 w-8 object-contain"
               />
               Skylos
-              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                Beta
-              </span>
             </Link>
 
             <div className="flex items-center gap-6">

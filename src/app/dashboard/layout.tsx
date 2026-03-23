@@ -67,9 +67,6 @@ export default async function DashboardLayout({
             <Link href="/dashboard" className="flex items-center gap-2.5 font-bold text-lg tracking-tight text-slate-900">
               <Image src={dogImg} alt="Skylos" width={32} height={32} className="h-8 w-8 object-contain" priority />
               Skylos
-              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                Beta
-              </span>
             </Link>
 
             <div className="hidden md:flex items-center gap-1">

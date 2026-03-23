@@ -293,7 +293,7 @@ export default async function Home() {
       <Script id="ld-breadcrumb" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
 
       {/* HERO SECTION */}
-      <section aria-label="Skylos Introduction" className="relative overflow-hidden pt-32 md:pt-40 pb-32">
+      <section aria-label="Skylos Introduction" className="relative overflow-hidden pt-24 md:pt-28 pb-32">
         {/* Enhanced Background with Animated Gradients */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/50 to-purple-50/30" />
 
@@ -302,7 +302,7 @@ export default async function Home() {
 
         <div className="relative mx-auto max-w-7xl px-6">
           {/* Version Badge with Enhanced Animation */}
-          <div className="flex justify-center mb-12 animate-fade-in">
+          <div className="flex justify-center mb-10 animate-fade-in">
             <a
               href="https://github.com/duriantaco/skylos/releases"
               target="_blank"
@@ -381,7 +381,7 @@ export default async function Home() {
               <CopyInstallButton command="pip install skylos" />
             </div>
             <p className="mt-3 text-sm text-slate-500 animate-fade-in-up [animation-delay:550ms]">
-              Then run <code className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-slate-900">skylos . -a</code> on a repo you care about. No login required.
+              Local scan is free — run <code className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-slate-900">skylos . -a</code> on a repo you care about. No login required.
             </p>
 
             {/* Trust Indicators */}
@@ -1066,7 +1066,7 @@ export default async function Home() {
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Slack and Discord notifications
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> AI triage, PR auto-fix, and compliance reports
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> AI triage and PR auto-fix <span className="text-slate-400">(coming soon)</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Credits never expire
@@ -1099,7 +1099,7 @@ export default async function Home() {
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> More projects, scans, and longer history
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Advanced gates, exports, and compliance reports
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Advanced gates and exports <span className="text-slate-400">(coming soon)</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Shared workspace, integrations, and governance

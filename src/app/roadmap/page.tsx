@@ -151,9 +151,6 @@ export default function RoadmapPage() {
               />
             </div>
             <span className="text-lg font-semibold text-slate-900">Skylos</span>
-            <span className="ml-1 rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">
-              Beta
-            </span>
           </Link>
 
           <div className="hidden items-center gap-2 text-sm text-slate-600 md:flex">
