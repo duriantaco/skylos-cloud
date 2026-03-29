@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { badRequest, serverError, unauthorized } from "@/lib/api-error";
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { applyActiveOrgCookie } from "@/lib/active-org";
+import { decideInviteAcceptance } from "@/lib/invite-acceptance";
 import {
   getInvitationStatus,
   getInvitationStatusMessage,
@@ -77,11 +79,12 @@ export async function POST(request: Request) {
   }
 
   const existingMemberships = (memberships || []) as MembershipRow[];
-  const alreadyInTargetOrg = existingMemberships.some(
-    (membership) => membership.org_id === invitation.org_id
-  );
+  const decision = decideInviteAcceptance({
+    existingOrgIds: existingMemberships.map((membership) => membership.org_id),
+    invitationOrgId: invitation.org_id,
+  });
 
-  if (alreadyInTargetOrg) {
+  if (decision.mode === "already_member") {
     const { error: markAcceptedError } = await supabaseAdmin
       .from("team_invitations")
       .update({
@@ -96,20 +99,13 @@ export async function POST(request: Request) {
       return serverError(markAcceptedError, "Mark invitation accepted");
     }
 
-    return NextResponse.json({
-      success: true,
-      already_member: true,
-      redirect_to: "/dashboard/settings",
-    });
-  }
-
-  if (existingMemberships.length > 0) {
-    return NextResponse.json(
-      {
-        error:
-          "This account already belongs to another organization. Multi-organization switching is not supported yet.",
-      },
-      { status: 409 }
+    return applyActiveOrgCookie(
+      NextResponse.json({
+        success: true,
+        already_member: true,
+        redirect_to: decision.redirectTo,
+      }),
+      decision.activeOrgId
     );
   }
 
@@ -140,8 +136,11 @@ export async function POST(request: Request) {
     return serverError(acceptError, "Finalize team invitation");
   }
 
-  return NextResponse.json({
-    success: true,
-    redirect_to: "/dashboard/settings",
-  });
+  return applyActiveOrgCookie(
+    NextResponse.json({
+      success: true,
+      redirect_to: decision.redirectTo,
+    }),
+    decision.activeOrgId
+  );
 }

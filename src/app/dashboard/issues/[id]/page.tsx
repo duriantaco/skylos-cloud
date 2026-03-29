@@ -1,16 +1,17 @@
-import { createClient } from "@/utils/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import IssueDetailClient from "@/components/mission-control/IssueDetailClient";
 import { getEffectivePlan } from "@/lib/entitlements";
+import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
 export default async function IssueDetailPage(
   props: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user, orgId, supabase } = await ensureWorkspace();
   if (!user) {
     redirect("/login");
+  }
+  if (!orgId) {
+    redirect("/dashboard");
   }
 
   const { id } = await props.params;
@@ -26,21 +27,20 @@ export default async function IssueDetailPage(
       project_id, last_seen_scan_id
     `)
     .eq("id", id)
+    .eq("org_id", orgId)
     .single();
 
   if (error || !group) return notFound();
 
-  // Get effective plan for gating
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id, organizations(plan, pro_expires_at)")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", orgId)
+    .single();
 
-  const org = member?.organizations as any;
   const effectivePlan = getEffectivePlan({
-    plan: org?.plan || "free",
-    pro_expires_at: org?.pro_expires_at || null,
+    plan: organization?.plan || "free",
+    pro_expires_at: organization?.pro_expires_at || null,
   });
 
   return (

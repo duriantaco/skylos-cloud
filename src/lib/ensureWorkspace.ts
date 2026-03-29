@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { resolveActiveOrganizationForRequest } from "@/lib/active-org";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 type EnsureWorkspaceResult = {
@@ -15,13 +16,11 @@ export async function ensureWorkspace(): Promise<EnsureWorkspaceResult> {
     return { user: null, orgId: null, supabase };
   }
 
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const activeOrg = await resolveActiveOrganizationForRequest(supabase, user.id, {
+    select: "org_id",
+  });
 
-  return { user, orgId: member?.org_id ?? null, supabase };
+  return { user, orgId: activeOrg.orgId, supabase };
 }
 
 export async function getUserProjects(supabase: SupabaseClient, orgId: string) {

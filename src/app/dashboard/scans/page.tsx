@@ -1,10 +1,10 @@
-import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   CheckCircle2, XCircle, Clock, GitBranch, GitCommit,
   ArrowRight, History, AlertTriangle, Shield, ArrowDownUp
 } from "lucide-react";
+import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
 type Scan = {
   id: string;
@@ -169,20 +169,12 @@ function ScanCard({ scan }: { scan: Scan }) {
 }
 
 export default async function ScansPage() {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user, orgId, supabase } = await ensureWorkspace();
   if (!user) {
     redirect("/login");
   }
 
-  const { data: membership } = await supabase
-    .from("organization_members")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!membership) {
+  if (!orgId) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -199,7 +191,7 @@ export default async function ScansPage() {
       id, created_at, commit_hash, branch, quality_gate_passed, stats, analysis_mode, tool,
       projects!inner(id, name, repo_url, org_id)
     `)
-    .eq("projects.org_id", membership.org_id)
+    .eq("projects.org_id", orgId)
     .order("created_at", { ascending: false })
     .limit(100);
 

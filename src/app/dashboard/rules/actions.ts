@@ -1,35 +1,34 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/utils/supabase/server";
 import { getEffectivePlan } from "@/lib/entitlements";
+import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
 async function getOrgContext() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const { user, orgId, supabase } = await ensureWorkspace();
+
   if (!user) {
     return { error: "Not authenticated" };
   }
 
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id, organizations(plan, pro_expires_at)")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!member?.org_id) {
+  if (!orgId) {
     return { error: "No organization found" };
   }
 
-  const rawPlan = (member.organizations as any)?.plan || "free";
-  const proExpiresAt = (member.organizations as any)?.pro_expires_at || null;
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", orgId)
+    .single();
+
+  const rawPlan = organization?.plan || "free";
+  const proExpiresAt = organization?.pro_expires_at || null;
   const plan = getEffectivePlan({ plan: rawPlan, pro_expires_at: proExpiresAt });
 
   return {
     supabase,
     user,
-    orgId: member.org_id,
+    orgId,
     plan,
     canUseRules: ["free", "pro", "enterprise"].includes(plan),
     canUsePython: ["pro", "enterprise"].includes(plan)

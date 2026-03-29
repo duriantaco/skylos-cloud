@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { unauthorized, forbidden } from "@/lib/api-error";
+import { resolveActiveOrganizationForRequest } from "@/lib/active-org";
 export {
   hasPermission,
   type OrgRole,
@@ -27,16 +28,11 @@ export async function requirePermission(
     return unauthorized();
   }
 
-  let memberQuery = supabase
-    .from("organization_members")
-    .select("org_id, role")
-    .eq("user_id", user.id);
-
-  if (orgId) {
-    memberQuery = memberQuery.eq("org_id", orgId);
-  }
-
-  const { data: member } = await memberQuery.maybeSingle();
+  const context = await resolveActiveOrganizationForRequest(supabase, user.id, {
+    requiredOrgId: orgId,
+    select: "org_id, role",
+  });
+  const member = context.membership;
 
   if (!member) {
     return forbidden("Not a member of this organization");

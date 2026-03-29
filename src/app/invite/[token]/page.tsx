@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { CheckCircle2, Clock, LogIn, Shield, UserPlus } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import AcceptInviteCard from "@/components/invite/AcceptInviteCard";
+import { getInviteWorkspaceNotice } from "@/lib/invite-acceptance";
 import {
   getInvitationStatus,
   getInvitationStatusMessage,
@@ -161,27 +161,10 @@ export default async function InvitePage({
     .eq("user_id", user.id);
 
   const membershipOrgIds = (memberships || []).map((membership) => membership.org_id);
-  if (membershipOrgIds.includes(typedInvitation.org_id)) {
-    redirect("/dashboard/settings");
-  }
-
-  if (membershipOrgIds.length > 0) {
-    return (
-      <main className="min-h-screen bg-slate-50 px-4 py-12">
-        <div className="mx-auto max-w-xl">
-          <InfoCard
-            title="Another Workspace Already Linked"
-            description="This account already belongs to another Skylos organization. Multi-organization switching is not supported yet, so accepting this invitation would put the app into an ambiguous org state."
-            action={
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Use a fresh account for this invitation for now. The next infrastructure step is proper multi-organization switching.
-              </div>
-            }
-          />
-        </div>
-      </main>
-    );
-  }
+  const workspaceNotice = getInviteWorkspaceNotice({
+    existingOrgIds: membershipOrgIds,
+    invitationOrgId: typedInvitation.org_id,
+  });
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-12">
@@ -209,6 +192,16 @@ export default async function InvitePage({
               <Shield className="h-4 w-4" />
               Signed in as {user.email}
             </div>
+            {workspaceNotice === "already_member" && (
+              <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                This account already belongs to {orgName}. Accepting will switch your active workspace there.
+              </div>
+            )}
+            {workspaceNotice === "joining_additional_org" && (
+              <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                Accepting will add this account to another workspace and switch your active workspace to {orgName}.
+              </div>
+            )}
             <div className="mt-2 flex items-center gap-2 text-slate-500">
               <Clock className="h-4 w-4" />
               Invitation expires on{" "}

@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { hashApiKey } from '@/lib/api-key'
 import { createClient as createServerClient } from '@/utils/supabase/server'
+import { resolveActiveOrganizationForRequest } from '@/lib/active-org'
 
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -117,13 +118,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: member } = await supabase
-      .from('organization_members')
-      .select('org_id')
-      .eq('user_id', user.id)
-      .single()
+    const activeOrg = await resolveActiveOrganizationForRequest(supabase, user.id, {
+      select: 'org_id',
+    })
 
-    if (!member) {
+    if (!activeOrg.orgId) {
       return NextResponse.json({ error: 'No organization' }, { status: 403 })
     }
 
@@ -132,7 +131,7 @@ export async function GET(req: NextRequest) {
     const { data: runs, error } = await supabase
       .from('agent_runs')
       .select('*, projects(name)')
-      .eq('org_id', member.org_id)
+      .eq('org_id', activeOrg.orgId)
       .order('created_at', { ascending: false })
       .limit(Math.min(limit, 200))
 

@@ -1,4 +1,3 @@
-import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { getEffectivePlan } from "@/lib/entitlements";
 import Link from "next/link";
@@ -7,6 +6,7 @@ import {
 } from "lucide-react";
 import { CreateRuleModal } from "@/components/rules/CreateRuleModal";
 import { RuleActions } from "@/components/rules/RuleActions";
+import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
 const RULE_LIMITS: Record<string, number> = {
   free: 3,
@@ -15,23 +15,21 @@ const RULE_LIMITS: Record<string, number> = {
 };
 
 export default async function RulesPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user, orgId, supabase } = await ensureWorkspace();
   if (!user) {
     return redirect("/login");
   }
 
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id, organizations(plan, name, pro_expires_at)")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  if (!orgId) return redirect("/dashboard");
 
-  if (!member?.org_id) return redirect("/dashboard");
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", orgId)
+    .single();
 
-  const orgId = member.org_id;
-  const rawPlan = (member.organizations as any)?.plan || "free";
-  const proExpiresAt = (member.organizations as any)?.pro_expires_at || null;
+  const rawPlan = organization?.plan || "free";
+  const proExpiresAt = organization?.pro_expires_at || null;
   const plan = getEffectivePlan({ plan: rawPlan, pro_expires_at: proExpiresAt });
   const canUseRules = ["free", "pro", "enterprise"].includes(plan);
   const canUsePython = ["pro", "enterprise"].includes(plan);

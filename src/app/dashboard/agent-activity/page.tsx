@@ -1,10 +1,10 @@
-import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   Bot, GitBranch, GitCommit, Clock, Search, CheckCircle2,
   Wrench, Sparkles, AlertTriangle
 } from "lucide-react";
+import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
 type AgentRun = {
   id: string;
@@ -159,20 +159,12 @@ function RunCard({ run }: { run: AgentRun }) {
 }
 
 export default async function AgentActivityPage() {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user, orgId, supabase } = await ensureWorkspace();
   if (!user) {
     redirect("/login");
   }
 
-  const { data: membership } = await supabase
-    .from("organization_members")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!membership) {
+  if (!orgId) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -186,7 +178,7 @@ export default async function AgentActivityPage() {
   const { data: runs } = await supabase
     .from("agent_runs")
     .select("*, projects(name)")
-    .eq("org_id", membership.org_id)
+    .eq("org_id", orgId)
     .order("created_at", { ascending: false })
     .limit(50);
 

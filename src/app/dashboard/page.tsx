@@ -1,7 +1,7 @@
-import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getEffectivePlan } from "@/lib/entitlements";
+import { ensureWorkspace } from "@/lib/ensureWorkspace";
 import {
   ShieldAlert,
   ArrowUpRight,
@@ -108,19 +108,10 @@ function GateBadge({ passed }: { passed: boolean | null }) {
 }
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user, orgId, supabase } = await ensureWorkspace();
   if (!user) {
     return redirect("/login");
   }
-
-  const { data: anyProject } = await supabase
-    .from("projects")
-    .select("org_id")
-    .limit(1)
-    .maybeSingle();
-
-  const orgId = anyProject?.org_id as string | undefined;
 
   if (!orgId) {
     return (
@@ -167,11 +158,17 @@ export default async function DashboardPage() {
     { data: openGroupsRaw, count: openGroupsCount },
     { data: criticalHighGroupsRaw, count: criticalHighCount },
   ] = await Promise.all([
-    supabase.from("projects").select("*", { count: "exact", head: true }),
+    supabase
+      .from("projects")
+      .select("*", { count: "exact", head: true })
+      .eq("org_id", orgId),
 
     supabase
       .from("scans")
-      .select("id, created_at, commit_hash, quality_gate_passed, stats, projects(name, repo_url)")
+      .select(
+        "id, created_at, commit_hash, quality_gate_passed, stats, projects!inner(name, repo_url, org_id)"
+      )
+      .eq("projects.org_id", orgId)
       .order("created_at", { ascending: false })
       .limit(10),
 

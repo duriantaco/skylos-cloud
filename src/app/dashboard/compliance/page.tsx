@@ -1,4 +1,3 @@
-import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -6,26 +5,25 @@ import { Shield, Calendar, Zap, BookOpen, CheckCircle } from "lucide-react";
 import dogImg from "../../../../public/assets/favicon-96x96.png";
 import ComplianceReportButton from "@/components/ComplianceReportButton";
 import { getEffectivePlan } from "@/lib/entitlements";
+import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
 export default async function CompliancePage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user, orgId, supabase } = await ensureWorkspace();
   if (!user) {
     return redirect("/login");
   }
 
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id, organizations(plan, name, pro_expires_at)")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!member?.org_id) 
+  if (!orgId) 
     return redirect("/dashboard");
 
-  const orgId = member.org_id;
-  const rawPlan = (member.organizations as any)?.plan || "free";
-  const proExpiresAt = (member.organizations as any)?.pro_expires_at || null;
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", orgId)
+    .single();
+
+  const rawPlan = organization?.plan || "free";
+  const proExpiresAt = organization?.pro_expires_at || null;
   const plan = getEffectivePlan({ plan: rawPlan, pro_expires_at: proExpiresAt });
   const canUseCompliance = ["pro", "enterprise"].includes(plan);
 

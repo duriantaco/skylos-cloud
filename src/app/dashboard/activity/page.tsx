@@ -1,4 +1,3 @@
-import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -6,26 +5,28 @@ import { BookOpen, Activity, Lock } from "lucide-react";
 import dogImg from "../../../../public/assets/favicon-96x96.png";
 import ActivityFeed from "@/components/ActivityFeed";
 import { getEffectivePlan } from "@/lib/entitlements";
+import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
 export default async function ActivityPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user, orgId, supabase } = await ensureWorkspace();
   if (!user) {
     return redirect("/login");
   }
 
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id, organizations(name, plan, pro_expires_at)")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!member?.org_id) {
+  if (!orgId) {
     return redirect("/dashboard");
   }
 
-  const orgData = (member.organizations as any);
-  const effectivePlan = getEffectivePlan({ plan: orgData?.plan || "free", pro_expires_at: orgData?.pro_expires_at });
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", orgId)
+    .single();
+
+  const effectivePlan = getEffectivePlan({
+    plan: organization?.plan || "free",
+    pro_expires_at: organization?.pro_expires_at || null,
+  });
   const isFreePlan = effectivePlan === "free";
 
   if (isFreePlan) {

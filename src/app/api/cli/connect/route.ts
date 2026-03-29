@@ -2,6 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { generateApiKey } from "@/lib/api-key";
 import { getEffectivePlan } from "@/lib/entitlements";
+import { resolveActiveOrganizationForRequest } from "@/lib/active-org";
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -23,30 +24,28 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!member) {
-    return NextResponse.json(
-      { error: "No workspace found" },
-      { status: 403 }
-    );
-  }
-
   const { data: project } = await supabase
     .from("projects")
     .select("id, name, org_id, organizations(name, plan, pro_expires_at)")
     .eq("id", project_id)
-    .eq("org_id", member.org_id)
     .single();
 
   if (!project) {
     return NextResponse.json(
       { error: "Project not found" },
       { status: 404 }
+    );
+  }
+
+  const activeOrg = await resolveActiveOrganizationForRequest(supabase, user.id, {
+    requiredOrgId: project.org_id,
+    select: "org_id",
+  });
+
+  if (!activeOrg.membership) {
+    return NextResponse.json(
+      { error: "You do not have access to this project" },
+      { status: 403 }
     );
   }
 

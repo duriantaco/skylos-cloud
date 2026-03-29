@@ -254,19 +254,21 @@ export default function ProjectsPage() {
     }
     setUser(user);
 
-    const { data: member } = await supabase
-      .from("organization_members")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const contextRes = await fetch("/api/org/context", { cache: "no-store" });
+    if (!contextRes.ok) {
+      setLoading(false);
+      return;
+    }
+    const context = await contextRes.json();
+    const activeOrgId = typeof context.org_id === "string" ? context.org_id : null;
 
-    if (member?.org_id) {
-      setOrgId(member.org_id);
+    if (activeOrgId) {
+      setOrgId(activeOrgId);
 
       const { data } = await supabase
         .from("projects")
         .select(`*, scans (id, created_at, branch, quality_gate_passed, stats)`)
-        .eq("org_id", member.org_id)
+        .eq("org_id", activeOrgId)
         .order("created_at", { ascending: false });
 
       setProjects(data || []);

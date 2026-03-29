@@ -265,17 +265,16 @@ export default function ScanComparePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: membership } = await supabase
-        .from("organization_members")
-        .select("org_id")
-        .eq("user_id", user.id)
-        .single();
-      if (!membership) return;
+      const contextRes = await fetch("/api/org/context", { cache: "no-store" });
+      if (!contextRes.ok) return;
+      const context = await contextRes.json();
+      const activeOrgId = typeof context.org_id === "string" ? context.org_id : null;
+      if (!activeOrgId) return;
 
       const { data } = await supabase
         .from("scans")
         .select("id, created_at, commit_hash, branch, quality_gate_passed, stats, projects!inner(id, name, org_id)")
-        .eq("projects.org_id", membership.org_id)
+        .eq("projects.org_id", activeOrgId)
         .order("created_at", { ascending: false })
         .limit(100);
 

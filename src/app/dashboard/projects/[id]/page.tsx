@@ -1,4 +1,3 @@
-import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -14,6 +13,7 @@ import ProjectTrendChart from "@/components/ProjectTrendChart";
 import { FileHotspotChart, TopViolationsChart } from "@/components/AdvanceCharts";
 import ScanActions from "@/components/ScanActions";
 import { getEffectivePlan } from "@/lib/entitlements";
+import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
 type ScanRow = {
   id: string;
@@ -30,30 +30,32 @@ export default async function ProjectPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const supabase = await createClient();
+  const { user, orgId, supabase } = await ensureWorkspace();
   const { id } = await params;
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
   if (!user) {
     return redirect("/login");
   }
+  if (!orgId) {
+    return redirect("/dashboard");
+  }
 
   // ---- Resolve plan
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id, organizations(plan, pro_expires_at)")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  const orgData = (member?.organizations as any);
-  const effectivePlan = getEffectivePlan({ plan: orgData?.plan || "free", pro_expires_at: orgData?.pro_expires_at });
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("plan, pro_expires_at")
+    .eq("id", orgId)
+    .single();
+  const effectivePlan = getEffectivePlan({
+    plan: organization?.plan || "free",
+    pro_expires_at: organization?.pro_expires_at || null,
+  });
 
   // ---- Load project
   const { data: project, error: projectErr } = await supabase
     .from("projects")
     .select("id, name, repo_url")
     .eq("id", id)
+    .eq("org_id", orgId)
     .single();
 
   if (projectErr || !project) {

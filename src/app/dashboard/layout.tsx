@@ -7,6 +7,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { BookOpen, Target, FolderOpen, TrendingUp, Zap, Bot, type LucideIcon } from "lucide-react";
 import DashboardUserMenu from "@/components/DashboardUserMenu";
+import OrganizationSwitcher from "@/components/OrganizationSwitcher";
+import {
+  resolveActiveOrganizationForRequest,
+  unwrapOrganization,
+} from "@/lib/active-org";
 import dogImg from "../../../public/assets/favicon-96x96.png";
 
 export const metadata: Metadata = {
@@ -19,15 +24,12 @@ export const metadata: Metadata = {
 };
 
 type MemberOrganization = {
+  id: string | null;
+  name: string | null;
   credits: number | null;
   plan: string | null;
   pro_expires_at: string | null;
 };
-
-function getMemberOrganization(value: MemberOrganization | MemberOrganization[] | null | undefined): MemberOrganization | null {
-  if (!value) return null;
-  return Array.isArray(value) ? value[0] ?? null : value;
-}
 
 export default async function DashboardLayout({
   children,
@@ -44,13 +46,14 @@ export default async function DashboardLayout({
   // Fetch credit balance for header
   let credits: number | null = null;
   let plan = "free";
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id, organizations(credits, plan, pro_expires_at)")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const org = getMemberOrganization(member?.organizations as MemberOrganization | MemberOrganization[] | null | undefined);
+  const activeOrg = await resolveActiveOrganizationForRequest<MemberOrganization>(
+    supabase,
+    user.id,
+    {
+      select: "org_id, role, organizations(id, name, credits, plan, pro_expires_at)",
+    }
+  );
+  const org = unwrapOrganization(activeOrg.membership?.organizations);
 
   if (org) {
     credits = org.credits ?? 0;
@@ -58,6 +61,14 @@ export default async function DashboardLayout({
   }
 
   const isUnlimited = plan === "enterprise";
+  const organizations = activeOrg.memberships.map((membership) => {
+    const organization = unwrapOrganization(membership.organizations);
+    return {
+      orgId: membership.org_id,
+      name: organization?.name || "Untitled Workspace",
+      role: membership.role || "member",
+    };
+  });
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -78,6 +89,10 @@ export default async function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-4">
+            <OrganizationSwitcher
+              organizations={organizations}
+              activeOrgId={activeOrg.orgId}
+            />
             {/* Credit balance badge */}
             {credits !== null && (
               <Link

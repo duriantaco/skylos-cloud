@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { resolveActiveOrganizationForRequest } from "@/lib/active-org";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -11,11 +12,9 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const activeOrg = await resolveActiveOrganizationForRequest(supabase, user.id, {
+    select: "org_id",
+  });
 
-  return NextResponse.json({ org_id: member?.org_id || null });
+  return NextResponse.json({ org_id: activeOrg.orgId });
 }

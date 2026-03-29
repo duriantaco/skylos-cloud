@@ -9,7 +9,6 @@ import ProjectSwitcher from "@/components/settings/ProjectSwitcher";
 import SlackIntegration from "@/components/settings/SlackIntegration";
 import DiscordIntegration from "@/components/settings/DiscordIntegration";
 import TeamMembers from "@/components/settings/TeamMembers";
-import { createClient } from "@/utils/supabase/server";
 import { getEffectivePlan } from "@/lib/entitlements";
 import DevPlanToggle from "@/components/settings/DevPlanToggle";
 import GitHubAppInstall from "@/components/settings/GitHubAppInstall"
@@ -18,24 +17,15 @@ import RepoUrlEditor from "@/components/settings/RepoUrlEditor";
 async function updatePlan(formData: FormData) {
   'use server'
   
-  const supabase = await createClient()
   const plan = formData.get('plan') as string
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false }
-  
-  const { data: membership } = await supabase
-    .from('organization_members')
-    .select('org_id')
-    .eq('user_id', user.id)
-    .single()
-  
-  if (!membership) return { success: false }
+  const { user, orgId, supabase } = await ensureWorkspace()
+
+  if (!user || !orgId) return { success: false }
   
   await supabase
     .from('organizations')
     .update({ plan })
-    .eq('id', membership.org_id)
+    .eq('id', orgId)
   
   revalidatePath('/dashboard/settings', 'layout')
   

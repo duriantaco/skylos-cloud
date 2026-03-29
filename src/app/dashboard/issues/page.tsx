@@ -1,7 +1,7 @@
-import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ShieldAlert, Search } from "lucide-react";
+import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
 function sevRank(sev: string) {
   const s = String(sev || "").toUpperCase();
@@ -49,19 +49,10 @@ function SeverityPill({ severity }: { severity: string }) {
 }
 
 export default async function IssuesInboxPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user, orgId, supabase } = await ensureWorkspace();
   if (!user) {
     return redirect("/login");
   }
-
-  const { data: anyProject } = await supabase
-    .from("projects")
-    .select("org_id")
-    .limit(1)
-    .maybeSingle();
-
-  const orgId = anyProject?.org_id;
   if (!orgId) 
     return redirect("/dashboard/projects");
 
