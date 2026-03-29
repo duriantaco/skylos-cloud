@@ -3,17 +3,20 @@
 import { createClient } from '@/utils/supabase/client'
 import { Github } from 'lucide-react'
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next') || '/dashboard'
 
   const handleLogin = async () => {
     setLoading(true)
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
-        redirectTo: `${location.origin}/auth/callback`,
+        redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
         skipBrowserRedirect: false,
       },
     })

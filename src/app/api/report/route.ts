@@ -2,8 +2,6 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { postSkylosCheckRun } from "@/lib/github-checkrun";
 import { getDiffScopeForCommit, isNewByDiff } from "@/lib/github-pr-diff";
-import { isSarif, sarifToSkylosPayload } from "@/lib/sarif";
-import { isClaudeSecurityReport, claudeSecurityToSkylosPayload } from "@/lib/claude-security";
 import { sendSlackNotification } from "@/lib/slack";
 import { sendDiscordNotification } from "@/lib/discord";
 import { getSiteUrl } from "@/lib/site";
@@ -14,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { serverError } from "@/lib/api-error";
 import { hashApiKey } from "@/lib/api-key";
 import { getEffectivePlan, getCapabilities as getEntitlementCaps } from "@/lib/entitlements";
+import { normalizeIncomingReport } from "@/lib/report-normalization";
 
 function getSupabaseAdmin(): SupabaseClient | null {
   const url =
@@ -226,53 +225,6 @@ function truncate(str: string | null | undefined, maxLen: number): string | null
   if (!str) 
     return null;
   return str.length > maxLen ? str.slice(0, maxLen) + "..." : str;
-}
-
-function normalizeIncomingReport(body: any) {
-  if (isSarif(body)) {
-    const norm = sarifToSkylosPayload(body)
-    return {
-      summary: norm.summary,
-      findings: norm.findings,
-      commit_hash: String(body.commit_hash || "local"),
-      branch: String(body.branch || "main"),
-      actor: String(body.actor || "sarif"),
-      tool: "sarif" as const,
-      source: "skylos" as string,
-      source_metadata: null as any[] | null,
-    }
-  }
-
-  if (isClaudeSecurityReport(body)) {
-    const norm = claudeSecurityToSkylosPayload(body)
-    return {
-      summary: norm.summary,
-      findings: norm.findings,
-      commit_hash: String(body.commit_hash || "local"),
-      branch: String(body.branch || "main"),
-      actor: String(body.actor || "claude-security"),
-      tool: "claude-code-security" as const,
-      source: "claude-code-security" as string,
-      source_metadata: norm.source_metadata,
-    }
-  }
-
-  const { summary, findings, commit_hash, branch, actor } = body || {}
-  return {
-    summary: summary || {},
-    findings: findings || [],
-    commit_hash: commit_hash || "local",
-    branch: branch || "main",
-    actor: actor || "unknown",
-    tool: (body.tool || "skylos") as string,
-    source: "skylos" as string,
-    source_metadata: null as any[] | null,
-    defense_score: body.defense_score || null,
-    ops_score: body.ops_score || null,
-    owasp_coverage: body.owasp_coverage || null,
-    defense_findings: body.defense_findings || [],
-    defense_integrations: body.defense_integrations || [],
-  }
 }
 
 function diffContextForDb(scope: any) {

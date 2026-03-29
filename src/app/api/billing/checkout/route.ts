@@ -3,19 +3,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { badRequest, serverError } from "@/lib/api-error";
 import { CREDIT_PACKS, createCheckoutUrl, type PackId } from "@/lib/payments";
 import { requirePermission, isAuthError } from "@/lib/permissions";
+import {
+  buildBillingSuccessUrl,
+  invalidPackIdMessage,
+  isValidPackId,
+  listPublicCheckoutPacks,
+} from "@/lib/billing-checkout";
 
 // GET /api/billing/checkout — list available credit packs
 export async function GET() {
-  const packs = Object.values(CREDIT_PACKS).map((p) => ({
-    id: p.id,
-    name: p.name,
-    credits: p.credits,
-    price: `$${(p.priceCents / 100).toFixed(0)}`,
-    priceCents: p.priceCents,
-    perCreditCost: p.perCreditCost,
-  }));
-
-  return NextResponse.json({ packs });
+  return NextResponse.json({ packs: listPublicCheckoutPacks(CREDIT_PACKS) });
 }
 
 // POST /api/billing/checkout — create a Lemon Squeezy checkout URL
@@ -34,10 +31,8 @@ export async function POST(request: NextRequest) {
   }
 
   const packId = body.pack_id;
-  if (!packId || !(packId in CREDIT_PACKS)) {
-    return badRequest(
-      `Invalid pack_id. Must be one of: ${Object.keys(CREDIT_PACKS).join(", ")}`
-    );
+  if (!isValidPackId(packId, CREDIT_PACKS)) {
+    return badRequest(invalidPackIdMessage(CREDIT_PACKS));
   }
 
   const { data: org } = await supabase
@@ -57,7 +52,7 @@ export async function POST(request: NextRequest) {
       orgId: org.id,
       email: auth.user.email || "",
       packId: packId as PackId,
-      successUrl: `${baseUrl}/dashboard/billing?success=true&pack=${packId}`,
+      successUrl: buildBillingSuccessUrl(baseUrl, packId),
     });
 
     return NextResponse.json({ url: checkoutUrl });

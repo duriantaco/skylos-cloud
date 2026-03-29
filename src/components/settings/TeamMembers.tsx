@@ -9,6 +9,16 @@ type Member = {
   users: { id: string; email: string } | null;
 };
 
+type PendingInvitation = {
+  id: string;
+  email: string;
+  role: string;
+  created_at: string;
+  expires_at: string;
+  status: "pending" | "expired";
+  invite_url: string;
+};
+
 const ROLE_LABELS: Record<string, { label: string; color: string; icon: typeof Crown }> = {
   owner: { label: "Owner", color: "bg-amber-100 text-amber-800 border-amber-200", icon: Crown },
   admin: { label: "Admin", color: "bg-indigo-100 text-indigo-800 border-indigo-200", icon: Shield },
@@ -28,26 +38,37 @@ export default function TeamMembers({
   plan?: string;
 }) {
   const [members, setMembers] = useState<Member[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<OrgRole>("member");
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [inviteLink, setInviteLink] = useState("");
 
   const canManage = currentUserRole === "admin" || currentUserRole === "owner";
   const isOwner = currentUserRole === "owner";
 
-  useEffect(() => {
-    fetchMembers();
-  }, []);
-
-  async function fetchMembers() {
-    setLoading(true);
+  async function fetchMembers(): Promise<Member[]> {
     const res = await fetch("/api/team/members");
     const data = await res.json();
-    setMembers(data.members || []);
-    setLoading(false);
+    return data.members || [];
+  }
+
+  async function fetchInvites(): Promise<PendingInvitation[]> {
+    const res = await fetch("/api/team/invite");
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.invitations || [];
+  }
+
+  async function refreshMembers() {
+    setMembers(await fetchMembers());
+  }
+
+  async function refreshInvites() {
+    setPendingInvites(await fetchInvites());
   }
 
   async function handleRoleChange(userId: string, newRole: string) {
@@ -64,7 +85,7 @@ export default function TeamMembers({
       return;
     }
 
-    await fetchMembers();
+    await refreshMembers();
   }
 
   async function handleRemove(userId: string, email: string) {
@@ -81,7 +102,7 @@ export default function TeamMembers({
       return;
     }
 
-    await fetchMembers();
+    await refreshMembers();
   }
 
   async function handleInvite(e: React.FormEvent) {
@@ -91,6 +112,7 @@ export default function TeamMembers({
     setInviting(true);
     setError("");
     setSuccess("");
+    setInviteLink("");
 
     const res = await fetch("/api/team/invite", {
       method: "POST",
@@ -106,12 +128,74 @@ export default function TeamMembers({
       return;
     }
 
-    setSuccess(`Added ${inviteEmail} as ${inviteRole}`);
+    setSuccess(
+      data.resent
+        ? `Invitation refreshed for ${inviteEmail}`
+        : `Invitation created for ${inviteEmail}`
+    );
+    setInviteLink(data.invitation?.invite_url || "");
     setInviteEmail("");
     setInviteRole("member");
-    await fetchMembers();
-    setTimeout(() => setSuccess(""), 3000);
+    const [nextMembers, nextInvites] = await Promise.all([
+      fetchMembers(),
+      fetchInvites(),
+    ]);
+    setMembers(nextMembers);
+    setPendingInvites(nextInvites);
   }
+
+  async function handleRevokeInvite(invitationId: string, email: string) {
+    if (!confirm(`Revoke the invitation for ${email}?`)) return;
+
+    setError("");
+    const res = await fetch(`/api/team/invite?id=${invitationId}`, {
+      method: "DELETE",
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Failed to revoke invitation");
+      return;
+    }
+
+    setSuccess(`Invitation revoked for ${email}`);
+    if (inviteLink && pendingInvites.find((invite) => invite.id === invitationId)?.invite_url === inviteLink) {
+      setInviteLink("");
+    }
+    await refreshInvites();
+  }
+
+  async function handleCopyInviteLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setSuccess("Invite link copied to clipboard");
+    } catch {
+      setError("Failed to copy invite link");
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTeamData() {
+      const [nextMembers, nextInvites] = await Promise.all([
+        fetchMembers(),
+        canManage ? fetchInvites() : Promise.resolve([]),
+      ]);
+
+      if (cancelled) return;
+
+      setMembers(nextMembers);
+      setPendingInvites(nextInvites);
+      setLoading(false);
+    }
+
+    void loadTeamData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canManage]);
 
   if (loading) {
     return (
@@ -128,7 +212,7 @@ export default function TeamMembers({
       {/* Member list */}
       <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
         {members.map((m) => {
-          const email = (m.users as any)?.email || "Unknown";
+          const email = m.users?.email || "Unknown";
           const roleInfo = ROLE_LABELS[m.role] || ROLE_LABELS.member;
           const isSelf = m.user_id === currentUserId;
           const RoleIcon = roleInfo.icon;
@@ -189,6 +273,56 @@ export default function TeamMembers({
       </div>
 
       {/* Invite form — admin/owner only, Pro plan required */}
+      {canManage && pendingInvites.length > 0 && (
+        <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+          <div className="border-b border-slate-100 px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Users className="w-4 h-4" />
+              Pending Invitations
+            </div>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {pendingInvites.map((invite) => (
+              <div
+                key={invite.id}
+                className="flex items-center justify-between gap-4 px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-slate-900 truncate">
+                    {invite.email}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    {invite.role} • {invite.status === "expired" ? "Expired" : "Expires"}{" "}
+                    {new Date(invite.expires_at).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyInviteLink(invite.invite_url)}
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition"
+                  >
+                    Copy Link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRevokeInvite(invite.id, invite.email)}
+                    className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {canManage && plan !== "pro" && plan !== "enterprise" && (
         <div className="p-4 rounded-lg bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200">
           <div className="flex items-center gap-2 text-sm font-semibold text-indigo-900 mb-1">
@@ -205,7 +339,7 @@ export default function TeamMembers({
         <form onSubmit={handleInvite} className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
             <UserPlus className="w-4 h-4" />
-            Add Team Member
+            Invite Team Member
           </div>
           <div className="flex gap-2">
             <input
@@ -231,9 +365,12 @@ export default function TeamMembers({
               disabled={inviting || !inviteEmail.trim()}
               className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition disabled:opacity-50"
             >
-              {inviting ? "Adding..." : "Add"}
+              {inviting ? "Inviting..." : "Invite"}
             </button>
           </div>
+          <p className="text-xs text-slate-500">
+            Invitations generate a secure link. The recipient must sign in with the invited email to accept it.
+          </p>
         </form>
       )}
 
@@ -244,8 +381,22 @@ export default function TeamMembers({
         </div>
       )}
       {success && (
-        <div className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2">
-          {success}
+        <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 space-y-2">
+          <div>{success}</div>
+          {inviteLink && (
+            <div className="flex items-center gap-2">
+              <code className="flex-1 overflow-x-auto whitespace-nowrap rounded bg-white px-2 py-1 text-xs text-slate-700 border border-emerald-200">
+                {inviteLink}
+              </code>
+              <button
+                type="button"
+                onClick={() => handleCopyInviteLink(inviteLink)}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-emerald-200 hover:bg-emerald-100 rounded-lg transition"
+              >
+                Copy
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

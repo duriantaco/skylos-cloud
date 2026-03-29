@@ -4,6 +4,10 @@ import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
 import { getEffectivePlan } from "@/lib/entitlements";
 import { requirePlan, requireCredits } from "@/lib/require-credits";
+import {
+  fetchTriageFindings,
+  type TriageFinding,
+} from "@/lib/issue-groups/triage";
 
 const TRIAGE_SYSTEM_PROMPT = `You are a security triage expert. Given a security finding with its context, provide a structured triage assessment.
 
@@ -22,7 +26,34 @@ Priority definitions:
 - P3: Medium — limited exploitability or impact, fix within sprint
 - P4: Low — informational or defense-in-depth, fix when convenient`;
 
-function buildTriagePrompt(issueGroup: any, findings: any[]): string {
+type TriageIssueGroup = {
+  rule_id: string;
+  title?: string | null;
+  category?: string | null;
+  severity?: string | null;
+};
+
+function extractOrgId(
+  projects: unknown
+): string | undefined {
+  if (Array.isArray(projects)) {
+    const first = projects[0];
+    if (first && typeof first === "object" && "org_id" in first) {
+      const orgId = (first as { org_id?: unknown }).org_id;
+      return typeof orgId === "string" ? orgId : undefined;
+    }
+    return undefined;
+  }
+
+  if (projects && typeof projects === "object" && "org_id" in projects) {
+    const orgId = (projects as { org_id?: unknown }).org_id;
+    return typeof orgId === "string" ? orgId : undefined;
+  }
+
+  return undefined;
+}
+
+function buildTriagePrompt(issueGroup: TriageIssueGroup, findings: TriageFinding[]): string {
   const finding = findings[0];
   const allFiles = [...new Set(findings.map((f) => f.file_path))].join(", ");
 
@@ -74,7 +105,7 @@ export async function POST(
       return NextResponse.json({ error: "Issue group not found" }, { status: 404 });
     }
 
-    const orgId = (group.projects as any)?.org_id;
+    const orgId = extractOrgId(group.projects);
     const auth = await requirePermission(supabase, "view:findings", orgId);
     if (isAuthError(auth)) return auth;
 
@@ -93,12 +124,7 @@ export async function POST(
     if (!creditCheck.ok) return creditCheck.response;
 
     // Fetch findings for this issue group
-    const { data: findings } = await supabase
-      .from("findings")
-      .select("id, rule_id, message, file_path, line_number, severity, category, snippet, taint_flow")
-      .eq("issue_group_id", id)
-      .order("created_at", { ascending: false })
-      .limit(5);
+    const { data: findings } = await fetchTriageFindings(supabase, id);
 
     if (!findings || findings.length === 0) {
       return NextResponse.json({ error: "No findings found for this issue group" }, { status: 404 });

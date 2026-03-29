@@ -1,24 +1,24 @@
 import {
   lemonSqueezySetup,
   createCheckout,
-  getCustomer,
-  type Checkout,
 } from "@lemonsqueezy/lemonsqueezy.js";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import crypto from "crypto";
+import {
+  getCheckoutBillingConfig,
+  getLemonSqueezyApiKey,
+  getLemonSqueezyWebhookSecret,
+  type PackId,
+} from "@/lib/billing-config";
 
 let _initialized = false;
 
 function ensureLemonSqueezy() {
   if (!_initialized) {
-    const key = process.env.LEMONSQUEEZY_API_KEY;
-    if (!key) throw new Error("LEMONSQUEEZY_API_KEY is not set");
-    lemonSqueezySetup({ apiKey: key });
+    lemonSqueezySetup({ apiKey: getLemonSqueezyApiKey() });
     _initialized = true;
   }
 }
-
-export type PackId = "starter" | "builder" | "team" | "scale";
 
 export interface CreditPack {
   id: PackId;
@@ -85,9 +85,7 @@ export function getPackById(packId: string): CreditPack | null {
 }
 
 export function getPackByVariantId(variantId: string): CreditPack | null {
-  return (
-    Object.values(CREDIT_PACKS).find((p) => p.variantId === variantId) ?? null
-  );
+  return Object.values(CREDIT_PACKS).find((p) => p.variantId === variantId) ?? null;
 }
 
 export async function createCheckoutUrl(opts: {
@@ -100,12 +98,9 @@ export async function createCheckoutUrl(opts: {
 
   const pack = CREDIT_PACKS[opts.packId];
   if (!pack) throw new Error(`Unknown pack: ${opts.packId}`);
-  if (!pack.variantId) throw new Error(`No variant ID configured for pack: ${opts.packId}`);
+  const { storeId, variantId } = getCheckoutBillingConfig(opts.packId);
 
-  const storeId = process.env.LEMONSQUEEZY_STORE_ID;
-  if (!storeId) throw new Error("LEMONSQUEEZY_STORE_ID is not set");
-
-  const { data, error } = await createCheckout(storeId, pack.variantId, {
+  const { data, error } = await createCheckout(storeId, variantId, {
     checkoutData: {
       email: opts.email,
       custom: {
@@ -121,7 +116,7 @@ export async function createCheckoutUrl(opts: {
 
   if (error) throw new Error(`Lemon Squeezy checkout failed: ${error.message}`);
 
-  const url = (data as any)?.data?.attributes?.url;
+  const url = data?.data?.attributes?.url;
   if (!url) throw new Error("No checkout URL returned from Lemon Squeezy");
 
   return url;
@@ -135,7 +130,7 @@ export async function fulfillCreditPurchase(opts: {
   orderId: string;
   userId?: string;
 }): Promise<boolean> {
-  const { data: success, error } = await supabaseAdmin.rpc("add_credits", {
+  const { error } = await supabaseAdmin.rpc("add_credits", {
     p_org_id: opts.orgId,
     p_amount: opts.credits,
     p_transaction_type: "purchase",
@@ -212,8 +207,7 @@ export function verifyWebhookSignature(
   rawBody: string,
   signature: string
 ): boolean {
-  const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
-  if (!secret) throw new Error("LEMONSQUEEZY_WEBHOOK_SECRET is not set");
+  const secret = getLemonSqueezyWebhookSecret();
 
   const hmac = crypto
     .createHmac("sha256", secret)
