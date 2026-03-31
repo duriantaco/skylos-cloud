@@ -1,8 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
 import crypto from "crypto";
 import { serverError } from "@/lib/api-error";
+import { buildRepoUrlOrFilter } from "@/lib/github-repo";
+import { canAutoConfigureGitHubInstall } from "@/lib/github-installation-core";
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -13,6 +16,7 @@ const supabase = createClient(
 const APP_ID = process.env.GITHUB_APP_ID!;
 const PRIVATE_KEY = process.env.GITHUB_APP_PRIVATE_KEY!;
 const WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET!;
+const AUTO_CONFIGURE_INSTALLATIONS = process.env.GITHUB_APP_AUTO_CONFIGURE === "true";
 
 function verifySignature(payload: string, signature: string): boolean {
   const sig = crypto
@@ -38,11 +42,54 @@ async function getInstallationOctokit(installationId: number): Promise<Octokit> 
   return new Octokit({ auth: token });
 }
 
-const SKYLOS_WORKFLOW_YAML = `name: Skylos Quality Gate
+async function linkInstallationToRepo(fullName: string, installationId: number) {
+  const repoFilter = buildRepoUrlOrFilter(`https://github.com/${fullName}`);
+  if (!repoFilter) {
+    return { kind: "invalid" as const };
+  }
+
+  const { data: projects, error: lookupError } = await supabase
+    .from("projects")
+    .select("id, name, repo_url, policy_config, organizations(plan, pro_expires_at)")
+    .or(repoFilter)
+    .limit(3);
+
+  if (lookupError) {
+    return { kind: "error" as const, error: lookupError };
+  }
+
+  if (!projects || projects.length === 0) {
+    return { kind: "missing" as const };
+  }
+
+  if (projects.length > 1) {
+    return { kind: "ambiguous" as const, projects };
+  }
+
+  const project = projects[0];
+  const { data: updatedProjects, error: updateError } = await supabase
+    .from("projects")
+    .update({ github_installation_id: installationId })
+    .eq("id", project.id)
+    .select("id, name, repo_url, policy_config, organizations(plan, pro_expires_at)");
+
+  if (updateError) {
+    return { kind: "error" as const, error: updateError };
+  }
+
+  return {
+    kind: "linked" as const,
+    projects: updatedProjects || [project],
+  };
+}
+
+function buildSkylosWorkflowYaml(defaultBranch: string): string {
+  const branches = JSON.stringify([defaultBranch]);
+  return `name: Skylos Quality Gate
 
 on:
   pull_request:
-    branches: [main, master]
+    branches: ${branches}
 
 permissions:
   contents: read
@@ -67,6 +114,77 @@ jobs:
       - name: Run Skylos Scan & Upload
         run: skylos . --danger --upload
 `;
+}
+
+function shouldAutoConfigureProject(project: {
+  policy_config?: Record<string, unknown> | null;
+  organizations?:
+    | {
+        plan?: string | null;
+        pro_expires_at?: string | null;
+      }
+    | Array<{
+        plan?: string | null;
+        pro_expires_at?: string | null;
+      }>
+    | null;
+}): boolean {
+  const org = Array.isArray(project.organizations)
+    ? (project.organizations[0] ?? null)
+    : (project.organizations ?? null);
+
+  return canAutoConfigureGitHubInstall(
+    project.policy_config ?? null,
+    AUTO_CONFIGURE_INSTALLATIONS,
+    org
+  );
+}
+
+async function configureRepository(
+  octokit: Octokit,
+  owner: string,
+  repoName: string,
+  fullName: string
+) {
+  const { data: repoData } = await octokit.repos.get({ owner, repo: repoName });
+  const defaultBranch = repoData.default_branch;
+
+  let existingProtection: any = null;
+  try {
+    const { data } = await octokit.repos.getBranchProtection({
+      owner,
+      repo: repoName,
+      branch: defaultBranch,
+    });
+    existingProtection = data;
+  } catch (e: any) {
+    if (e.status !== 404) throw e;
+  }
+
+  const existingChecks = existingProtection?.required_status_checks?.contexts || [];
+  const newChecks = [...new Set([...existingChecks, "Skylos Quality Gate"])];
+
+  await octokit.repos.updateBranchProtection({
+    owner,
+    repo: repoName,
+    branch: defaultBranch,
+    required_status_checks: {
+      strict: true,
+      contexts: newChecks,
+    },
+    enforce_admins: existingProtection?.enforce_admins?.enabled ?? false,
+    required_pull_request_reviews: existingProtection?.required_pull_request_reviews ?? null,
+    restrictions: existingProtection?.restrictions ?? null,
+  });
+
+  console.log(`Enabled branch protection for ${fullName}:${defaultBranch}`);
+
+  try {
+    await createWorkflowPR(octokit, owner, repoName, defaultBranch);
+  } catch (prErr: any) {
+    console.warn(`Could not create workflow PR for ${fullName}:`, prErr.message);
+  }
+}
 
 async function createWorkflowPR(octokit: Octokit, owner: string, repo: string, defaultBranch: string) {
   // Check if workflow already exists
@@ -109,7 +227,7 @@ async function createWorkflowPR(octokit: Octokit, owner: string, repo: string, d
   }
 
   // Create the workflow file
-  const content = Buffer.from(SKYLOS_WORKFLOW_YAML).toString('base64');
+  const content = Buffer.from(buildSkylosWorkflowYaml(defaultBranch)).toString('base64');
   await octokit.repos.createOrUpdateFileContents({
     owner,
     repo,
@@ -149,7 +267,6 @@ async function createWorkflowPR(octokit: Octokit, owner: string, repo: string, d
 async function handleInstallation(payload: any) {
   const installationId = payload.installation.id;
   const repos = payload.repositories || [];
-  const account = payload.installation.account;
   
   console.log(`Processing installation ${installationId} with ${repos.length} repos`);
   
@@ -159,61 +276,37 @@ async function handleInstallation(payload: any) {
     const fullName = repo.full_name;
     const [owner, repoName] = fullName.split("/");
     
-    const { data: matchedProjects, error: updateError } = await supabase
-      .from('projects')
-      .update({ github_installation_id: installationId })
-      .ilike('repo_url', `%github.com/${fullName}%`)
-      .select('id, name, repo_url');
-    
-    if (updateError) {
-      console.error(`Failed to update installation for ${fullName}:`, updateError);
-    } else if (matchedProjects && matchedProjects.length > 0) {
+    const linkResult = await linkInstallationToRepo(fullName, installationId);
+
+    if (linkResult.kind === "error") {
+      console.error(`Failed to update installation for ${fullName}:`, linkResult.error);
+    } else if (linkResult.kind === "ambiguous") {
+      console.error(
+        `Refusing to link ${fullName}: multiple projects share the same repo URL`,
+        linkResult.projects
+      );
+    } else if (linkResult.kind === "linked") {
+      const matchedProjects = linkResult.projects;
       console.log(`Linked installation ${installationId} to ${matchedProjects.length} project(s):`);
       matchedProjects.forEach(p => console.log(`   - ${p.name} (${p.repo_url})`));
     } else {
       console.log(`No projects found matching ${fullName} - user may need to create project first`);
     }
     
-    try {
-      const { data: repoData } = await octokit.repos.get({ owner, repo: repoName });
-      const defaultBranch = repoData.default_branch;
-      
-      let existingProtection: any = null;
-      try {
-        const { data } = await octokit.repos.getBranchProtection({
-          owner,
-          repo: repoName,
-          branch: defaultBranch,
-        });
-        existingProtection = data;
-      } catch (e: any) {
-        if (e.status !== 404) throw e;
-      }
-      
-      const existingChecks = existingProtection?.required_status_checks?.contexts || [];
-      const newChecks = [...new Set([...existingChecks, "Skylos Quality Gate"])];
-      
-      await octokit.repos.updateBranchProtection({
-        owner,
-        repo: repoName,
-        branch: defaultBranch,
-        required_status_checks: {
-          strict: true,
-          contexts: newChecks,
-        },
-        enforce_admins: existingProtection?.enforce_admins?.enabled ?? false,
-        required_pull_request_reviews: existingProtection?.required_pull_request_reviews ?? null,
-        restrictions: existingProtection?.restrictions ?? null,
-      });
-      
-      console.log(`Enabled branch protection for ${fullName}:${defaultBranch}`);
+    const matchedProjects = linkResult.kind === "linked" ? linkResult.projects : [];
+    const shouldAutoConfigure = matchedProjects.some(shouldAutoConfigureProject);
 
-      // Auto-create workflow PR if skylos.yml doesn't exist
-      try {
-        await createWorkflowPR(octokit, owner, repoName, defaultBranch);
-      } catch (prErr: any) {
-        console.warn(`Could not create workflow PR for ${fullName}:`, prErr.message);
-      }
+    if (!shouldAutoConfigure) {
+      console.log(
+        AUTO_CONFIGURE_INSTALLATIONS
+          ? `Skipping automatic repo configuration for ${fullName}; project opt-in is disabled`
+          : `Skipping automatic repo configuration for ${fullName}; set GITHUB_APP_AUTO_CONFIGURE=true to enable`
+      );
+      continue;
+    }
+
+    try {
+      await configureRepository(octokit, owner, repoName, fullName);
     } catch (e: any) {
       console.warn(`Could not configure branch protection for ${fullName}:`, e.message);
     }
@@ -225,22 +318,43 @@ async function handleInstallationRepositoriesAdded(payload: any) {
   const addedRepos = payload.repositories_added || [];
   
   console.log(`Adding ${addedRepos.length} repos to installation ${installationId}`);
+  const octokit = await getInstallationOctokit(installationId);
   
   for (const repo of addedRepos) {
     const fullName = repo.full_name;
+    const [owner, repoName] = fullName.split("/");
     
-    const { data: matchedProjects, error } = await supabase
-      .from('projects')
-      .update({ github_installation_id: installationId })
-      .ilike('repo_url', `%github.com/${fullName}%`)
-      .select('id, name');
-    
-    if (error) {
-      console.error(`Failed to link ${fullName}:`, error);
-    } else if (matchedProjects && matchedProjects.length > 0) {
-      console.log(`Linked ${fullName} to ${matchedProjects.length} project(s)`);
+    const linkResult = await linkInstallationToRepo(fullName, installationId);
+
+    if (linkResult.kind === "error") {
+      console.error(`Failed to link ${fullName}:`, linkResult.error);
+    } else if (linkResult.kind === "ambiguous") {
+      console.error(
+        `Refusing to link ${fullName}: multiple projects share the same repo URL`,
+        linkResult.projects
+      );
+    } else if (linkResult.kind === "linked") {
+      console.log(`Linked ${fullName} to ${linkResult.projects.length} project(s)`);
     } else {
       console.log(`No projects found for ${fullName}`);
+    }
+
+    const matchedProjects = linkResult.kind === "linked" ? linkResult.projects : [];
+    const shouldAutoConfigure = matchedProjects.some(shouldAutoConfigureProject);
+
+    if (!shouldAutoConfigure) {
+      console.log(
+        AUTO_CONFIGURE_INSTALLATIONS
+          ? `Skipping automatic repo configuration for ${fullName}; project opt-in is disabled`
+          : `Skipping automatic repo configuration for ${fullName}; set GITHUB_APP_AUTO_CONFIGURE=true to enable`
+      );
+      continue;
+    }
+
+    try {
+      await configureRepository(octokit, owner, repoName, fullName);
+    } catch (e: any) {
+      console.warn(`Could not configure branch protection for ${fullName}:`, e.message);
     }
   }
 }

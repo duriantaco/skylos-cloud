@@ -17,7 +17,7 @@ export type TriageFinding = {
 
 type TriageFindingsResult = Promise<{ data: TriageFinding[] | null }>;
 
-type TriageFindingsClient = {
+export type TriageFindingsClient = {
   from: (table: string) => {
     select: (columns: string) => {
       eq: (column: string, value: string) => {

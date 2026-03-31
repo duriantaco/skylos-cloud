@@ -1,6 +1,10 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
+import {
+  buildRepoUrlOrFilter,
+  normalizeGitHubRepoUrl,
+} from "@/lib/github-repo";
 import { requirePermission, isAuthError } from "@/lib/permissions";
 
 
@@ -27,9 +31,48 @@ export async function PATCH(
 
     const body = await req.json();
 
-    const allowedUpdates: Record<string, any> = {};
-    if ('repo_url' in body) {
-      allowedUpdates.repo_url = body.repo_url || null;
+    const allowedUpdates: Record<string, unknown> = {};
+    if ("repo_url" in body) {
+      if (typeof body.repo_url === "string" && body.repo_url.trim().length > 0) {
+        const normalizedRepoUrl = normalizeGitHubRepoUrl(body.repo_url);
+        if (!normalizedRepoUrl) {
+          return NextResponse.json(
+            { error: "A valid GitHub repository URL is required" },
+            { status: 400 }
+          );
+        }
+
+        const repoFilter = buildRepoUrlOrFilter(normalizedRepoUrl);
+        if (repoFilter) {
+          const { data: existingProjects, error: existingError } = await supabase
+            .from("projects")
+            .select("id")
+            .or(repoFilter)
+            .limit(10);
+
+          if (existingError) {
+            return serverError(existingError, "Check repo URL uniqueness");
+          }
+
+          const conflict = (existingProjects || []).some(
+            (existingProject) => existingProject.id !== id
+          );
+
+          if (conflict) {
+            return NextResponse.json(
+              {
+                error:
+                  "This GitHub repository is already linked to another project. Use a unique repo binding per project.",
+              },
+              { status: 409 }
+            );
+          }
+        }
+
+        allowedUpdates.repo_url = normalizedRepoUrl;
+      } else {
+        allowedUpdates.repo_url = null;
+      }
     }
 
     const { error } = await supabase
@@ -42,7 +85,7 @@ export async function PATCH(
     }
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
+  } catch (e: unknown) {
     return serverError(e, "Project update");
   }
 }
@@ -68,19 +111,6 @@ export async function DELETE(
     const auth = await requirePermission(supabase, "delete:projects", project.org_id);
     if (isAuthError(auth)) return auth;
 
-    const { data: scans } = await supabase
-      .from("scans")
-      .select("id")
-      .eq("project_id", id);
-
-    if (scans && scans.length > 0) {
-      const scanIds = scans.map(s => s.id);
-      await supabase.from("findings").delete().in("scan_id", scanIds);
-      await supabase.from("finding_suppressions").delete().in("scan_id", scanIds);
-    }
-
-    await supabase.from("scans").delete().eq("project_id", id);
-
     const { error } = await supabase.from("projects").delete().eq("id", id);
 
     if (error) {
@@ -88,7 +118,7 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true });
-  } catch (e: any) {
+  } catch (e: unknown) {
     return serverError(e, "Project delete");
   }
 }

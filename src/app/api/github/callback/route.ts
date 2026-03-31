@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { verifySignedState } from '@/lib/github-state'
+import { requirePermission, isAuthError } from '@/lib/permissions'
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams
-  const installationId = searchParams.get('installation_id')
+  const installationIdParam = searchParams.get('installation_id')
   const state = searchParams.get('state')
 
-  if (!installationId || !state) {
+  if (!installationIdParam || !state) {
     return NextResponse.redirect(new URL('/dashboard/settings?error=missing_params', req.url))
+  }
+
+  const installationId = Number.parseInt(installationIdParam, 10)
+  if (!Number.isInteger(installationId) || installationId <= 0) {
+    return NextResponse.redirect(new URL('/dashboard/settings?error=invalid_installation', req.url))
   }
 
   // Verify HMAC-signed state to prevent CSRF
@@ -34,20 +40,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/settings?error=project_not_found', req.url))
   }
 
-  const { data: member, error: memberError } = await supabase
-    .from('organization_members')
-    .select('org_id')
-    .eq('user_id', user.id)
-    .eq('org_id', project.org_id)
-    .single()
-
-  if (memberError || !member) {
+  const auth = await requirePermission(supabase, 'manage:settings', project.org_id)
+  if (isAuthError(auth)) {
     return NextResponse.redirect(new URL('/dashboard/settings?error=unauthorized', req.url))
   }
 
   const { error } = await supabase
     .from('projects')
-    .update({ github_installation_id: parseInt(installationId) })
+    .update({ github_installation_id: installationId })
     .eq('id', projectId)
 
   if (error) {
