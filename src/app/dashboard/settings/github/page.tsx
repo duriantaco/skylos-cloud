@@ -24,9 +24,9 @@ export default function GitHubIntegration() {
         </p>
         
         <ul className="text-sm text-slate-600 mb-6 space-y-2">
-          <li>✓ Automatically configures branch protection</li>
+          <li>✓ Can configure branch protection and bootstrap CI with project opt-in</li>
           <li>✓ Shows check status directly on PRs</li>
-          <li>✓ No manual setup required</li>
+          <li>✓ Works with explicit repo-to-project binding</li>
         </ul>
         
         <button

@@ -120,7 +120,7 @@ When Cursor rewrites a handler, service, or policy module, the highest-risk chan
 Run:
 
 ```bash
-skylos diff main..HEAD --danger
+skylos . --diff origin/main --danger
 ```
 
 This is how you catch:
@@ -203,7 +203,7 @@ For a Python team using Cursor seriously, this is the setup that covers most fai
 
 1. `skylos . -a` before commit
 2. `pre-commit` hook for routine scanning
-3. `skylos diff main..HEAD --danger` in PRs
+3. `skylos . --diff origin/main --danger` in PRs
 4. `skylos defend .` for LLM-powered products
 5. approval still enabled for high-impact MCP tools
 
@@ -213,6 +213,7 @@ That is enough to make Cursor a lot safer without turning the workflow into ente
 
 ## Where to go next
 
+- Need the broader verification workflow first? Read [How to Review AI-Generated Python Code Before Merge](/blog/review-ai-generated-python-code-before-merge)
 - Need MCP hardening guidance? Read [How to Secure an MCP Server Before You Trust It With Your Code](/use-cases/secure-mcp-server)
 - Using Claude Code too? Read [How to Review Claude Code Output for Python Security Regressions](/use-cases/claude-code-security-review)
 - Need diff-focused review? Read [How to Catch Removed Auth Checks and Security Regressions in AI-Generated PRs](/use-cases/ai-security-regressions-in-prs)
@@ -220,4 +221,3 @@ That is enough to make Cursor a lot safer without turning the workflow into ente
 ## References
 
 - [Cursor: Model Context Protocol](https://docs.cursor.com/en/context/mcp)
-

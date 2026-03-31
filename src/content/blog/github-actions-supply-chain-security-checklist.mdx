@@ -1,0 +1,363 @@
+---
+title: "GitHub Actions Supply Chain Security Checklist for Python Teams"
+excerpt: "A practical GitHub Actions supply chain security checklist for Python teams: protect workflow changes, pin third-party actions, restrict GITHUB_TOKEN, separate untrusted PRs, use OIDC, and scan every pull request."
+publishedAt: "2026-03-30"
+updatedAt: "2026-03-30"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "The repo already had one page about securing GitHub Actions and another about scanning Python code inside GitHub Actions. This article targets the adjacent checklist-style search intent: teams that want a fast audit of CI supply-chain risk without reading a full implementation guide first."
+methodology:
+  - "Reviewed the existing GitHub Actions hardening guidance and Python CI content already published in this repo, then compressed it into a checklist format for security-audit search intent."
+  - "Kept the guidance limited to controls Python teams can apply quickly: workflow change protection, action pinning, token permissions, untrusted PR isolation, OIDC, and pull-request scanning."
+  - "Mapped the final checklist item to a concrete Python workflow using Skylos because the product and site already cover GitHub Actions scanning, diff-aware review, and PR annotations."
+tags: ["github-actions", "security", "python", "ci"]
+keywords:
+  - github actions supply chain security
+  - github actions security checklist
+  - github actions supply chain security python
+  - secure github actions python
+  - github actions hardening checklist
+  - github actions security best practices
+  - github token permissions least privilege
+  - pin github actions by sha
+  - github actions oidc python
+  - python ci security checklist
+  - secure python ci pipeline
+  - github actions pull_request_target security
+canonicalUrl: "/blog/github-actions-supply-chain-security-checklist"
+keyTakeaways:
+  - "GitHub Actions supply chain security is not only about scanning your Python code. It is also about reducing what the workflow itself is allowed to do."
+  - "The highest-value fixes are usually simple: protect workflow-file changes, pin third-party actions, add explicit `permissions`, and keep untrusted PRs away from privileged jobs."
+  - "OIDC is the safest default for cloud auth because it replaces long-lived deploy secrets with short-lived, scoped credentials."
+  - "Code scanning still matters. A hardened workflow is stronger when every pull request also scans the Python code moving through it."
+faq:
+  - question: "What is GitHub Actions supply chain security?"
+    answer: "It is the practice of reducing trust in the CI/CD workflow itself. That includes the third-party actions you run, the permissions you grant, the secrets you expose, and whether untrusted pull requests can execute privileged jobs."
+  - question: "Do I need to pin every GitHub Action by commit SHA?"
+    answer: "The strictest answer is yes for third-party actions, especially in security-sensitive or deploy workflows. If a team cannot do it everywhere immediately, start with third-party actions and then tighten first-party actions later."
+  - question: "Is OIDC better than storing cloud secrets in GitHub?"
+    answer: "Usually yes. OIDC lets workflows request short-lived credentials instead of relying on long-lived cloud keys stored as repository secrets."
+  - question: "What is the difference between this page and a Python security scanner guide?"
+    answer: "This page is about securing the GitHub Actions workflow itself. A scanner guide focuses on the Python code that runs inside that workflow."
+howToSteps:
+  - name: "Audit workflow trust"
+    text: "Check who can change workflow files, which actions run, and what permissions or secrets each job really needs."
+  - name: "Split untrusted from privileged"
+    text: "Keep pull-request analysis jobs read-only and move deploy credentials into separate trusted workflows or environments."
+  - name: "Scan every pull request"
+    text: "After the workflow is hardened, add Python code scanning and diff-aware review so risky changes are blocked before merge."
+---
+
+# GitHub Actions Supply Chain Security Checklist for Python Teams
+
+If you use GitHub Actions to test, build, or deploy Python code, the workflow itself is part of your supply chain.
+
+That means GitHub Actions supply chain security is not just:
+
+- "run Bandit in CI"
+- "scan `requirements.txt`"
+- "add one more secret and hope the workflow is fine"
+
+It is also about **what the workflow can execute, which third-party code it trusts, what permissions it gets, and whether untrusted pull requests can reach privileged paths**.
+
+If you want the full implementation guide, read [How to Secure GitHub Actions for Python Repos](/use-cases/secure-github-actions-python). If you want the faster audit version, use this checklist.
+
+## The short checklist
+
+For most Python teams, the practical baseline is:
+
+1. protect workflow-file changes with `CODEOWNERS`
+2. pin third-party actions by full-length commit SHA
+3. set explicit `GITHUB_TOKEN` permissions
+4. keep untrusted pull-request jobs separate from privileged deploy jobs
+5. prefer OIDC over long-lived cloud secrets
+6. reduce third-party action sprawl
+7. treat inline shell steps as part of the attack surface
+8. keep actions updated
+9. scan Python code on every pull request
+
+If you only fix three things this week, do these first:
+
+- pin third-party actions
+- add explicit `permissions`
+- separate PR scanning from deploy credentials
+
+## 1. Protect workflow changes with `CODEOWNERS`
+
+Your workflow file is production code with repository and deployment power. Treat changes to `.github/workflows/` like infrastructure changes, not like casual YAML edits.
+
+A simple `CODEOWNERS` rule raises the bar immediately:
+
+```text
+.github/workflows/ @platform-team @security-team
+```
+
+That does two useful things:
+
+- workflow changes stop being invisible in normal feature PRs
+- the people who understand CI risk are forced into the review path
+
+This is one of the cheapest controls in the whole checklist.
+
+## 2. Pin third-party actions by full-length commit SHA
+
+Tags like `@v4` are convenient. They are not immutable.
+
+For third-party actions, the safer pattern is:
+
+```yaml
+- uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+- uses: actions/setup-python@42375524d7b3f331cfa0bf3d4e21d0d3e1df3630
+```
+
+That is noisier than:
+
+```yaml
+- uses: actions/checkout@v4
+- uses: actions/setup-python@v5
+```
+
+but it reduces surprise. If an action changes upstream, your workflow does not silently follow it.
+
+Practical rule:
+
+- start with third-party actions first
+- pin deploy and release workflows before lower-risk jobs
+- if you depend on many actions, that is itself a signal to simplify the workflow
+
+## 3. Set explicit `GITHUB_TOKEN` permissions
+
+Do not let the workflow inherit broader defaults than it needs.
+
+For a typical pull-request scan job, this is a reasonable baseline:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+```
+
+If the job does not comment on pull requests, you may not need `pull-requests: write` at all.
+
+For an OIDC-based deploy job, the shape changes:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+```
+
+The principle is simple:
+
+- read-only where possible
+- only grant write scopes to the job that actually needs them
+- do not reuse one broad permission block across unrelated jobs
+
+## 4. Keep untrusted PRs away from privileged workflows
+
+This is where many GitHub Actions incidents start.
+
+Public pull requests, forked pull requests, and automation-generated pull requests should not share the same trust assumptions as your trusted branch deploys.
+
+For Python teams, the clean split is usually:
+
+### Workflow A: unprivileged PR analysis
+
+Purpose:
+
+- install dependencies
+- run tests
+- lint
+- run Python security scanning
+- annotate or comment if needed
+
+Permissions:
+
+- `contents: read`
+- maybe `pull-requests: write`
+
+No deploy keys. No publish tokens. No cloud credentials.
+
+### Workflow B: trusted deploy
+
+Purpose:
+
+- build release artifacts
+- publish to registries
+- deploy to cloud
+
+Permissions:
+
+- minimal deploy permissions
+- `id-token: write` if you use OIDC
+
+Only trusted branches or protected environments should reach this workflow.
+
+Also: treat `pull_request_target` carefully. It runs in the context of the base branch, which makes it useful for metadata tasks but risky if you check out or execute untrusted PR code inside it.
+
+## 5. Prefer OIDC over long-lived cloud secrets
+
+If your Python deploy pipeline still stores long-lived AWS, GCP, Azure, or other cloud credentials in GitHub secrets, you are carrying avoidable risk.
+
+OIDC is a better default because it gives the workflow short-lived credentials scoped to the run. That means:
+
+- fewer static secrets sitting in the repository settings
+- easier rotation
+- clearer trust boundaries
+- less damage if one workflow path is misconfigured
+
+The workflow side usually starts with:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+```
+
+Then the provider-specific login action exchanges the GitHub-issued token for a short-lived cloud credential.
+
+For stricter repos, pair this with protected environments so only approved branches, tags, or reviewers can reach production credentials.
+
+## 6. Reduce third-party action sprawl
+
+Every external action is code you are executing inside CI.
+
+That does not mean "never use third-party actions." It means:
+
+- prefer fewer actions, not more
+- prefer widely used actions with clear maintainers
+- remove one-off utility actions you could replace with a small shell step or a built-in feature
+- review old workflows for actions nobody remembers adding
+
+The supply-chain mistake is usually not one obviously dangerous action. It is the accumulated sprawl of five or ten helper actions that nobody has reviewed in months.
+
+## 7. Treat inline shell as part of the attack surface
+
+A workflow can be compromised even without a malicious action if you inject untrusted values directly into shell commands.
+
+Risky pattern:
+
+```yaml
+- name: Risky PR title handling
+  run: python scripts/review.py --title "${{ github.event.pull_request.title }}"
+```
+
+Safer pattern:
+
+```yaml
+- name: Safer PR title handling
+  env:
+    PR_TITLE: ${{ github.event.pull_request.title }}
+  run: python scripts/review.py --title "$PR_TITLE"
+```
+
+This does not solve every shell problem, but it avoids the worst habit: embedding untrusted workflow context directly into command strings.
+
+The practical mindset is:
+
+- quote variables
+- keep shell steps small
+- avoid turning YAML into an ad hoc scripting platform
+
+## 8. Keep actions updated
+
+Pinned actions reduce drift. They do not remove maintenance work.
+
+You still need a process to update them intentionally. Otherwise "secure by pinning" turns into "secure until the next critical fix ships and nobody notices."
+
+For most teams, the low-friction path is:
+
+- enable Dependabot for GitHub Actions updates
+- review action updates like code changes
+- update release and deploy workflows first
+
+This is also where `CODEOWNERS` helps again. Workflow updates are safer when the same reviewers see both new actions and version bumps.
+
+## 9. Scan Python code on every pull request
+
+Workflow hardening is only half the story. You still need to scan the Python code moving through the workflow.
+
+That means checking for:
+
+- hardcoded secrets
+- risky subprocess usage
+- SQL injection patterns
+- dead code that expands attack surface
+- AI-generated regressions or plausible-looking bad code
+
+If you want the fastest path, use the existing scanner workflow documented here:
+
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+
+For a repo already using Skylos, the baseline PR job is straightforward:
+
+```yaml
+name: python-pr-scan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**.py"
+      - ".github/workflows/**"
+      - "pyproject.toml"
+      - "requirements*.txt"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@42375524d7b3f331cfa0bf3d4e21d0d3e1df3630
+        with:
+          python-version: "3.12"
+
+      - name: Install Skylos
+        run: pip install skylos
+
+      - name: Scan changed Python code
+        run: skylos . --danger --quality --diff origin/main --github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+That gives you a workflow where:
+
+- the job is still relatively constrained
+- the pull request gets actionable feedback
+- Python risk is checked before merge instead of after deployment
+
+## A secure baseline is boring on purpose
+
+The best GitHub Actions supply chain security checklist is not impressive. It is boring, explicit, and repeatable.
+
+For Python teams, that usually means:
+
+- workflow changes require the right reviewers
+- third-party actions do not drift silently
+- job permissions are narrow
+- untrusted PRs do not reach privileged deploy paths
+- cloud access is short-lived and scoped
+- Python code is scanned on every PR
+
+That baseline will prevent more real-world mistakes than a clever but fragile CI design.
+
+## Where to go next
+
+- Want the implementation guide? Read [How to Secure GitHub Actions for Python Repos](/use-cases/secure-github-actions-python)
+- Want the code scanning setup? Read [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+- Want the tool comparison? Read [Bandit vs Skylos: Which Python Security Scanner Should You Use?](/compare/bandit-vs-skylos)
+- Want the broader tooling landscape? Read [Best Python Static Analysis Tools Compared](/blog/python-sast-comparison-2026)
+
+## References
+
+- [GitHub Docs: Secure use reference](https://docs.github.com/en/actions/reference/secure-use-reference)
+- [GitHub Docs: Events that trigger workflows (`pull_request_target`)](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows)
+- [GitHub Docs: security hardening with OpenID Connect](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect)

@@ -2,7 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { generateApiKey } from "@/lib/api-key";
 import { getEffectivePlan } from "@/lib/entitlements";
-import { resolveActiveOrganizationForRequest } from "@/lib/active-org";
+import { requirePermission, isAuthError } from "@/lib/permissions";
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -37,27 +37,25 @@ export async function POST(req: Request) {
     );
   }
 
-  const activeOrg = await resolveActiveOrganizationForRequest(supabase, user.id, {
-    requiredOrgId: project.org_id,
-    select: "org_id",
-  });
-
-  if (!activeOrg.membership) {
-    return NextResponse.json(
-      { error: "You do not have access to this project" },
-      { status: 403 }
-    );
-  }
+  const auth = await requirePermission(supabase, "rotate:keys", project.org_id);
+  if (isAuthError(auth)) return auth;
 
   // Generate a new API key for CLI connection
   // This ensures we always return a valid key, even for existing projects
   const { plain: apiKey, hash: apiKeyHash } = generateApiKey();
 
   // Update the project with the new API key hash
-  await supabase
+  const { error: updateError } = await supabase
     .from("projects")
     .update({ api_key_hash: apiKeyHash })
     .eq("id", project_id);
+
+  if (updateError) {
+    return NextResponse.json(
+      { error: "Failed to issue API key" },
+      { status: 500 }
+    );
+  }
 
   const org = (project as any).organizations;
   const orgData = Array.isArray(org) ? org[0] : org;

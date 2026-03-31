@@ -10,6 +10,9 @@ import {
   getLemonSqueezyWebhookSecret,
   type PackId,
 } from "@/lib/billing-config";
+import type { RefundReconciliationStatus } from "@/lib/billing-webhook-core";
+
+export type { PackId } from "@/lib/billing-config";
 
 let _initialized = false;
 
@@ -130,77 +133,72 @@ export async function fulfillCreditPurchase(opts: {
   orderId: string;
   userId?: string;
 }): Promise<boolean> {
-  const { error } = await supabaseAdmin.rpc("add_credits", {
+  const { data, error } = await supabaseAdmin.rpc("fulfill_credit_purchase", {
     p_org_id: opts.orgId,
-    p_amount: opts.credits,
-    p_transaction_type: "purchase",
-    p_description: `Purchased ${opts.credits} credits (${opts.packId} pack)`,
-    p_metadata: {
-      pack_id: opts.packId,
-      ls_order_id: opts.orderId,
-    },
-    p_created_by: opts.userId || null,
+    p_pack_id: opts.packId,
+    p_credits: opts.credits,
+    p_amount_cents: opts.amountCents,
+    p_order_id: opts.orderId,
+    p_user_id: opts.userId || null,
   });
 
   if (error) {
-    console.error("Failed to add credits:", error);
+    console.error("Failed to fulfill credit purchase:", error);
     return false;
   }
 
-  await supabaseAdmin.from("credit_purchases").insert({
-    org_id: opts.orgId,
-    credits: opts.credits,
-    amount_cents: opts.amountCents,
-    pack_name: opts.packId,
-    ls_order_id: opts.orderId,
-    status: "completed",
-  });
-
-  const proDurationDays = getProDurationDays(opts.packId);
-
-  const { data: currentOrg } = await supabaseAdmin
-    .from("organizations")
-    .select("plan, pro_expires_at")
-    .eq("id", opts.orgId)
-    .single();
-
-  if (currentOrg?.plan !== "enterprise") {
-    const now = new Date();
-    const currentExpiry = currentOrg?.pro_expires_at ? new Date(currentOrg.pro_expires_at) : null;
-
-    const baseDate = currentExpiry && currentExpiry > now ? currentExpiry : now;
-    const newExpiry = new Date(baseDate.getTime() + proDurationDays * 24 * 60 * 60 * 1000);
-
-    await supabaseAdmin
-      .from("organizations")
-      .update({ plan: "pro", pro_expires_at: newExpiry.toISOString() })
-      .eq("id", opts.orgId);
-  }
-
-  return !error;
+  return data === true;
 }
 
-export async function handleRefund(orderId: string): Promise<void> {
-  const { data: updated, error: updateErr } = await supabaseAdmin
-    .from("credit_purchases")
-    .update({ status: "refunded" })
-    .eq("ls_order_id", orderId)
-    .eq("status", "completed")
-    .select("org_id, credits");
+export type RefundResult =
+  | "refunded"
+  | "already_refunded"
+  | "not_found"
+  | "invalid_status"
+  | "error";
 
-  if (updateErr || !updated || updated.length === 0) {
-    console.warn("No matching completed purchase for refund (already refunded or not found):", orderId);
-    return;
+export async function handleRefund(orderId: string): Promise<RefundResult> {
+  const { data, error } = await supabaseAdmin.rpc("refund_credit_purchase", {
+    p_order_id: orderId,
+  });
+
+  if (error) {
+    console.error("Failed to process refund:", error);
+    return "error";
   }
 
-  const purchase = updated[0];
+  if (
+    data === "refunded" ||
+    data === "already_refunded" ||
+    data === "not_found" ||
+    data === "invalid_status"
+  ) {
+    return data;
+  }
 
-  await supabaseAdmin.rpc("deduct_credits", {
-    p_org_id: purchase.org_id,
-    p_amount: purchase.credits,
-    p_description: `Refund: ${purchase.credits} credits removed`,
-    p_metadata: { ls_order_id: orderId },
-  });
+  return "error";
+}
+
+export async function recordBillingReconciliationEvent(opts: {
+  eventName: string;
+  status: RefundReconciliationStatus;
+  orderId?: string | null;
+  details?: Record<string, unknown>;
+  payload?: Record<string, unknown>;
+}): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("billing_reconciliation_events")
+    .insert({
+      event_name: opts.eventName,
+      status: opts.status,
+      order_id: opts.orderId ?? null,
+      details: opts.details ?? {},
+      payload: opts.payload ?? {},
+    });
+
+  if (error) {
+    console.error("Failed to record billing reconciliation event:", error);
+  }
 }
 
 export function verifyWebhookSignature(

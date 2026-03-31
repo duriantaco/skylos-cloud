@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { hashApiKey } from '@/lib/api-key'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { resolveActiveOrganizationForRequest } from '@/lib/active-org'
+import { resolveOidcProject } from '@/lib/oidc-project'
 
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -41,21 +42,27 @@ export async function POST(req: NextRequest) {
           code: 'INVALID_OIDC'
         }, { status: 401 })
       }
-      const repoUrl = `https://github.com/${claims.repository}`
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, name, org_id')
-        .or(`repo_url.eq.${repoUrl},repo_url.eq.${repoUrl}.git`)
-        .limit(1)
-        .maybeSingle()
+      const resolution = await resolveOidcProject<{ id: string; name: string; org_id: string }>(
+        supabase,
+        claims.repository,
+        'id, name, org_id'
+      )
 
-      if (error || !data) {
+      if (resolution.kind === 'not_found') {
         return NextResponse.json({
           error: `No project linked to ${claims.repository}.`,
           code: 'REPO_NOT_LINKED'
         }, { status: 404 })
       }
-      project = data
+
+      if (resolution.kind === 'ambiguous') {
+        return NextResponse.json({
+          error: `Multiple projects are linked to ${claims.repository}. OIDC uploads require a unique repo-to-project binding.`,
+          code: 'AMBIGUOUS_REPO_BINDING',
+        }, { status: 409 })
+      }
+
+      project = resolution.project
     } else {
       const { data, error } = await supabase
         .from('projects')
