@@ -266,6 +266,7 @@ export default async function SettingsPage({
 
   const pc = (project.policy_config as Record<string, any>) ?? {};
   const excludePaths = Array.isArray(pc.exclude_paths) ? pc.exclude_paths : [];
+  const githubAutoConfigureEnabled = pc.github_auto_configure_on_install === true;
 
   return (
     <div className="min-h-screen bg-gray-50 text-slate-900 p-8 font-sans">
@@ -287,6 +288,8 @@ export default async function SettingsPage({
           githubInstallationId={project.github_installation_id}
           repoUrl={project.repo_url}
           projectId={project.id}
+          autoConfigureEnabled={githubAutoConfigureEnabled}
+          canManageSettings={canManageSettings}
         />
 
         <div className={`rounded-xl p-6 mb-8 border-2 ${

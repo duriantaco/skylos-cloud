@@ -15,7 +15,11 @@
   "include": [
     "tests/**/*.ts",
     "src/lib/active-org-core.ts",
-    "src/lib/invite-acceptance.ts"
+    "src/lib/invite-acceptance.ts",
+    "src/lib/github-installation-core.ts",
+    "src/lib/github-repo-core.ts",
+    "src/lib/billing-webhook-core.ts",
+    "src/lib/report-suppressions-core.ts"
   ],
   "exclude": ["node_modules", ".next", ".test-dist"]
 }

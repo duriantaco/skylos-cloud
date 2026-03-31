@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { postSkylosCheckRun } from "@/lib/github-checkrun";
@@ -11,8 +12,15 @@ import crypto from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { serverError } from "@/lib/api-error";
 import { hashApiKey } from "@/lib/api-key";
+import { isClaudeSecurityReport } from "@/lib/claude-security";
 import { getEffectivePlan, getCapabilities as getEntitlementCaps } from "@/lib/entitlements";
 import { normalizeIncomingReport } from "@/lib/report-normalization";
+import { resolveOidcProject } from "@/lib/oidc-project";
+import { resolveGitHubDefaultBranch } from "@/lib/github-repo";
+import {
+  buildActiveSuppressionKeys,
+  buildSuppressionKey,
+} from "@/lib/report-suppressions-core";
 
 function getSupabaseAdmin(): SupabaseClient | null {
   const url =
@@ -83,7 +91,7 @@ async function createOrUpdateIssueGroups(
   const upsertRows: any[] = [];
   const fingerprintToItems: Map<string, InsertedFinding[]> = new Map();
 
-  for (const [_, items] of grouped as any as Iterable<[string, InsertedFinding[]]>) {
+  for (const [, items] of grouped as any as Iterable<[string, InsertedFinding[]]>) {
     const canonical = items?.[0];
     if (!canonical) 
       continue;
@@ -129,7 +137,6 @@ async function createOrUpdateIssueGroups(
   const BATCH_SIZE = 100;
   for (let i = 0; i < upsertRows.length; i += BATCH_SIZE) {
     const batch = upsertRows.slice(i, i + BATCH_SIZE);
-    const fingerprints = batch.map((r) => r.fingerprint);
 
     const { data: upsertedRows, error: upsertErr } = await supabase
       .from("issue_groups")
@@ -170,8 +177,6 @@ async function createOrUpdateIssueGroups(
 }
 
 
-type Plan = "free" | "pro" | "enterprise";
-
 type ReportCaps = {
   maxScansStored: number;
   prDiffEnabled: boolean;
@@ -201,10 +206,6 @@ function key(ruleId: string, filePath: string) {
   return `${ruleId}::${filePath}`
 }
 
-function supKey(ruleId: string, filePath: string, line: number) {
-  return `${ruleId}::${filePath}::${line}`
-}
-
 function normPath(p: string) {
   let s = String(p || "");
   try { 
@@ -225,6 +226,41 @@ function truncate(str: string | null | undefined, maxLen: number): string | null
   if (!str) 
     return null;
   return str.length > maxLen ? str.slice(0, maxLen) + "..." : str;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readNumber(
+  value: Record<string, unknown> | null,
+  key: string,
+  fallback = 0
+): number {
+  const candidate = value?.[key];
+  if (typeof candidate === "number" && Number.isFinite(candidate)) {
+    return candidate;
+  }
+  if (typeof candidate === "string" && candidate.trim().length > 0) {
+    const parsed = Number(candidate);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+}
+
+function readString(
+  value: Record<string, unknown> | null,
+  key: string,
+  fallback: string
+): string {
+  const candidate = value?.[key];
+  return typeof candidate === "string" && candidate.length > 0
+    ? candidate
+    : fallback;
 }
 
 function diffContextForDb(scope: any) {
@@ -317,6 +353,9 @@ export async function POST(req: Request) {
   }
   
   const sb = supabase;
+  let chargedCredits:
+    | { orgId: string; amount: number; projectId: string; featureKey: string }
+    | null = null;
 
   try {
     const contentLength = req.headers.get('content-length');
@@ -348,25 +387,47 @@ export async function POST(req: Request) {
         }, { status: 401 })
       }
 
-      const repoUrl = `https://github.com/${claims.repository}`
-      const { data: oidcProject, error: oidcError } = await supabase
-        .from('projects')
-        .select(`
+      const resolution = await resolveOidcProject<{
+        id: string;
+        name: string;
+        org_id: string;
+        strict_mode: boolean | null;
+        repo_url: string | null;
+        policy_config: Record<string, unknown> | null;
+        ai_assurance_enabled: boolean | null;
+        github_installation_id: number | null;
+        slack_webhook_url: string | null;
+        slack_notifications_enabled: boolean | null;
+        slack_notify_on: string | null;
+        discord_webhook_url: string | null;
+        discord_notifications_enabled: boolean | null;
+        discord_notify_on: string | null;
+        organizations: unknown;
+      }>(
+        supabase,
+        claims.repository,
+        `
           id, name, org_id, strict_mode, repo_url, policy_config, ai_assurance_enabled,
           github_installation_id, slack_webhook_url, slack_notifications_enabled,
           slack_notify_on, discord_webhook_url, discord_notifications_enabled,
-          discord_notify_on, organizations(plan, pro_expires_at)`)
-        .or(`repo_url.eq.${repoUrl},repo_url.eq.${repoUrl}.git`)
-        .limit(1)
-        .maybeSingle()
+          discord_notify_on, organizations(plan, pro_expires_at)`
+      )
 
-      if (oidcError || !oidcProject) {
+      if (resolution.kind === "not_found") {
         return NextResponse.json({
           error: `No project linked to ${claims.repository}. Create a project at skylos.dev and set the repo URL.`,
           code: 'REPO_NOT_LINKED'
         }, { status: 404 })
       }
-      project = oidcProject
+
+      if (resolution.kind === "ambiguous") {
+        return NextResponse.json({
+          error: `Multiple projects are linked to ${claims.repository}. OIDC uploads require a unique repo-to-project binding.`,
+          code: "AMBIGUOUS_REPO_BINDING",
+        }, { status: 409 })
+      }
+
+      project = resolution.project
     } else {
       const { data: apiKeyProject, error: projError } = await supabase
         .from('projects')
@@ -393,11 +454,37 @@ export async function POST(req: Request) {
     const plan = getEffectivePlan({ plan: rawPlan, pro_expires_at: proExpiresAt });
     const caps = getReportCaps(plan);
 
-    // --- Credit gate: deduct before any processing ---
-    // Peek at analysis_mode to determine credit cost (2 for Claude Security, 1 for native)
-    const bodyForCredits = await req.clone().json().catch(() => ({}));
-    const isClaudeSecurity = String(bodyForCredits.analysis_mode || "").includes("claude-security")
-      || isClaudeSecurityReport(bodyForCredits);
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body." }, { status: 400 })
+    }
+    const normalized = normalizeIncomingReport(body)
+    const { summary, findings, commit_hash, branch, actor, tool, source, source_metadata, defense_score, ops_score, owasp_coverage, defense_findings, defense_integrations } = normalized
+    const { is_forced } = body
+    const analysis_mode = String(body.analysis_mode || "static");
+    const ai_code = body.ai_code || null;
+    const provenance = body.provenance || null;
+    const definitions = body.definitions || null;
+    const requestedBranch =
+      typeof body.branch === "string" && body.branch.trim().length > 0
+        ? body.branch.trim()
+        : null;
+    const defaultBranch =
+      (await resolveGitHubDefaultBranch(
+        project.repo_url,
+        project.github_installation_id || null
+      ).catch(() => null)) || "main";
+    const effectiveBranch = requestedBranch || defaultBranch || branch || "main";
+
+    if (project.strict_mode && is_forced) {
+      return NextResponse.json({
+        success: false,
+        error: "STRICT MODE ENABLED. The '--force' flag is disabled by your administrator.",
+      }, { status: 403 })
+    }
+
+    const isClaudeSecurity = String(body.analysis_mode || "").includes("claude-security")
+      || isClaudeSecurityReport(body);
     const creditCost = isClaudeSecurity ? 2 : 1;
     const creditFeatureKey = isClaudeSecurity ? "claude_security_ingest" : "scan_upload";
 
@@ -431,6 +518,13 @@ export async function POST(req: Request) {
         }, { status: 402 });
       }
 
+      chargedCredits = {
+        orgId: project.org_id,
+        amount: creditCost,
+        projectId: project.id,
+        featureKey: creditFeatureKey,
+      };
+
       // Check remaining balance
       const { data: updatedOrg } = await supabase
         .from("organizations")
@@ -445,15 +539,6 @@ export async function POST(req: Request) {
         }
       }
     }
-
-    const body = await req.json()
-    const normalized = normalizeIncomingReport(body)
-    const { summary, findings, commit_hash, branch, actor, tool, source, source_metadata, defense_score, ops_score, owasp_coverage, defense_findings, defense_integrations } = normalized
-    const { is_forced } = body
-    const analysis_mode = String(body.analysis_mode || "static");
-    const ai_code = body.ai_code || null;
-    const provenance = body.provenance || null;
-    const definitions = body.definitions || null;
 
     if (tool === "sarif" && !caps.sarifEnabled) {
       // SARIF import is a Pro feature — scan accepted but SARIF-specific features disabled
@@ -485,13 +570,6 @@ export async function POST(req: Request) {
       });
     }
 
-    if (project.strict_mode && is_forced) {
-      return NextResponse.json({
-        success: false,
-        error: "STRICT MODE ENABLED. The '--force' flag is disabled by your administrator.",
-      }, { status: 403 })
-    }
-
     const [overriddenScanResult, suppressionsResult] = await Promise.all([
       caps.overridesEnabled
         ? supabase
@@ -502,16 +580,20 @@ export async function POST(req: Request) {
             .eq('is_overridden', true)
             .limit(1)
             .maybeSingle()
-        : Promise.resolve({ data: null }),
+        : Promise.resolve({ data: null, error: null }),
 
       caps.suppressionsEnabled
         ? supabase
-            .from('suppressions')
+            .from('finding_suppressions')
             .select('rule_id, file_path, line_number, expires_at')
             .eq('project_id', project.id)
             .is('revoked_at', null)
-        : Promise.resolve({ data: [] }),
+        : Promise.resolve({ data: [], error: null }),
     ])
+
+    if (caps.suppressionsEnabled && suppressionsResult.error) {
+      throw new Error(`Failed to load suppressions: ${suppressionsResult.error.message}`);
+    }
 
    
     let baselineScan: { id: string } | null = null;
@@ -520,7 +602,8 @@ export async function POST(req: Request) {
       .from('scans')
       .select('id')
       .eq('project_id', project.id)
-      .eq('branch', branch)
+      .eq('branch', effectiveBranch)
+      .or('quality_gate_passed.eq.true,is_overridden.eq.true')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -528,25 +611,30 @@ export async function POST(req: Request) {
     if (sameBranchScan?.id) {
       baselineScan = sameBranchScan;
     }
-    else if (branch !== 'main') {
-      const { data: mainScan } = await supabase
+    else if (effectiveBranch !== defaultBranch) {
+      const { data: fallbackScan } = await supabase
         .from('scans')
         .select('id')
         .eq('project_id', project.id)
-        .eq('branch', 'main')
+        .eq('branch', defaultBranch)
+        .or('quality_gate_passed.eq.true,is_overridden.eq.true')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (mainScan?.id) {
-        baselineScan = mainScan;
+      if (fallbackScan?.id) {
+        baselineScan = fallbackScan;
       }
     }
 
     const hasBaseline = !!baselineScan?.id;
     const isWhitelisted = !!overriddenScanResult.data
 
-    console.log(`[gate-debug] project=${project.id} branch=${branch} hasBaseline=${hasBaseline} baselineScanId=${baselineScan?.id || 'none'} incomingFindings=${processedFindings.length} diffScope=${!!diffScope} prDiffEnabled=${caps.prDiffEnabled}`)
+    if (process.env.SKYLOS_DEBUG) {
+      console.log(
+        `[gate-debug] project=${project.id} branch=${branch} hasBaseline=${hasBaseline} baselineScanId=${baselineScan?.id || 'none'} incomingFindings=${processedFindings.length} diffScope=${!!diffScope} prDiffEnabled=${caps.prDiffEnabled}`
+      )
+    }
 
     const baselineCredits = new Map<string, number>()
     if (baselineScan?.id) {
@@ -555,7 +643,11 @@ export async function POST(req: Request) {
         .select('rule_id, file_path')
         .eq('scan_id', baselineScan.id)
 
-      console.log(`[gate-debug] baseline findings loaded: ${oldFindings?.length ?? 0} error: ${oldErr?.message || 'none'}`)
+      if (process.env.SKYLOS_DEBUG) {
+        console.log(
+          `[gate-debug] baseline findings loaded: ${oldFindings?.length ?? 0} error: ${oldErr?.message || 'none'}`
+        )
+      }
 
       oldFindings?.forEach((f: any) => {
         const ruleId = String(f.rule_id || "UNKNOWN")
@@ -564,29 +656,37 @@ export async function POST(req: Request) {
         baselineCredits.set(k, (baselineCredits.get(k) || 0) + 1)
       })
 
-      console.log(`[gate-debug] baseline unique keys: ${baselineCredits.size}`)
+      if (process.env.SKYLOS_DEBUG) {
+        console.log(`[gate-debug] baseline unique keys: ${baselineCredits.size}`)
+      }
 
       // Show first 5 baseline keys for comparison
-      const bKeys = Array.from(baselineCredits.keys()).slice(0, 5)
-      console.log(`[gate-debug] sample baseline keys: ${JSON.stringify(bKeys)}`)
+      if (process.env.SKYLOS_DEBUG) {
+        const bKeys = Array.from(baselineCredits.keys()).slice(0, 5)
+        console.log(`[gate-debug] sample baseline keys: ${JSON.stringify(bKeys)}`)
+      }
 
       // Show first 5 incoming keys for comparison
-      const iKeys = processedFindings.slice(0, 5).map((f: any) => key(f.rule_id, f.file_path))
-      console.log(`[gate-debug] sample incoming keys: ${JSON.stringify(iKeys)}`)
+      if (process.env.SKYLOS_DEBUG) {
+        const iKeys = processedFindings
+          .slice(0, 5)
+          .map((f: any) => key(f.rule_id, f.file_path))
+        console.log(`[gate-debug] sample incoming keys: ${JSON.stringify(iKeys)}`)
+      }
     }
 
-    const activeSuppressions = new Set<string>()
     const now = new Date()
     const nowIso = now.toISOString()
-
-    ;(suppressionsResult.data || []).forEach((s: any) => {
-      if (s.expires_at && String(s.expires_at) <= nowIso) 
-        return
-      const ruleId = String(s.rule_id || "UNKNOWN")
-      const filePath = normPath(String(s.file_path || ""))
-      const lineNum = Number(s.line_number || 0)
-      activeSuppressions.add(supKey(ruleId, filePath, lineNum))
-    })
+    const activeSuppressions = buildActiveSuppressionKeys(
+      (suppressionsResult.data || []) as Array<{
+        rule_id?: string | null;
+        file_path?: string | null;
+        line_number?: number | null;
+        expires_at?: string | null;
+      }>,
+      nowIso,
+      normPath
+    )
 
     const finalFindings = processedFindings.map((f: any) => {
       const ruleId = f.rule_id
@@ -629,7 +729,7 @@ export async function POST(req: Request) {
       }
 
       const isSuppressed = caps.suppressionsEnabled 
-        ? activeSuppressions.has(supKey(ruleId, filePath, line))
+        ? activeSuppressions.has(buildSuppressionKey(ruleId, filePath, line))
         : false
 
       return {
@@ -742,7 +842,7 @@ export async function POST(req: Request) {
       .insert({
         project_id: project.id,
         commit_hash: commit_hash || 'local',
-        branch: branch || 'main',
+        branch: effectiveBranch,
         actor: actor || 'unknown',
         tool,
         analysis_mode,
@@ -845,22 +945,37 @@ export async function POST(req: Request) {
     // --- AI Defense: populate normalized tables if defense data present ---
     if (defense_score && typeof defense_score === 'object') {
       try {
+        const defenseScore = asRecord(defense_score);
+        const opsScore = asRecord(ops_score);
+        const defenseIntegrations = Array.isArray(defense_integrations)
+          ? defense_integrations
+              .map((integration) => asRecord(integration))
+              .filter((integration): integration is Record<string, unknown> => !!integration)
+          : [];
+        const defenseFindings = Array.isArray(defense_findings)
+          ? defense_findings
+              .map((finding) => asRecord(finding))
+              .filter((finding): finding is Record<string, unknown> => !!finding)
+          : [];
+
         // 1. Insert aggregate defense score
         const { error: dsErr } = await supabase.from('defense_scores').insert({
           scan_id: scan.id,
           project_id: project.id,
-          weighted_score: defense_score.weighted_score || 0,
-          weighted_max: defense_score.weighted_max || 0,
-          score_pct: defense_score.score_pct ?? 0,
-          risk_rating: defense_score.risk_rating || 'UNKNOWN',
-          passed: defense_score.passed || 0,
-          total: defense_score.total_checks || defense_score.total || 0,
-          ops_passed: ops_score?.passed || 0,
-          ops_total: ops_score?.total || 0,
-          ops_score_pct: ops_score?.score_pct ?? 100,
-          ops_rating: ops_score?.rating || 'EXCELLENT',
-          integrations_found: defense_score.integrations_found || 0,
-          files_scanned: defense_score.files_scanned || 0,
+          weighted_score: readNumber(defenseScore, "weighted_score"),
+          weighted_max: readNumber(defenseScore, "weighted_max"),
+          score_pct: readNumber(defenseScore, "score_pct"),
+          risk_rating: readString(defenseScore, "risk_rating", 'UNKNOWN'),
+          passed: readNumber(defenseScore, "passed"),
+          total:
+            readNumber(defenseScore, "total_checks") ||
+            readNumber(defenseScore, "total"),
+          ops_passed: readNumber(opsScore, "passed"),
+          ops_total: readNumber(opsScore, "total"),
+          ops_score_pct: readNumber(opsScore, "score_pct", 100),
+          ops_rating: readString(opsScore, "rating", 'EXCELLENT'),
+          integrations_found: readNumber(defenseScore, "integrations_found"),
+          files_scanned: readNumber(defenseScore, "files_scanned"),
         });
         if (dsErr) console.error('defense_scores insert failed:', dsErr.message);
 
@@ -868,21 +983,21 @@ export async function POST(req: Request) {
         //    Build location -> integration_id map for findings FK.
         const locationToIntegrationId = new Map<string, string>();
 
-        if (defense_integrations && defense_integrations.length > 0) {
+        if (defenseIntegrations.length > 0) {
           // Use explicit integrations from CLI payload (includes real metadata)
-          const integrationRows = defense_integrations.map((integ: any) => ({
+          const integrationRows = defenseIntegrations.map((integ) => ({
             scan_id: scan.id,
             project_id: project.id,
-            provider: integ.provider || 'unknown',
-            integration_type: integ.integration_type || 'chat',
-            location: integ.location || 'unknown',
-            model: integ.model_value || integ.model || null,
-            tools_count: Array.isArray(integ.tools) ? integ.tools.length : (integ.tools_count || 0),
-            input_sources: integ.input_sources || [],
-            weighted_score: integ.weighted_score || 0,
-            weighted_max: integ.weighted_max || 0,
-            score_pct: integ.score_pct || 0,
-            risk_rating: integ.risk_rating || 'UNKNOWN',
+            provider: readString(integ, "provider", 'unknown'),
+            integration_type: readString(integ, "integration_type", 'chat'),
+            location: readString(integ, "location", 'unknown'),
+            model: readString(integ, "model_value", readString(integ, "model", "")) || null,
+            tools_count: Array.isArray(integ.tools) ? integ.tools.length : readNumber(integ, "tools_count"),
+            input_sources: Array.isArray(integ.input_sources) ? integ.input_sources : [],
+            weighted_score: readNumber(integ, "weighted_score"),
+            weighted_max: readNumber(integ, "weighted_max"),
+            score_pct: readNumber(integ, "score_pct"),
+            risk_rating: readString(integ, "risk_rating", 'UNKNOWN'),
           }));
 
           const { data: insertedIntegs, error: diErr } = await supabase
@@ -896,11 +1011,12 @@ export async function POST(req: Request) {
               locationToIntegrationId.set(row.location, row.id);
             }
           }
-        } else if (defense_findings && defense_findings.length > 0) {
+        } else if (defenseFindings.length > 0) {
           // Fallback: derive unique integrations from findings (legacy payloads)
-          const uniqueLocations = new Map<string, any>();
-          for (const f of defense_findings) {
-            const loc = f.integration_location || f.location || 'unknown';
+          const uniqueLocations = new Map<string, Record<string, unknown>>();
+          for (const f of defenseFindings) {
+            const loc =
+              readString(f, "integration_location", readString(f, "location", 'unknown'));
             if (!uniqueLocations.has(loc)) {
               uniqueLocations.set(loc, {
                 scan_id: scan.id,
@@ -934,23 +1050,24 @@ export async function POST(req: Request) {
         }
 
         // 3. Insert defense findings WITH integration_id populated
-        if (defense_findings && defense_findings.length > 0) {
-          const capped = defense_findings.slice(0, 500);
-          const defenseRows = capped.map((f: any) => {
-            const loc = f.integration_location || f.location || null;
+        if (defenseFindings.length > 0) {
+          const capped = defenseFindings.slice(0, 500);
+          const defenseRows = capped.map((f) => {
+            const loc =
+              readString(f, "integration_location", readString(f, "location", "")) || null;
             return {
               scan_id: scan.id,
               project_id: project.id,
               integration_id: (loc && locationToIntegrationId.get(loc)) || null,
-              plugin_id: f.plugin_id || 'unknown',
-              category: f.category || 'defense',
-              severity: f.severity || 'medium',
-              weight: f.weight || 2,
-              passed: !!f.passed,
+              plugin_id: readString(f, "plugin_id", 'unknown'),
+              category: readString(f, "category", 'defense'),
+              severity: readString(f, "severity", 'medium'),
+              weight: readNumber(f, "weight", 2),
+              passed: Boolean(f.passed),
               location: loc,
-              message: f.message || null,
-              owasp_llm: f.owasp_llm || null,
-              remediation: f.remediation || null,
+              message: readString(f, "message", "") || null,
+              owasp_llm: readString(f, "owasp_llm", "") || null,
+              remediation: readString(f, "remediation", "") || null,
             };
           });
           const { error: dfErr } = await supabase.from('defense_findings').insert(defenseRows);
@@ -1313,7 +1430,7 @@ export async function POST(req: Request) {
           .from('scans')
           .select('quality_gate_passed')
           .eq('project_id', projectId)
-          .eq('branch', branch)
+          .eq('branch', effectiveBranch)
           .neq('id', scanId)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -1340,7 +1457,7 @@ export async function POST(req: Request) {
           {
             webhookUrl: project.slack_webhook_url,
             projectName: project.name || 'Unknown Project',
-            branch: branch || 'main',
+            branch: effectiveBranch,
             commitHash: commit_hash || 'local',
             repoUrl: project.repo_url,
             scanId: scan.id,
@@ -1364,7 +1481,7 @@ export async function POST(req: Request) {
           {
             webhookUrl: project.discord_webhook_url,
             projectName: project.name || 'Unknown Project',
-            branch: branch || 'main',
+            branch: effectiveBranch,
             commitHash: commit_hash || 'local',
             repoUrl: project.repo_url,
             scanId: scan.id,
@@ -1393,9 +1510,9 @@ export async function POST(req: Request) {
       explain: {
             baseline: {
               scan_id: baselineScan?.id || null,
-              branch: "main",
+              branch: baselineScan?.id ? (sameBranchScan?.id ? effectiveBranch : defaultBranch) : null,
               selection_rule:
-                "latest scan on main where quality_gate_passed==true OR is_overridden==true",
+                "latest successful or overridden scan on the current branch, otherwise the repository default branch",
             },
             detection_mode: caps.prDiffEnabled ? "pr-diff" : "baseline-fallback",
             suppressions_enabled: caps.suppressionsEnabled,
@@ -1440,6 +1557,24 @@ export async function POST(req: Request) {
 
     return NextResponse.json(response)
   } catch (e) {
+    if (chargedCredits) {
+      try {
+        await sb.rpc("add_credits", {
+          p_org_id: chargedCredits.orgId,
+          p_amount: chargedCredits.amount,
+          p_transaction_type: "refund",
+          p_description: `Automatic refund for failed ${chargedCredits.featureKey}`,
+          p_metadata: {
+            feature_key: chargedCredits.featureKey,
+            project_id: chargedCredits.projectId,
+            refund_reason: "report_api_failure",
+          },
+        });
+      } catch (refundErr) {
+        console.error("Automatic credit refund failed:", refundErr);
+      }
+    }
+
     return serverError(e, "Report API");
   }
 }

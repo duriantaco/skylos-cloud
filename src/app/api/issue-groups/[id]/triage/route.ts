@@ -7,6 +7,7 @@ import { requirePlan, requireCredits } from "@/lib/require-credits";
 import {
   fetchTriageFindings,
   type TriageFinding,
+  type TriageFindingsClient,
 } from "@/lib/issue-groups/triage";
 
 const TRIAGE_SYSTEM_PROMPT = `You are a security triage expert. Given a security finding with its context, provide a structured triage assessment.
@@ -106,6 +107,10 @@ export async function POST(
     }
 
     const orgId = extractOrgId(group.projects);
+    if (!orgId) {
+      return NextResponse.json({ error: "Issue group is missing organization context" }, { status: 400 });
+    }
+
     const auth = await requirePermission(supabase, "view:findings", orgId);
     if (isAuthError(auth)) return auth;
 
@@ -124,7 +129,10 @@ export async function POST(
     if (!creditCheck.ok) return creditCheck.response;
 
     // Fetch findings for this issue group
-    const { data: findings } = await fetchTriageFindings(supabase, id);
+    const { data: findings } = await fetchTriageFindings(
+      supabase as unknown as TriageFindingsClient,
+      id
+    );
 
     if (!findings || findings.length === 0) {
       return NextResponse.json({ error: "No findings found for this issue group" }, { status: 404 });

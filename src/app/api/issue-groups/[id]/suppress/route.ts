@@ -4,6 +4,16 @@ import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
 import { getEffectivePlan, getCapabilities } from "@/lib/entitlements";
 
+type IssueGroupProjectRelation =
+  | { org_id?: string | null }
+  | Array<{ org_id?: string | null }>
+  | null;
+
+type SuppressionFindingRow = {
+  rule_id?: string | null;
+  file_path?: string | null;
+  line_number?: number | null;
+};
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,7 +32,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (gErr || !group) return NextResponse.json({ error: "Group not found" }, { status: 404 });
   if (!group.project_id) return NextResponse.json({ error: "Group missing project_id" }, { status: 400 });
 
-  const orgId = (group.projects as any)?.org_id;
+  const projectRelation = group.projects as IssueGroupProjectRelation;
+  const orgId = Array.isArray(projectRelation)
+    ? projectRelation[0]?.org_id
+    : projectRelation?.org_id;
+
+  if (!orgId) {
+    return NextResponse.json({ error: "Group missing organization context" }, { status: 400 });
+  }
+
   const auth = await requirePermission(supabase, "suppress:findings", orgId);
   if (isAuthError(auth)) return auth;
 
@@ -46,9 +64,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Enforce per-project suppression limit
   const { count: existingCount } = await supabase
-    .from("suppressions")
+    .from("finding_suppressions")
     .select("id", { count: "exact", head: true })
-    .eq("project_id", group.project_id);
+    .eq("project_id", group.project_id)
+    .is("revoked_at", null);
 
   if ((existingCount ?? 0) >= caps.maxSuppressionsPerProject) {
     return NextResponse.json({
@@ -69,7 +88,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!findings?.length)
     return NextResponse.json({ error: "No findings in group" }, { status: 404 });
 
-  const suppressionRows = findings.map((f: any) => ({
+  const suppressionRows = findings.map((f: SuppressionFindingRow) => ({
     project_id: group.project_id,
     rule_id: f.rule_id,
     file_path: f.file_path,
@@ -80,7 +99,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }));
 
   const { error: sErr } = await supabase
-    .from("suppressions")
+    .from("finding_suppressions")
     .upsert(suppressionRows, { onConflict: "project_id,rule_id,line_number,file_path" });
 
   if (sErr)

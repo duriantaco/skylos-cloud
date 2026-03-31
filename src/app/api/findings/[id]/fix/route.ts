@@ -7,6 +7,7 @@ import { generateFix, generateDiffPreview } from "@/lib/fix-generator";
 import { requirePermission, isAuthError } from "@/lib/permissions";
 import { getEffectivePlan } from "@/lib/entitlements";
 import { requirePlan, requireCredits } from "@/lib/require-credits";
+import { parseGitHubRepoUrl, resolveGitHubDefaultBranch } from "@/lib/github-repo";
 
 
 async function getInstallationOctokit(installationId: number): Promise<Octokit> {
@@ -59,6 +60,10 @@ function getFixSuggestion(finding: any) {
   return null;
 }
 
+function isCommitSha(value: string): boolean {
+  return /^[0-9a-f]{7,40}$/i.test(value);
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -72,6 +77,7 @@ export async function POST(
       *,
       scans (
         commit_hash,
+        branch,
         projects (
           id,
           name,
@@ -111,17 +117,29 @@ export async function POST(
   try {
     const octokit = await getInstallationOctokit(project.github_installation_id);
 
-    const [owner, repo] = project.repo_url.replace("https://github.com/", "").replace(".git", "").split("/");
+    const repoRef = parseGitHubRepoUrl(project.repo_url);
+    if (!repoRef) {
+      return NextResponse.json({ error: "Invalid GitHub repository URL." }, { status: 400 });
+    }
 
-    const baseSha = finding.scans.commit_hash === 'local' ? 'main' : finding.scans.commit_hash;
+    const { owner, repo } = repoRef;
+    const defaultBranch =
+      (await resolveGitHubDefaultBranch(project.repo_url, project.github_installation_id).catch(() => null)) ||
+      "main";
+
+    const baseSha = finding.scans.commit_hash === 'local' ? defaultBranch : finding.scans.commit_hash;
 
     const timestamp = Date.now();
     const newBranchName = `skylos-fix-${finding.rule_id.toLowerCase()}-${timestamp}`;
 
     let shaToBranchFrom = baseSha;
-    if (baseSha === 'main' || baseSha === 'master') {
-       const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${baseSha}` });
-       shaToBranchFrom = refData.object.sha;
+    if (!isCommitSha(baseSha)) {
+      const { data: refData } = await octokit.git.getRef({
+        owner,
+        repo,
+        ref: `heads/${baseSha}`,
+      });
+      shaToBranchFrom = refData.object.sha;
     }
 
     await octokit.git.createRef({
@@ -201,7 +219,7 @@ export async function POST(
       repo,
       title: `fix: ${finding.rule_id} – ${truncate(finding.message, 60)}`,
       head: newBranchName,
-      base: "main",
+      base: defaultBranch,
       body: prBody,
     });
 

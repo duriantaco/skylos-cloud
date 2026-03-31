@@ -13,6 +13,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+type SuppressionRow = {
+  rule_id?: string | null;
+  file_path?: string | null;
+  line_number?: number | null;
+  reason?: string | null;
+  created_at?: string | null;
+  expires_at?: string | null;
+};
+
 function fingerprint(ruleId: string, filePath: string, line: number | null): string {
   const input = `${ruleId}|${filePath}|${line || ''}`
   return createHash('sha256').update(input).digest('hex').slice(0, 16)
@@ -44,8 +53,8 @@ export async function GET(request: NextRequest) {
   const now = new Date().toISOString()
   
   const { data: rows, error: suppError } = await supabase
-    .from('suppressions')
-    .select('rule_id, file_path, line_number, reason, type, created_at, expires_at')
+    .from('finding_suppressions')
+    .select('rule_id, file_path, line_number, reason, created_at, expires_at')
     .eq('project_id', project.id)
     .is('revoked_at', null)
 
@@ -53,15 +62,20 @@ export async function GET(request: NextRequest) {
     return serverError(suppError, "Suppressions query");
   }
 
-  const suppressions = (rows || [])
-    .filter((s: any) => !s.expires_at || s.expires_at > now)
-    .map((s: any) => ({
+  const suppressionRows = (rows || []) as SuppressionRow[];
+  const suppressions = suppressionRows
+    .filter((s) => !s.expires_at || s.expires_at > now)
+    .map((s) => ({
       rule_id: s.rule_id,
       file_path: s.file_path,
       line_number: s.line_number,
-      fingerprint: fingerprint(s.rule_id, s.file_path || '', s.line_number),
+      fingerprint: fingerprint(
+        String(s.rule_id || "UNKNOWN"),
+        s.file_path || '',
+        s.line_number ?? null
+      ),
       reason: s.reason || '',
-      type: s.type || 'false_positive',
+      type: 'false_positive',
       created_at: s.created_at,
       expires_at: s.expires_at,
     }))
