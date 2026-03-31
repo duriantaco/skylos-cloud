@@ -144,7 +144,7 @@ Skylos detects 13 categories of removed security controls:
 - Security middleware
 
 ```bash
-skylos diff main..HEAD --danger
+skylos . --diff origin/main --danger
 ```
 
 This catches the number one way AI assistants introduce vulnerabilities: not by writing bad code, but by removing existing security controls during refactoring.
@@ -271,7 +271,7 @@ Both tools can catch SQL injection in source code. Skylos uses taint analysis to
 
 **Skylos:**
 ```bash
-skylos diff main..feature-branch --danger
+skylos . --diff origin/main --danger
 # WARNING: @login_required removed from view_profile (line 42)
 # WARNING: csrf_protect decorator removed from submit_form (line 89)
 # WARNING: rate_limit decorator removed from api_endpoint (line 156)

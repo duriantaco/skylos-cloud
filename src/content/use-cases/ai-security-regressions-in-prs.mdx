@@ -145,7 +145,7 @@ But the security model is not the same route anymore.
 Run:
 
 ```bash
-skylos diff main..HEAD --danger
+skylos . --diff origin/main --danger
 ```
 
 Now the deleted control is part of the finding set instead of disappearing into the refactor narrative.
@@ -210,7 +210,7 @@ For teams shipping a lot of AI-generated code, this is the minimal reliable setu
 
 ```bash
 skylos . -a
-skylos diff main..HEAD --danger
+skylos . --diff origin/main --danger
 ```
 
 Then enforce the diff scan in PRs.
@@ -221,7 +221,7 @@ That alone catches a class of issues most teams still do not review for explicit
 
 ## Where to go next
 
+- Need the broader verification workflow? Read [How to Review AI-Generated Python Code Before Merge](/blog/review-ai-generated-python-code-before-merge)
 - Using Claude Code? Read [How to Review Claude Code Output for Python Security Regressions](/use-cases/claude-code-security-review)
 - Using Cursor? Read [How to Use Skylos as a Cursor Security Scanner for Python](/use-cases/cursor-security-scanner)
 - Need to secure the MCP layer too? Read [How to Secure an MCP Server Before You Trust It With Your Code](/use-cases/secure-mcp-server)
-

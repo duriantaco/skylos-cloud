@@ -101,7 +101,7 @@ The core Claude Code review problem is often **removal**, not introduction.
 Run:
 
 ```bash
-skylos diff main..HEAD --danger
+skylos . --diff origin/main --danger
 ```
 
 This is the fast way to catch removed controls such as:
@@ -160,7 +160,7 @@ Better prompts and review rules look like:
 - "No hardcoded tokens, passwords, or internal hostnames."
 - "Flag deleted decorators or middleware in Python web routes."
 
-If you use GitHub Copilot code review alongside Claude Code, GitHub's current coding-guidelines feature is useful for some repository-level rules. But it is not a replacement for static analysis and diff scanning.
+If you use GitHub Copilot code review alongside Claude Code, GitHub's current repository custom instructions are useful for some repository-level rules. But they are not a replacement for static analysis and diff scanning.
 
 ---
 
@@ -170,7 +170,7 @@ If a team is serious about using Claude Code in production repos, this is a sane
 
 1. Keep permission prompts on for commands and high-impact MCP tools
 2. Require local `skylos . -a` before commit
-3. Require `skylos diff main..HEAD --danger` on PRs
+3. Require `skylos . --diff origin/main --danger` on PRs
 4. Add `skylos defend .` for LLM-integrated apps
 5. Reject broad "cleanup" diffs with no explicit explanation of preserved security controls
 
@@ -192,6 +192,7 @@ The point is consistency. If a developer accepts a Claude Code patch locally, th
 
 ## Where to go next
 
+- Need the broader verification workflow first? Read [How to Review AI-Generated Python Code Before Merge](/blog/review-ai-generated-python-code-before-merge)
 - Need to secure the tool layer itself? Read [How to Secure an MCP Server Before You Trust It With Your Code](/use-cases/secure-mcp-server)
 - Need a Cursor-specific workflow? Read [How to Use Skylos as a Cursor Security Scanner for Python](/use-cases/cursor-security-scanner)
 - Need diff-focused review guidance? Read [How to Catch Removed Auth Checks and Security Regressions in AI-Generated PRs](/use-cases/ai-security-regressions-in-prs)
@@ -200,5 +201,4 @@ The point is consistency. If a developer accepts a Claude Code patch locally, th
 
 - [Anthropic: Claude Code security](https://docs.anthropic.com/en/docs/claude-code/security)
 - [Anthropic: Claude Code MCP](https://docs.anthropic.com/en/docs/claude-code/mcp)
-- [GitHub Docs: configuring coding guidelines for Copilot code review](https://docs.github.com/en/copilot/how-tos/agents/copilot-code-review/configuring-coding-guidelines)
-
+- [GitHub Docs: adding repository custom instructions for GitHub Copilot](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions?tool=vscode)

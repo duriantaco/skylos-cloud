@@ -245,7 +245,7 @@ skylos . -a
 For AI-generated PRs or local diffs:
 
 ```bash
-skylos diff main..HEAD --danger
+skylos . --diff origin/main --danger
 ```
 
 For LLM-integrated applications:
@@ -280,6 +280,7 @@ That setup will not make MCP risk-free. It will make it **understandable, review
 
 ## Where to go next
 
+- Need the broader verification workflow first? Read [How to Review AI-Generated Python Code Before Merge](/blog/review-ai-generated-python-code-before-merge)
 - Need a repo-specific workflow for Claude Code? Read [How to Review Claude Code Output for Python Security Regressions](/use-cases/claude-code-security-review)
 - Need a Cursor-specific workflow? Read [How to Use Skylos as a Cursor Security Scanner for Python](/use-cases/cursor-security-scanner)
 - Need to catch removed decorators and missing checks in PRs? Read [How to Catch Removed Auth Checks and Security Regressions in AI-Generated PRs](/use-cases/ai-security-regressions-in-prs)
@@ -291,4 +292,3 @@ That setup will not make MCP risk-free. It will make it **understandable, review
 - [Cursor: Model Context Protocol](https://docs.cursor.com/en/context/mcp)
 - [Model Context Protocol: roots security considerations](https://modelcontextprotocol.io/docs/concepts/roots)
 - [Model Context Protocol: authorization security considerations](https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization)
-

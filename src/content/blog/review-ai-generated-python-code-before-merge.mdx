@@ -1,0 +1,327 @@
+---
+title: "How to Review AI-Generated Python Code Before Merge"
+excerpt: "GitHub and Anthropic both frame AI review as assistive, not authoritative. Here is a practical Python workflow to review and verify AI-generated code before it reaches main: baseline scan, diff scan, optional LLM-app checks, and CI gating."
+publishedAt: "2026-03-30"
+updatedAt: "2026-03-30"
+author:
+  name: "Skylos team"
+  role: "Product engineering and research"
+  type: "Organization"
+whyThisExists: "This site already had specific pages for hallucinated imports, Copilot review, Claude Code review, and AI security regressions in pull requests. This article fills the broader blog-level search intent around reviewing AI-generated Python code before merge and turns vendor caveats into one practical workflow."
+methodology:
+  - "Reviewed current GitHub Copilot and Anthropic Claude Code documentation to anchor the central claim: AI review features assist review, but they do not replace human and repository-level verification."
+  - "Mapped the article to Skylos workflows documented in the main repo, especially `skylos . -a`, `--diff`, `discover`, `defend`, `cicd init`, and provenance reporting."
+  - "Kept the examples limited to Python failure modes already covered elsewhere in the repo: hallucinated references, removed protections, dead paths, insecure defaults, and CI enforcement."
+tags: ["ai code", "python", "security", "code review"]
+keywords:
+  - verify ai-generated python code
+  - verify ai generated code
+  - review ai-generated python code before merge
+  - ai code review checklist python
+  - ai code verification python
+  - ai generated code review python
+  - how to review ai generated code
+  - verify ai-generated code before merge
+  - python ai code review
+  - ai code verification workflow
+  - secure ai generated code python
+  - ai generated code merge checklist
+canonicalUrl: "/blog/review-ai-generated-python-code-before-merge"
+keyTakeaways:
+  - "AI review features help, but even the vendor docs position them as supplemental rather than authoritative."
+  - "Verification before merge should prove four things: the code is real, the diff did not remove protections, the change did not add insecure shortcuts, and the repository gate enforces the same policy every time."
+  - "For Python teams, the fastest reliable workflow is baseline scan, diff scan, optional LLM-app checks, then CI enforcement."
+  - "Use assistant-specific guidance like Copilot repository custom instructions or Claude Code approvals, but do not treat those controls as the merge gate."
+faq:
+  - question: "Why are AI-generated Python bugs hard to review?"
+    answer: "Because the code usually looks plausible. Imports, helpers, decorators, and API calls can read as if they belong in the project even when they are missing, outdated, or no longer enforced."
+  - question: "Do tests catch most AI-generated code problems?"
+    answer: "No. Tests only cover the paths they execute. AI-generated code can still hide dead helpers, removed auth checks, insecure defaults, and stale references outside the tested path."
+  - question: "Is AI code verification different from normal code review?"
+    answer: "It includes normal code review, but with more emphasis on proving references are real, checking for deleted protections in refactors, and enforcing repository-level scanning before merge."
+  - question: "Should I verify Copilot, Claude Code, and Cursor output differently?"
+    answer: "The baseline is the same: local scan, diff scan, CI gate. The vendor-specific controls differ, but none of them remove the need for repository verification."
+howToSteps:
+  - name: "Scan the current repository"
+    text: "Run a baseline scan so you know the current finding set before judging the new AI-generated change."
+  - name: "Scan the diff before merge"
+    text: "Use diff-aware analysis to catch removed auth, validation, rate limiting, and other protections that disappear in plausible refactors."
+  - name: "Gate the shared workflow"
+    text: "Put the same checks in CI so every accepted AI-generated change faces the same merge barrier."
+---
+
+# How to Review AI-Generated Python Code Before Merge
+
+If your team uses Copilot, Claude Code, Cursor, or similar tools, the hard part is no longer generating code.
+
+The hard part is **verifying it before it reaches `main`**.
+
+GitHub's current Copilot docs explicitly say to validate Copilot feedback carefully and supplement it with human review. Anthropic's Claude Code security docs say Claude Code uses a permission-based model, but users are still responsible for reviewing proposed code and commands before approval.
+
+That is the boundary.
+
+AI review can assist you. It does not close the verification loop for you.
+
+For Python teams, that means the question is not:
+
+- "Which assistant wrote this?"
+
+It is:
+
+- "How do we prove this change is real, safe, and still enforcing the protections our repo depends on?"
+
+## What verification should prove
+
+Before an AI-generated Python change merges, your workflow should prove four things.
+
+### 1. The code is real
+
+Imports, helper functions, decorators, config keys, and library APIs must actually exist in the repository or dependency set you are running.
+
+This is where hallucinated imports, phantom calls, and stale mocks show up.
+
+### 2. The diff did not remove an existing protection
+
+Broad refactors often look fine because the resulting file is clean. The real bug is a missing decorator, permission branch, middleware registration, or validation path that disappeared during cleanup.
+
+### 3. The change did not add insecure shortcuts
+
+Examples:
+
+- `verify=False`
+- `DEBUG=True`
+- hardcoded secrets
+- unsafe shell execution
+- weak crypto
+
+These are classic "make it work quickly" patterns, and AI tools generate them often.
+
+### 4. The repository enforces the same rule every time
+
+If verification depends on whether one reviewer happened to notice a bad diff on a tired Friday afternoon, it is not a workflow. It is luck.
+
+That is why the merge gate matters.
+
+## The Python failure modes to check first
+
+### Hallucinated references
+
+This is the most obvious AI-generated code failure mode and still one of the easiest to miss in review:
+
+```python
+def create_order(payload):
+    validated = validate_order_schema(payload)
+    inventory = reserve_inventory(validated.items)
+    payment = charge_customer(validated.total)
+    return persist_order(validated, inventory, payment)
+```
+
+The orchestration looks reasonable. The problem is that one or more of those helpers may not exist anywhere in the repo.
+
+The same issue shows up in decorators and imports:
+
+```python
+from auth_utils import require_workspace_access
+
+@require_workspace_access
+def get_report(request):
+    ...
+```
+
+That code may read like an existing project abstraction even when the decorator was invented by the model.
+
+If you want the narrower deep dive on this class of problem, read [How to Catch Hallucinated Imports and Phantom Calls in AI-Generated Python Code](/use-cases/ai-generated-code-security).
+
+### Regressions hidden inside clean refactors
+
+The more dangerous failure mode is often deletion.
+
+This route starts protected:
+
+```python
+@login_required
+@rate_limit("10/m")
+def export_customer_data(request):
+    customer_id = request.GET["customer_id"]
+    return generate_export(customer_id)
+```
+
+Then the AI refactor lands like this:
+
+```python
+def export_customer_data(request):
+    customer_id = request.GET["customer_id"]
+    return generate_export(customer_id)
+```
+
+The function still works. The tests may still pass. But the route is not enforcing the same security model anymore.
+
+This is exactly the class of problem covered in [How to Catch Removed Auth Checks and Security Regressions in AI-Generated PRs](/use-cases/ai-security-regressions-in-prs).
+
+### Insecure convenience code
+
+AI tools are very willing to trade safety for immediacy:
+
+```python
+response = requests.get(url, verify=False)
+
+decoded = jwt.decode(token, algorithms=["none"])
+
+app.config["DEBUG"] = True
+```
+
+Each example solves a short-term problem:
+
+- certificate trouble
+- JWT decoding trouble
+- local debugging convenience
+
+Each example is also the sort of thing that survives review when the code around it looks otherwise neat.
+
+### Dead paths and stale test scaffolding
+
+AI-generated diffs also leave behind code that is no longer part of the real execution path:
+
+- helper functions nobody calls
+- unfinished stubs
+- renamed symbols with stale mocks
+- dead cleanup code after an aggressive refactor
+
+These are not always direct vulnerabilities, but they increase review noise, hide intent, and make it easier for real security regressions to blend in.
+
+## A practical verification workflow for Python teams
+
+### 1. Start with a baseline scan
+
+Run the repository once before you judge the new AI-generated change:
+
+```bash
+pip install skylos
+skylos . -a
+```
+
+In the current Skylos workflow, `-a` enables the broader local audit path: dead code, risky flows, secrets, quality checks, and SCA findings.
+
+This is important because AI verification gets messy fast when reviewers cannot tell the difference between:
+
+- old project noise
+- newly introduced risk
+- and protections that the current diff removed
+
+### 2. Scan the changed lines, not only the whole tree
+
+The safest documented diff-aware command in the Skylos repo is:
+
+```bash
+skylos . --diff origin/main --danger --quality
+```
+
+This changes the review question from:
+
+> "What problems exist somewhere in this repository?"
+
+to:
+
+> "What risky behavior is present in the code this PR actually changed?"
+
+That is the better question for AI-generated code review because assistants often produce large, plausible refactors. The higher-risk issue is frequently a deleted guardrail or a newly introduced shortcut inside the diff.
+
+### 3. If the repository includes LLM features, verify that surface too
+
+If your Python application includes prompts, tool-calling, RAG, or LLM endpoints, normal code verification is not enough by itself.
+
+Use:
+
+```bash
+skylos discover .
+skylos defend .
+```
+
+In the main Skylos repo, `discover` maps LLM integrations and `defend` checks those integrations for missing guardrails such as prompt injection exposure, unsafe output handling, weak isolation, missing rate limits, or missing cost controls.
+
+That step is only necessary when the repository actually includes an AI feature surface. It is not required for every generic Python service.
+
+### 4. Keep assistant-specific controls, but do not confuse them with verification
+
+Use the vendor-specific controls where they help:
+
+- GitHub Copilot repository custom instructions and review rules
+- Claude Code approval prompts and project-scoped MCP approvals
+- Cursor approval and MCP configuration boundaries
+
+Those controls shape behavior.
+
+They do not replace repository scanning or PR gating.
+
+For the tool-specific workflows, see:
+
+- [How to Review GitHub Copilot Output for Python Security and Regressions](/use-cases/github-copilot-security-review)
+- [How to Review Claude Code Output for Python Security Regressions](/use-cases/claude-code-security-review)
+- [How to Use Skylos as a Cursor Security Scanner for Python](/use-cases/cursor-security-scanner)
+
+### 5. Put the merge gate in CI once
+
+After the local workflow feels useful, make it systemic:
+
+```bash
+skylos cicd init
+```
+
+That gives the team a shared merge barrier instead of a best-effort habit.
+
+If you are already using GitHub Actions, pair this with:
+
+- [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+- [How to Secure GitHub Actions for Python Repos](/use-cases/secure-github-actions-python)
+
+### Optional: measure where AI-authored risk is showing up
+
+If your team also wants attribution, Skylos includes an AI provenance command:
+
+```bash
+skylos provenance . --json
+```
+
+That is not the verification step itself. It is the visibility step that helps you answer whether risky changes are clustering around specific AI-assisted workflows.
+
+## The shortest reliable default
+
+If you want the minimum setup that is hard to regret, use this:
+
+```bash
+pip install skylos
+skylos . -a
+skylos . --diff origin/main --danger --quality
+skylos cicd init
+```
+
+If the repository includes real LLM features, add:
+
+```bash
+skylos discover .
+skylos defend .
+```
+
+That is enough to move the team from "we reviewed what the AI suggested" to "we verified the change before merge."
+
+## Final thought
+
+The most useful thing about the current AI coding tools is that they make code generation cheap.
+
+The most important thing about verification is that it stays expensive unless you systematize it.
+
+The teams that handle AI-generated Python code well are not the teams with the most enthusiastic prompts. They are the teams that make verification boring, repeatable, and hard to skip.
+
+## Where to go next
+
+- Need the hallucination-specific deep dive? Read [How to Catch Hallucinated Imports and Phantom Calls in AI-Generated Python Code](/use-cases/ai-generated-code-security)
+- Need the regression-specific workflow? Read [How to Catch Removed Auth Checks and Security Regressions in AI-Generated PRs](/use-cases/ai-security-regressions-in-prs)
+- Need GitHub-native PR review guidance? Read [How to Review GitHub Copilot Output for Python Security and Regressions](/use-cases/github-copilot-security-review)
+- Need Claude-specific guidance? Read [How to Review Claude Code Output for Python Security Regressions](/use-cases/claude-code-security-review)
+- Need CI setup? Read [Python Security Scanner for GitHub Actions](/use-cases/python-security-github-actions)
+
+## References
+
+- [GitHub Docs: About GitHub Copilot code review](https://docs.github.com/en/copilot/concepts/agents/code-review)
+- [GitHub Docs: Responsible use of GitHub Copilot code review](https://docs.github.com/en/copilot/responsible-use/code-review)
+- [Anthropic: Claude Code security](https://code.claude.com/docs/en/security)

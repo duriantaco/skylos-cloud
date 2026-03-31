@@ -1,15 +1,15 @@
 ---
 title: "How to Review GitHub Copilot Output for Python Security and Regressions"
-excerpt: "GitHub Copilot can now review pull requests and follow repository guidelines, but you still need static analysis to catch dead code, insecure patterns, and removed protections in AI-generated Python changes."
+excerpt: "GitHub Copilot can now review pull requests and use repository custom instructions, but you still need static analysis to catch dead code, insecure patterns, and removed protections in AI-generated Python changes."
 publishedAt: "2026-03-16"
 updatedAt: "2026-03-16"
 author:
   name: "Skylos team"
   role: "Product engineering and research"
   type: "Organization"
-whyThisExists: "Teams increasingly use Copilot for both code generation and code review, but repository guidelines alone do not prove the resulting Python changes are safe or regression-free."
+whyThisExists: "Teams increasingly use Copilot for both code generation and code review, but repository custom instructions and review comments alone do not prove the resulting Python changes are safe or regression-free."
 methodology:
-  - "Built around GitHub's current Copilot code review and coding-guidelines model."
+  - "Built around GitHub's current Copilot code review and repository custom instructions model."
   - "Focused on the gap between rule-based review comments and actual repo-level verification."
   - "Mapped the workflow to Skylos commands teams can run locally or in CI without changing their existing GitHub flow."
 tags: ["security", "ai code", "python"]
@@ -22,23 +22,23 @@ keywords:
   - ai code review security python
   - detect removed auth checks
   - python security scanner github copilot
-  - copilot code review guidelines
+  - copilot repository custom instructions
   - secure github copilot workflow
 canonicalUrl: "/use-cases/github-copilot-security-review"
 keyTakeaways:
-  - "Copilot review comments and coding guidelines improve consistency, but they do not replace static analysis or diff-aware regression detection."
+  - "Copilot review comments and repository custom instructions improve consistency, but they do not replace static analysis or diff-aware regression detection."
   - "The biggest Python risks in Copilot-generated code are still insecure patterns, dead code, and removed guardrails in refactors."
   - "The right workflow is GitHub-native review plus Skylos verification before merge."
 faq:
   - question: "Does GitHub Copilot code review replace static analysis?"
     answer: "No. Copilot review can surface useful review comments, but static analysis is still needed to catch code-level security issues, dead code, and removed protections consistently."
-  - question: "What should repository coding guidelines cover?"
+  - question: "What should repository custom instructions cover?"
     answer: "Use them for review intent and repo rules, such as preserving auth checks, requiring validation, and avoiding risky shell patterns. Then enforce the result with scanning."
   - question: "Can I keep my current GitHub PR workflow?"
     answer: "Yes. Skylos fits alongside GitHub review by adding local scans, diff scans, and CI gates rather than replacing pull-request review."
 howToSteps:
   - name: "Set review intent"
-    text: "Use GitHub's coding guidelines to tell Copilot what security-sensitive patterns must be preserved in your repo."
+    text: "Use GitHub's repository custom instructions to tell Copilot what security-sensitive patterns must be preserved in your repo."
   - name: "Scan the repo and diff"
     text: "Run a full scan and a PR diff scan so Copilot-generated changes face real verification."
   - name: "Gate the merge"
@@ -49,14 +49,14 @@ howToSteps:
 
 GitHub Copilot is no longer just autocomplete.
 
-It can now participate more directly in review workflows, and GitHub documents repository-level coding guidelines for Copilot code review. That is useful because it gives teams a way to express expectations like:
+It can now participate more directly in review workflows, and GitHub documents repository custom instructions for Copilot. That is useful because it gives teams a way to express expectations like:
 
 - preserve auth and permission checks
 - do not weaken validation
 - avoid risky shell-backed helpers
 - keep tests aligned with protected routes
 
-But guidelines and review comments are still not the same thing as verification.
+But repository instructions and review comments are still not the same thing as verification.
 
 If Copilot generates a clean-looking refactor that removes a security decorator, leaves behind dead code, or introduces an insecure shortcut, you still need the repo to prove that the change is safe.
 
@@ -86,7 +86,7 @@ What it does **not** replace is:
 
 ### 1. Keep GitHub review rules explicit
 
-If your repo uses Copilot review, set coding guidelines for the patterns that matter most:
+If your repo uses Copilot review, set repository custom instructions for the patterns that matter most:
 
 - protected routes must keep auth and permission checks
 - request validation cannot move without equivalent coverage
@@ -112,7 +112,7 @@ This catches:
 ### 3. Scan the PR diff
 
 ```bash
-skylos diff main..HEAD --danger
+skylos . --diff origin/main --danger
 ```
 
 This is the step that exposes removed controls in Copilot-generated refactors:
@@ -154,9 +154,9 @@ That is why "Copilot already reviewed it" should never be the end of the review 
 
 For teams already living in GitHub, this is the practical default:
 
-1. Copilot code review and coding guidelines for reviewer intent
+1. Copilot code review and repository custom instructions for reviewer intent
 2. `skylos . -a` for local verification
-3. `skylos diff main..HEAD --danger` for PR regression detection
+3. `skylos . --diff origin/main --danger` for PR regression detection
 4. `skylos cicd init` for merge enforcement
 
 That keeps GitHub as the collaboration surface while adding an actual security and regression gate.
@@ -165,6 +165,7 @@ That keeps GitHub as the collaboration surface while adding an actual security a
 
 ## Where to go next
 
+- Need the broader verification workflow? Read [How to Review AI-Generated Python Code Before Merge](/blog/review-ai-generated-python-code-before-merge)
 - Using Claude Code too? Read [How to Review Claude Code Output for Python Security Regressions](/use-cases/claude-code-security-review)
 - Using Cursor? Read [How to Use Skylos as a Cursor Security Scanner for Python](/use-cases/cursor-security-scanner)
 - Need PR-focused regression detection? Read [How to Catch Removed Auth Checks and Security Regressions in AI-Generated PRs](/use-cases/ai-security-regressions-in-prs)
@@ -172,5 +173,4 @@ That keeps GitHub as the collaboration surface while adding an actual security a
 ## References
 
 - [GitHub Docs: About GitHub Copilot code review](https://docs.github.com/en/copilot/concepts/agents/code-review)
-- [GitHub Docs: configure coding guidelines for Copilot code review](https://docs.github.com/copilot/how-tos/use-copilot-agents/request-a-code-review/configure-coding-guidelines)
-
+- [GitHub Docs: adding repository custom instructions for GitHub Copilot](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions?tool=vscode)
