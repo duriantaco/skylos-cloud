@@ -9,14 +9,19 @@ import { canAutoConfigureGitHubInstall } from "@/lib/github-installation-core";
 
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 const APP_ID = process.env.GITHUB_APP_ID!;
 const PRIVATE_KEY = process.env.GITHUB_APP_PRIVATE_KEY!;
 const WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET!;
 const AUTO_CONFIGURE_INSTALLATIONS = process.env.GITHUB_APP_AUTO_CONFIGURE === "true";
+
+function getSupabaseAdmin() {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    return null
+  }
+  return createClient(url, key)
+}
 
 function verifySignature(payload: string, signature: string): boolean {
   const sig = crypto
@@ -43,6 +48,11 @@ async function getInstallationOctokit(installationId: number): Promise<Octokit> 
 }
 
 async function linkInstallationToRepo(fullName: string, installationId: number) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return { kind: "error" as const, error: new Error("Missing Supabase environment variables") };
+  }
+
   const repoFilter = buildRepoUrlOrFilter(`https://github.com/${fullName}`);
   if (!repoFilter) {
     return { kind: "invalid" as const };
@@ -360,6 +370,11 @@ async function handleInstallationRepositoriesAdded(payload: any) {
 }
 
 async function handleInstallationDeleted(payload: any) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    throw new Error("Missing Supabase environment variables");
+  }
+
   const installationId = payload.installation.id;
   
   console.log(`Installation ${installationId} deleted, clearing from projects`);
@@ -406,6 +421,10 @@ async function handleCheckRun(payload: any) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!getSupabaseAdmin()) {
+    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+  }
+
   const body = await request.text();
   const signature = request.headers.get("x-hub-signature-256") || "";
   

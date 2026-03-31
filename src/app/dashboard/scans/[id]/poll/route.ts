@@ -2,19 +2,24 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { hashApiKey } from '@/lib/api-key'
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('Missing Supabase environment variables');
+function getSupabaseAdmin() {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    return null
+  }
+  return createClient(url, key)
 }
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
+  }
+
   const { id } = await params
 
   const authHeader = request.headers.get('authorization')

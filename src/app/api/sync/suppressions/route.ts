@@ -4,14 +4,14 @@ import { createHash } from 'crypto'
 import { serverError } from '@/lib/api-error';
 import { hashApiKey } from '@/lib/api-key';
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('Missing Supabase environment variables');
+function getSupabaseAdmin() {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    return null
+  }
+  return createClient(url, key)
 }
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
 
 type SuppressionRow = {
   rule_id?: string | null;
@@ -28,6 +28,14 @@ function fingerprint(ruleId: string, filePath: string, line: number | null): str
 }
 
 export async function GET(request: NextRequest) {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return NextResponse.json(
+      { error: 'Server misconfigured', code: 'SERVER_MISCONFIGURED' },
+      { status: 500 }
+    )
+  }
+
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) {
     return NextResponse.json(

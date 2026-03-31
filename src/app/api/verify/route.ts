@@ -4,15 +4,14 @@ import { serverError } from "@/lib/api-error";
 import { hashApiKey } from "@/lib/api-key";
 import { getEffectivePlan } from "@/lib/entitlements";
 
-
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error("Missing Supabase environment variables");
+function getSupabaseAdmin() {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    return null
+  }
+  return createClient(url, key);
 }
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
 
 type Plan = "free" | "pro" | "enterprise";
 
@@ -137,6 +136,14 @@ function extractCalls(fnLines: string[]) {
 
 export async function POST(req: Request) {
   try {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return NextResponse.json(
+        { error: "Server misconfigured", code: "SERVER_MISCONFIGURED" },
+        { status: 500 }
+      );
+    }
+
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return NextResponse.json(
