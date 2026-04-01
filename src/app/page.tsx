@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar'
 import CopyInstallButton from '@/components/CopyInstallButton'
 import SkylosHeroSandbox from '@/components/SkylosHeroSandbox'
 import { getGithubRepo, getSiteUrl } from '@/lib/site'
+import { getJudgeRepoIndex } from '@/lib/judge'
 import { ArrowRight, Terminal, Shield, AlertTriangle, Code2, GitBranch, Timer, Search, Check, Zap, Bug, BookOpen } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -218,6 +219,7 @@ export default async function Home() {
   const stars = await getGithubStars()
   const siteUrl = getSiteUrl()
   const DISCORD_URL = process.env.NEXT_PUBLIC_DISCORD_URL || "https://discord.gg/Hm5KQMzyrR"
+  const judgeRepos = (await getJudgeRepoIndex().catch(() => [])).slice(0, 3)
   const docsUrl = 'https://docs.skylos.dev/'
   const rulesReferenceUrl = 'https://docs.skylos.dev/rules-reference'
 
@@ -950,6 +952,123 @@ export default async function Home() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-3xl text-center mb-14">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
+              See how public repos score before you scan your own
+            </h2>
+            <p className="mt-4 text-lg text-slate-600">
+              Skylos Judge turns public repos into pinned scorecards for security, quality, and dead code. The scoring is static and deterministic, not LLM-generated.
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {judgeRepos.length > 0 ? judgeRepos.map(({ repo, latestSnapshot, activeJob }) => (
+              <Link
+                key={`${repo.owner}/${repo.name}`}
+                href={`/judge/${repo.owner}/${repo.name}`}
+                className="group rounded-3xl border border-slate-200 bg-slate-50 p-8 hover:border-slate-300 hover:bg-white hover:shadow-lg transition"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{repo.language || "unknown"}</div>
+                    <h3 className="mt-2 text-2xl font-bold text-slate-900">{repo.owner}/{repo.name}</h3>
+                  </div>
+                  {latestSnapshot ? (
+                    <div className="rounded-2xl bg-slate-900 px-4 py-3 text-center text-white">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">Grade</div>
+                      <div className="mt-1 text-2xl font-black">{latestSnapshot.grade}</div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl bg-amber-50 px-4 py-3 text-center text-amber-900">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.14em]">Status</div>
+                      <div className="mt-1 text-sm font-semibold">{activeJob?.status === "running" ? "Scanning" : "Queued"}</div>
+                    </div>
+                  )}
+                </div>
+
+                {latestSnapshot ? (
+                  <>
+                    <div className="mt-6 grid grid-cols-3 gap-3">
+                      <div className="rounded-2xl bg-white p-3">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Security</div>
+                        <div className="mt-2 text-xl font-bold text-slate-900">{latestSnapshot.security_score}</div>
+                      </div>
+                      <div className="rounded-2xl bg-white p-3">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Quality</div>
+                        <div className="mt-2 text-xl font-bold text-slate-900">{latestSnapshot.quality_score}</div>
+                      </div>
+                      <div className="rounded-2xl bg-white p-3">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Dead Code</div>
+                        <div className="mt-2 text-xl font-bold text-slate-900">{latestSnapshot.dead_code_score}</div>
+                      </div>
+                    </div>
+                    <p className="mt-4 text-sm text-slate-500">
+                      {latestSnapshot.branch || repo.default_branch || "main"} @ {latestSnapshot.commit_sha.slice(0, 7)}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-6 text-sm text-slate-500">First snapshot has not been imported yet.</p>
+                )}
+
+                <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  Open scorecard
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </div>
+              </Link>
+            )) : (
+              <>
+                <Link href="/judge" className="group rounded-3xl border border-slate-200 bg-slate-50 p-8 hover:border-slate-300 hover:bg-white hover:shadow-lg transition">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Python</div>
+                  <h3 className="mt-2 text-2xl font-bold text-slate-900">psf/black</h3>
+                  <p className="mt-4 text-sm leading-relaxed text-slate-600">Read a pinned Judge scorecard for a real production repo, with a visible scan date and commit SHA.</p>
+                  <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    Open Judge
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </div>
+                </Link>
+                <Link href="/judge" className="group rounded-3xl border border-slate-200 bg-slate-50 p-8 hover:border-slate-300 hover:bg-white hover:shadow-lg transition">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Python</div>
+                  <h3 className="mt-2 text-2xl font-bold text-slate-900">networkx/networkx</h3>
+                  <p className="mt-4 text-sm leading-relaxed text-slate-600">Use public scorecards to understand how Skylos presents security, quality, and dead-code signal before connecting your own repo.</p>
+                  <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    Open Judge
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </div>
+                </Link>
+                <Link href="/judge" className="group rounded-3xl border border-slate-200 bg-slate-50 p-8 hover:border-slate-300 hover:bg-white hover:shadow-lg transition">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Python</div>
+                  <h3 className="mt-2 text-2xl font-bold text-slate-900">mitmproxy/mitmproxy</h3>
+                  <p className="mt-4 text-sm leading-relaxed text-slate-600">Judge pages are meant to be public, crawlable, and deterministic, so the score always ties back to a real pinned snapshot.</p>
+                  <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    Open Judge
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </div>
+                </Link>
+              </>
+            )}
+          </div>
+
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/judge"
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white hover:bg-slate-800 transition"
+            >
+              Browse Judge
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition"
+            >
+              Scan your repo
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-24 bg-white border-y border-slate-200">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="mx-auto max-w-3xl text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
               Open source locally. Use cloud when you need workflow.
             </h2>
             <p className="mt-4 text-lg text-slate-600">
@@ -1160,6 +1279,7 @@ export default async function Home() {
             <Link href="/blog" className="hover:text-slate-900 transition">Blog</Link>
             <Link href="/compare" className="hover:text-slate-900 transition">Compare</Link>
             <Link href="/use-cases" className="hover:text-slate-900 transition">Use Cases</Link>
+            <Link href="/judge" className="hover:text-slate-900 transition">Judge</Link>
             <a href={docsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-slate-900 transition">Docs</a>
             <Link href="/login" className="hover:text-slate-900 transition">Login</Link>
             <a href={DISCORD_URL} target="_blank" rel="noreferrer" className="hover:text-slate-900 transition">Discord</a>

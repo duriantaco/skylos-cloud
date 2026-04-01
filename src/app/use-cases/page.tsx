@@ -74,6 +74,9 @@ export default function UseCasesPage() {
             <Link href="/use-cases" className="text-sm text-slate-900 font-medium">
               Use Cases
             </Link>
+            <Link href="/judge" className="text-sm text-slate-500 hover:text-slate-900 transition">
+              Judge
+            </Link>
             <Link href="/docs" className="text-sm text-slate-500 hover:text-slate-900 transition">
               Docs
             </Link>
@@ -112,6 +115,13 @@ export default function UseCasesPage() {
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition"
             >
               Compare tools first
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/judge"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition"
+            >
+              See public repo grades
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -154,6 +164,10 @@ export default function UseCasesPage() {
               <div className="flex items-center gap-2">
                 <Check className="h-4 w-4 text-emerald-500" />
                 Use <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-900">skylos cicd init</code> when you are ready to gate PRs
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-emerald-500" />
+                Review <Link href="/judge" className="underline decoration-slate-300 hover:decoration-slate-900">Judge scorecards</Link> for public-repo examples
               </div>
             </div>
           </div>

@@ -73,6 +73,9 @@ export default function ComparePage() {
             <Link href="/use-cases" className="text-sm text-slate-500 hover:text-slate-900 transition">
               Use Cases
             </Link>
+            <Link href="/judge" className="text-sm text-slate-500 hover:text-slate-900 transition">
+              Judge
+            </Link>
             <Link href="/docs" className="text-sm text-slate-500 hover:text-slate-900 transition">
               Docs
             </Link>
@@ -111,6 +114,13 @@ export default function ComparePage() {
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition"
             >
               See maintainer proof
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/judge"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition"
+            >
+              Browse repo grades
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -153,6 +163,10 @@ export default function ComparePage() {
               <div className="flex items-center gap-2">
                 <Check className="h-4 w-4 text-emerald-500" />
                 Add <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-900">skylos cicd init</code> only if the signal is useful
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-emerald-500" />
+                Use <Link href="/judge" className="underline decoration-slate-300 hover:decoration-slate-900">Judge</Link> to see how real public repos score first
               </div>
             </div>
           </div>

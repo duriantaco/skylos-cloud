@@ -24,6 +24,7 @@ This repo contains the public website, comparison pages, use-case content, blog 
 - `/blog` research and benchmark articles
 - `/compare` Python tool comparisons
 - `/use-cases` workflow guides
+- `/judge` public repository scorecards
 - `/vscode` VS Code landing page
 - `/llms.txt` compact AI-facing site summary
 - `/llms-full.txt` expanded AI-facing page inventory
@@ -47,6 +48,7 @@ The app expects Supabase credentials and site configuration through environment 
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `NEXT_PUBLIC_SITE_URL`
+- `JUDGE_ADMIN_TOKEN` for Judge seed/import admin routes
 
 Some pages also use optional integrations such as GitHub and Lemon Squeezy.
 
