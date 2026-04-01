@@ -3,11 +3,13 @@
 import Link from "next/link"
 import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
+import { createClient } from "@/utils/supabase/client"
 import dogImg from "../../public/assets/favicon-96x96.png"
 
 export default function Navbar() {
   const [productsOpen, setProductsOpen] = useState(false)
   const [resourcesOpen, setResourcesOpen] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const resourcesRef = useRef<HTMLDivElement>(null)
 
@@ -23,6 +25,25 @@ export default function Navbar() {
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    void supabase.auth.getUser().then(({ data }) => {
+      setIsAuthenticated(Boolean(data.user))
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(Boolean(session?.user))
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const primaryHref = isAuthenticated ? "/dashboard" : "/login"
+  const primaryLabel = isAuthenticated ? "Dashboard" : "Login"
 
   return (
     <nav className="fixed top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-slate-100">
@@ -160,10 +181,10 @@ export default function Navbar() {
             See proof
           </Link>
           <Link
-            href="/docs"
+            href={primaryHref}
             className="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition"
           >
-            Try locally
+            {primaryLabel}
           </Link>
         </div>
       </div>
