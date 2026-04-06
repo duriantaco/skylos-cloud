@@ -1,7 +1,7 @@
 'use client'
 
 import { createClient } from '@/utils/supabase/client'
-import { Github } from 'lucide-react'
+import { Github, Loader2 } from 'lucide-react'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
@@ -9,6 +9,7 @@ function LoginContent() {
   const [loading, setLoading] = useState(false)
   const searchParams = useSearchParams()
   const next = searchParams.get('next') || '/dashboard'
+  const error = searchParams.get('error')
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -26,23 +27,55 @@ function LoginContent() {
 
   const handleLogin = async () => {
     setLoading(true)
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
         redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-        skipBrowserRedirect: false,
+        skipBrowserRedirect: true,
       },
     })
-    if (error) alert(error.message)
-    setLoading(false)
+
+    if (error) {
+      alert(error.message)
+      setLoading(false)
+      return
+    }
+
+    if (!data.url) {
+      alert('Could not start the GitHub sign-in flow.')
+      setLoading(false)
+      return
+    }
+
+    window.location.assign(data.url)
   }
 
   return (
     <>
+      {loading && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-[#02040a]/90 backdrop-blur-sm">
+          <div className="text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white/5 text-white">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+            <h2 className="mt-4 text-lg font-semibold text-white">Opening GitHub</h2>
+            <p className="mt-2 text-sm text-slate-400">
+              You&apos;ll return here automatically after approval.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="text-center mb-8">
         <h1 className="text-2xl font-bold text-white mb-2">Welcome to Skylos</h1>
         <p className="text-slate-400 text-sm">Sign in to manage your organization policies.</p>
       </div>
+
+      {error === 'auth_failed' && (
+        <div className="mb-5 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          Sign-in did not complete. Please try again.
+        </div>
+      )}
 
       <button
         onClick={handleLogin}
@@ -50,7 +83,10 @@ function LoginContent() {
         className="w-full bg-white text-black font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-3 hover:bg-slate-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? (
-          <span className="animate-pulse">Redirecting...</span>
+          <>
+            <Loader2 className="w-5 h-5 animate-spin" />
+            Opening GitHub...
+          </>
         ) : (
           <>
             <Github className="w-5 h-5" />
