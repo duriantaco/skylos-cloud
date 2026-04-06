@@ -362,7 +362,7 @@ export default function SkylosHeroSandbox() {
               {running ? "Scanning…" : "Scan"}
             </button>
             <Link
-              href="/docs"
+              href="/scan"
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
             >
               Run your first scan

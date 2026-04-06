@@ -349,7 +349,7 @@ export default async function Home() {
 
             <div className="mt-12 flex flex-col sm:flex-row gap-5 justify-center items-center">
               <Link
-                href="/docs"
+                href="/scan"
                 className="group inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-10 py-5 text-lg font-bold text-white shadow-sm transition-colors hover:bg-slate-800"
                 aria-label="Run your first Skylos scan"
               >
@@ -1081,7 +1081,7 @@ export default async function Home() {
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> No login required
                 </li>
               </ul>
-              <Link href="/docs" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+              <Link href="/scan" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
                 Run your first scan <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -1237,7 +1237,7 @@ export default async function Home() {
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Link
-              href="/docs"
+              href="/scan"
               className="group inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-4 text-base font-semibold text-white hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
             >
               Run your first scan
