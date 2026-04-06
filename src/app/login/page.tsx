@@ -2,14 +2,27 @@
 
 import { createClient } from '@/utils/supabase/client'
 import { Github } from 'lucide-react'
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 function LoginContent() {
   const [loading, setLoading] = useState(false)
-  const supabase = createClient()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') || '/dashboard'
+  const supabase = useMemo(() => createClient(), [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!isMounted || !data.session?.user) return
+      window.location.replace(next)
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [next, supabase])
 
   const handleLogin = async () => {
     setLoading(true)
