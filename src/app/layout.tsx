@@ -5,7 +5,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { getSiteUrl } from '@/lib/site'
 import { buildWebsiteSchema } from '@/lib/structured-data'
-import MarketingAttributionTracker from '@/components/MarketingAttributionTracker'
+import MarketingAttributionTrackerLoader from '@/components/MarketingAttributionTrackerLoader'
 import './globals.css'; // kept only one instance
 
 const siteUrl = getSiteUrl()
@@ -111,7 +111,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="font-sans antialiased">
-        <MarketingAttributionTracker />
+        <MarketingAttributionTrackerLoader />
         <Script
           id="ld-organization"
           type="application/ld+json"

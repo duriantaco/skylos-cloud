@@ -10,12 +10,6 @@
   --color-brand-primary: #6366f1;
   --color-brand-secondary: #0ea5e9;
 
-  --animate-fade-in: fadeIn 0.5s ease-out;
-
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
 }
 
 body {

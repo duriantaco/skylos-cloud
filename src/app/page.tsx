@@ -3,7 +3,7 @@ import Script from 'next/script'
 import { Metadata } from 'next'
 import Navbar from '@/components/Navbar'
 import CopyInstallButton from '@/components/CopyInstallButton'
-import SkylosHeroSandbox from '@/components/SkylosHeroSandbox'
+import SkylosHeroSandboxLoader from '@/components/SkylosHeroSandboxLoader'
 import { getGithubRepo, getSiteUrl } from '@/lib/site'
 import { getJudgeRepoIndex } from '@/lib/judge'
 import { ArrowRight, Terminal, Shield, AlertTriangle, Code2, GitBranch, Timer, Search, Check, Zap, Bug, BookOpen } from 'lucide-react'
@@ -296,25 +296,19 @@ export default async function Home() {
 
       {/* HERO SECTION */}
       <section aria-label="Skylos Introduction" className="relative overflow-hidden pt-24 md:pt-28 pb-32">
-        {/* Enhanced Background with Animated Gradients */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/50 to-purple-50/30" />
 
-        {/* Animated Grid Pattern - Much more visible */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#64748b33_1px,transparent_1px),linear-gradient(to_bottom,#64748b33_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
-
         <div className="relative mx-auto max-w-7xl px-6">
-          {/* Version Badge with Enhanced Animation */}
-          <div className="flex justify-center mb-10 animate-fade-in">
+          <div className="mb-10 flex justify-center">
             <a
               href="https://github.com/duriantaco/skylos/releases"
               target="_blank"
               rel="noopener noreferrer"
-              className="group inline-flex items-center gap-3 rounded-full border border-slate-200/50 bg-white/60 backdrop-blur-xl px-5 py-2.5 text-sm shadow-lg shadow-slate-900/5 hover:border-slate-300/50 hover:shadow-xl hover:scale-105 transition-all duration-300"
+              className="group inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm shadow-sm transition-colors hover:border-slate-300"
             >
               <span className="flex items-center gap-2 text-slate-900 font-semibold">
                 <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-lg shadow-emerald-500/50"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                 </span>
                 v1.0 live
               </span>
@@ -322,7 +316,7 @@ export default async function Home() {
                 <>
                   <span className="text-slate-300">|</span>
                   <span className="text-slate-600 font-medium flex items-center gap-1">
-                    <span className="group-hover:scale-125 transition-transform inline-block">⭐</span>
+                    <span className="inline-block">⭐</span>
                     {stars.toLocaleString()} stars
                   </span>
                 </>
@@ -330,13 +324,12 @@ export default async function Home() {
             </a>
           </div>
 
-          {/* Hero Title - Clean & Professional */}
           <div className="relative max-w-5xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50/80 px-4 py-2 text-sm font-semibold text-blue-900 animate-fade-in-up [animation-delay:150ms]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50/80 px-4 py-2 text-sm font-semibold text-blue-900">
               Built for teams shipping with Cursor, Copilot, and Claude Code
             </div>
 
-            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.02] animate-fade-in-up">
+            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.02]">
               <span className="block mt-6 text-slate-900">Catch what AI</span>
               <span className="block mt-2 text-slate-900">writes wrong.</span>
               <span className="block mt-2 text-slate-900">
@@ -348,23 +341,19 @@ export default async function Home() {
               </span>
             </h1>
 
-            {/* Enhanced Subtitle */}
-            <p className="mt-8 text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto leading-relaxed animate-fade-in-up [animation-delay:200ms] font-medium">
+            <p className="mt-8 text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto leading-relaxed font-medium">
               Skylos is the open source Python security and static analysis tool for teams shipping AI-generated code.
               <br className="hidden sm:block" />
               <span className="text-slate-500">Find dead code, hallucinated imports, risky patterns, and removed auth, CSRF, or rate-limit controls before merge, and add guardrails around MCP-driven workflows.</span>
             </p>
 
-            {/* Enhanced CTA Buttons */}
-            <div className="mt-12 flex flex-col sm:flex-row gap-5 justify-center items-center animate-fade-in-up [animation-delay:400ms]">
+            <div className="mt-12 flex flex-col sm:flex-row gap-5 justify-center items-center">
               <Link
                 href="/docs"
-                className="group relative inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 px-10 py-5 text-lg font-bold text-white hover:shadow-2xl hover:shadow-slate-900/40 hover:scale-105 transition-all duration-300 overflow-hidden"
+                className="group inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-10 py-5 text-lg font-bold text-white shadow-sm transition-colors hover:bg-slate-800"
                 aria-label="Run your first Skylos scan"
               >
-                {/* Shimmer Effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-                <span className="relative z-10 flex items-center gap-2">
+                <span className="flex items-center gap-2">
                   Run your first scan
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </span>
@@ -372,22 +361,21 @@ export default async function Home() {
 
               <Link
                 href="#proof"
-                className="group relative inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-white/80 backdrop-blur-sm px-10 py-5 text-lg font-bold text-slate-900 hover:border-slate-300 hover:bg-white hover:shadow-xl hover:scale-105 transition-all duration-300"
+                className="group inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-white px-10 py-5 text-lg font-bold text-slate-900 transition-colors hover:border-slate-300 hover:bg-slate-50"
               >
                 See proof
                 <ArrowRight className="w-5 h-5 text-slate-400 group-hover:translate-x-1 group-hover:text-slate-900 transition-all" />
               </Link>
             </div>
 
-            <div className="mt-6 flex justify-center animate-fade-in-up [animation-delay:500ms]">
+            <div className="mt-6 flex justify-center">
               <CopyInstallButton command="pip install skylos" />
             </div>
-            <p className="mt-3 text-sm text-slate-500 animate-fade-in-up [animation-delay:550ms]">
+            <p className="mt-3 text-sm text-slate-500">
               Local scan is free — run <code className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-slate-900">skylos . -a</code> on a repo you care about. No login required.
             </p>
 
-            {/* Trust Indicators */}
-            <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm text-slate-500 animate-fade-in-up [animation-delay:600ms]">
+            <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm text-slate-500">
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-500" />
                 <span>Open source CLI, no signup required</span>
@@ -404,7 +392,7 @@ export default async function Home() {
 
             <Link
               href="/blog/3-merged-prs-dead-code-in-black-flagsmith-pypdf"
-              className="mt-8 mx-auto flex max-w-4xl items-start gap-4 rounded-2xl border border-slate-200 bg-white/70 px-6 py-5 text-left shadow-lg shadow-slate-900/5 hover:border-slate-300 hover:shadow-xl transition-all animate-fade-in-up [animation-delay:650ms]"
+              className="mt-8 mx-auto flex max-w-4xl items-start gap-4 rounded-2xl border border-slate-200 bg-white px-6 py-5 text-left shadow-sm transition-colors hover:border-slate-300"
             >
               <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
                 <GitBranch className="h-5 w-5 text-emerald-600" />
@@ -423,7 +411,7 @@ export default async function Home() {
           </div>
 
           <div className="mt-16 md:mt-20" id="example-output">
-            <SkylosHeroSandbox />
+            <SkylosHeroSandboxLoader />
           </div>
         </div>
       </section>
