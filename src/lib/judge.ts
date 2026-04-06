@@ -88,6 +88,13 @@ export type JudgeSuggestionRow = {
   review_notes: string | null;
 };
 
+function hasJudgeAdminAccess(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+}
+
 function isJudgeSchemaMissing(message: string | undefined): boolean {
   return typeof message === "string" && message.includes("judge_repos");
 }
@@ -105,6 +112,10 @@ function firstByRepoId<T extends { repo_id: string }>(rows: T[]): Map<string, T>
 }
 
 export async function getJudgeRepoIndex(): Promise<JudgeRepoSummary[]> {
+  if (!hasJudgeAdminAccess()) {
+    return [];
+  }
+
   const { data: repos, error: repoError } = await supabaseAdmin
     .from("judge_repos")
     .select("id, host, owner, name, source_url, default_branch, language, last_scanned_at")
@@ -184,6 +195,10 @@ export async function getJudgeRepoIndex(): Promise<JudgeRepoSummary[]> {
 }
 
 export async function getJudgeRepoSitemapEntries(): Promise<JudgeRepoSitemapEntry[]> {
+  if (!hasJudgeAdminAccess()) {
+    return [];
+  }
+
   const { data: repos, error } = await supabaseAdmin
     .from("judge_repos")
     .select("owner, name, last_scanned_at")
@@ -212,6 +227,10 @@ export async function getJudgeRepoDetail(
   owner: string,
   name: string
 ): Promise<JudgeRepoDetail> {
+  if (!hasJudgeAdminAccess()) {
+    notFound();
+  }
+
   const { data: repo, error: repoError } = await supabaseAdmin
     .from("judge_repos")
     .select("id, host, owner, name, source_url, default_branch, language, last_scanned_at")
