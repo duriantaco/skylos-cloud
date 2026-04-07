@@ -4,10 +4,15 @@ import { useState, useEffect } from 'react';
 import { Download, FileText, File, FileSpreadsheet, Loader2, Coins, AlertCircle } from 'lucide-react';
 import { checkCredits, FEATURE_KEYS } from '@/lib/credits';
 import Link from 'next/link';
+import NoticeModal from './NoticeModal';
 
 type Props = {
   frameworkCode: string;
 };
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
 export default function ComplianceReportButton({ frameworkCode }: Props) {
   const [generating, setGenerating] = useState(false);
@@ -16,6 +21,7 @@ export default function ComplianceReportButton({ frameworkCode }: Props) {
   const [creditsRequired, setCreditsRequired] = useState(0);
   const [checking, setChecking] = useState(true);
   const [unlimited, setUnlimited] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     // Check credits on mount
@@ -57,8 +63,8 @@ export default function ComplianceReportButton({ frameworkCode }: Props) {
           : `compliance-report-${frameworkCode}-${Date.now()}.html`;
         downloadBlob(blob, filename);
       }
-    } catch (error: any) {
-      alert(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      setNotice(getErrorMessage(error, 'Failed to generate report'));
     } finally {
       setGenerating(false);
     }
@@ -171,6 +177,14 @@ export default function ComplianceReportButton({ frameworkCode }: Props) {
           </div>
         </>
       )}
+
+      <NoticeModal
+        isOpen={notice !== null}
+        onClose={() => setNotice(null)}
+        title="Report Generation Failed"
+        message={notice || ''}
+        tone="error"
+      />
     </div>
   );
 }

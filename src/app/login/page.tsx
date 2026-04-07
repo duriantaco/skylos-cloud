@@ -1,5 +1,6 @@
 'use client'
 
+import NoticeModal from '@/components/NoticeModal'
 import { createClient } from '@/utils/supabase/client'
 import { Github, Loader2 } from 'lucide-react'
 import { Suspense, useEffect, useMemo, useState } from 'react'
@@ -7,6 +8,7 @@ import { useSearchParams } from 'next/navigation'
 
 function LoginContent() {
   const [loading, setLoading] = useState(false)
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null)
   const searchParams = useSearchParams()
   const next = searchParams.get('next') || '/dashboard'
   const error = searchParams.get('error')
@@ -36,13 +38,19 @@ function LoginContent() {
     })
 
     if (error) {
-      alert(error.message)
+      setNotice({
+        title: 'GitHub Sign-In Failed',
+        message: error.message,
+      })
       setLoading(false)
       return
     }
 
     if (!data.url) {
-      alert('Could not start the GitHub sign-in flow.')
+      setNotice({
+        title: 'GitHub Sign-In Failed',
+        message: 'Could not start the GitHub sign-in flow.',
+      })
       setLoading(false)
       return
     }
@@ -98,6 +106,14 @@ function LoginContent() {
       <p className="text-center text-xs text-slate-600 mt-6">
         By clicking continue, you agree to our Terms of Service and Privacy Policy.
       </p>
+
+      <NoticeModal
+        isOpen={notice !== null}
+        onClose={() => setNotice(null)}
+        title={notice?.title || 'Notice'}
+        message={notice?.message || ''}
+        tone="error"
+      />
     </>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ConfirmModal from "@/components/ConfirmModal";
+import NoticeModal from "@/components/NoticeModal";
 
 type Row = {
   project_id: string;
@@ -32,6 +33,7 @@ export default function SuppressionsTable({ projectId }: { projectId: string }) 
   const [loading, setLoading] = useState(true);
   const [pendingRevoke, setPendingRevoke] = useState<Row | null>(null);
   const [isRevoking, setIsRevoking] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [q, setQ] = useState("");
   const [includeRevoked, setIncludeRevoked] = useState(false);
@@ -84,7 +86,7 @@ export default function SuppressionsTable({ projectId }: { projectId: string }) 
       setPendingRevoke(null);
       await load();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to revoke suppression");
+      setNotice(error instanceof Error ? error.message : "Failed to revoke suppression");
     } finally {
       setIsRevoking(false);
     }
@@ -205,6 +207,14 @@ export default function SuppressionsTable({ projectId }: { projectId: string }) 
         confirmText="Revoke Suppression"
         confirmStyle="warning"
         isLoading={isRevoking}
+      />
+
+      <NoticeModal
+        isOpen={notice !== null}
+        onClose={() => setNotice(null)}
+        title="Revoke Failed"
+        message={notice || ""}
+        tone="error"
       />
     </>
   );

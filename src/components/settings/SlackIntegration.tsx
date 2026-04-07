@@ -12,6 +12,7 @@ import {
   Bell,
   BellOff,
 } from 'lucide-react'
+import ConfirmModal from '@/components/ConfirmModal'
 
 type NotifyOn = 'failure' | 'always' | 'recovery'
 
@@ -40,6 +41,7 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
   const [showWebhookInput, setShowWebhookInput] = useState(false)
   const [notifyOn, setNotifyOn] = useState<NotifyOn>('failure')
   const [enabled, setEnabled] = useState(false)
+  const [showRemoveModal, setShowRemoveModal] = useState(false)
 
   useEffect(() => {
     async function fetchSettings() {
@@ -51,8 +53,8 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
           setEnabled(data.enabled)
           setNotifyOn(data.notifyOn || 'failure')
         }
-      } catch (e) {
-        console.error('Failed to fetch Slack settings:', e)
+      } catch (error) {
+        console.error('Failed to fetch Slack settings:', error)
       } finally {
         setLoading(false)
       }
@@ -88,7 +90,7 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
       } else {
         setSuccess('Test message sent! Check your Slack channel.')
       }
-    } catch (e) {
+    } catch {
       setError('Failed to send test message')
     } finally {
       setTesting(false)
@@ -100,7 +102,7 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
     setSaving(true)
     
     try {
-      const body: Record<string, any> = { enabled, notifyOn }
+      const body: Record<string, unknown> = { enabled, notifyOn }
       if (webhookUrl.trim()) {
         body.webhookUrl = webhookUrl.trim()
       }
@@ -124,7 +126,7 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
           setSettings(await refreshRes.json())
         }
       }
-    } catch (e) {
+    } catch {
       setError('Failed to save settings')
     } finally {
       setSaving(false)
@@ -132,8 +134,7 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
   }
 
   const handleRemove = async () => {
-    if (!confirm('Remove Slack integration? You can add it back anytime.')) return
-    
+    setShowRemoveModal(false)
     clearMessages()
     setSaving(true)
     
@@ -149,7 +150,7 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
       } else {
         setError('Failed to remove integration')
       }
-    } catch (e) {
+    } catch {
       setError('Failed to remove integration')
     } finally {
       setSaving(false)
@@ -172,7 +173,7 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
         setEnabled(!newEnabled)
         setError('Failed to update')
       }
-    } catch (e) {
+    } catch {
       setEnabled(!newEnabled)
     }
   }
@@ -261,7 +262,7 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
                   Update
                 </button>
                 <button
-                  onClick={handleRemove}
+                  onClick={() => setShowRemoveModal(true)}
                   disabled={saving}
                   className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                 >
@@ -288,7 +289,7 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ notifyOn: opt.value }),
                         })
-                      } catch (e) {}
+                      } catch {}
                     }}
                     className={`
                       px-3 py-2 rounded-lg text-sm text-left transition border
@@ -376,6 +377,17 @@ export default function SlackIntegration({ projectId }: { projectId: string }) {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={showRemoveModal}
+        onClose={() => setShowRemoveModal(false)}
+        onConfirm={handleRemove}
+        title="Remove Slack Integration"
+        message="Remove Slack integration? You can add it back anytime."
+        confirmText="Remove Integration"
+        confirmStyle="warning"
+        isLoading={saving}
+      />
 
       {/* Status footer */}
       {settings?.hasWebhook && (

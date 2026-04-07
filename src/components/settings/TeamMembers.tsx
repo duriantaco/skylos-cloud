@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { Users, UserPlus, Trash2, Shield, Crown, Eye, UserCog, Lock } from "lucide-react";
 import type { OrgRole } from "@/lib/permissions";
+import ConfirmModal from "@/components/ConfirmModal";
 
 type Member = {
   user_id: string;
@@ -46,6 +47,10 @@ export default function TeamMembers({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [inviteLink, setInviteLink] = useState("");
+  const [pendingMemberRemoval, setPendingMemberRemoval] = useState<{ userId: string; email: string } | null>(null);
+  const [pendingInviteRevoke, setPendingInviteRevoke] = useState<{ invitationId: string; email: string } | null>(null);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
+  const [isRevokingInvite, setIsRevokingInvite] = useState(false);
 
   const canManage = currentUserRole === "admin" || currentUserRole === "owner";
   const isOwner = currentUserRole === "owner";
@@ -88,20 +93,24 @@ export default function TeamMembers({
     await refreshMembers();
   }
 
-  async function handleRemove(userId: string, email: string) {
-    if (!confirm(`Remove ${email} from this organization?`)) return;
+  async function handleRemove() {
+    if (!pendingMemberRemoval) return;
 
     setError("");
-    const res = await fetch(`/api/team/members?user_id=${userId}`, {
+    setIsRemovingMember(true);
+    const res = await fetch(`/api/team/members?user_id=${pendingMemberRemoval.userId}`, {
       method: "DELETE",
     });
 
     if (!res.ok) {
       const data = await res.json();
       setError(data.error || "Failed to remove member");
+      setIsRemovingMember(false);
       return;
     }
 
+    setPendingMemberRemoval(null);
+    setIsRemovingMember(false);
     await refreshMembers();
   }
 
@@ -144,24 +153,28 @@ export default function TeamMembers({
     setPendingInvites(nextInvites);
   }
 
-  async function handleRevokeInvite(invitationId: string, email: string) {
-    if (!confirm(`Revoke the invitation for ${email}?`)) return;
+  async function handleRevokeInvite() {
+    if (!pendingInviteRevoke) return;
 
     setError("");
-    const res = await fetch(`/api/team/invite?id=${invitationId}`, {
+    setIsRevokingInvite(true);
+    const res = await fetch(`/api/team/invite?id=${pendingInviteRevoke.invitationId}`, {
       method: "DELETE",
     });
 
     const data = await res.json();
     if (!res.ok) {
       setError(data.error || "Failed to revoke invitation");
+      setIsRevokingInvite(false);
       return;
     }
 
-    setSuccess(`Invitation revoked for ${email}`);
-    if (inviteLink && pendingInvites.find((invite) => invite.id === invitationId)?.invite_url === inviteLink) {
+    setSuccess(`Invitation revoked for ${pendingInviteRevoke.email}`);
+    if (inviteLink && pendingInvites.find((invite) => invite.id === pendingInviteRevoke.invitationId)?.invite_url === inviteLink) {
       setInviteLink("");
     }
+    setPendingInviteRevoke(null);
+    setIsRevokingInvite(false);
     await refreshInvites();
   }
 
@@ -259,7 +272,7 @@ export default function TeamMembers({
 
                 {canManage && !isSelf && (
                   <button
-                    onClick={() => handleRemove(m.user_id, email)}
+                    onClick={() => setPendingMemberRemoval({ userId: m.user_id, email })}
                     className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition"
                     title="Remove member"
                   >
@@ -311,7 +324,7 @@ export default function TeamMembers({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleRevokeInvite(invite.id, invite.email)}
+                    onClick={() => setPendingInviteRevoke({ invitationId: invite.id, email: invite.email })}
                     className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition"
                   >
                     Revoke
@@ -399,6 +412,28 @@ export default function TeamMembers({
           )}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={pendingMemberRemoval !== null}
+        onClose={() => setPendingMemberRemoval(null)}
+        onConfirm={handleRemove}
+        title="Remove Team Member"
+        message={pendingMemberRemoval ? `Remove ${pendingMemberRemoval.email} from this organization?` : ""}
+        confirmText="Remove Member"
+        confirmStyle="danger"
+        isLoading={isRemovingMember}
+      />
+
+      <ConfirmModal
+        isOpen={pendingInviteRevoke !== null}
+        onClose={() => setPendingInviteRevoke(null)}
+        onConfirm={handleRevokeInvite}
+        title="Revoke Invitation"
+        message={pendingInviteRevoke ? `Revoke the invitation for ${pendingInviteRevoke.email}?` : ""}
+        confirmText="Revoke Invitation"
+        confirmStyle="warning"
+        isLoading={isRevokingInvite}
+      />
     </div>
   );
 }

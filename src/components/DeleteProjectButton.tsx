@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
 import ConfirmModal from './ConfirmModal'
+import NoticeModal from './NoticeModal'
 
 type Props = {
   projectId: string
@@ -19,6 +20,7 @@ export default function DeleteProjectButton({
   const router = useRouter()
   const [showModal, setShowModal] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const handleDelete = async () => {
     setIsDeleting(true)
@@ -30,10 +32,10 @@ export default function DeleteProjectButton({
         router.refresh()
       } else {
         const data = await res.json().catch(() => ({}))
-        alert(data.error || 'Failed to delete project')
+        setNotice(data.error || 'Failed to delete project')
       }
     } catch {
-      alert('Failed to delete project')
+      setNotice('Failed to delete project')
     } finally {
       setIsDeleting(false)
     }
@@ -63,6 +65,14 @@ export default function DeleteProjectButton({
         confirmText="Delete Project"
         confirmStyle="danger"
         isLoading={isDeleting}
+      />
+
+      <NoticeModal
+        isOpen={notice !== null}
+        onClose={() => setNotice(null)}
+        title="Delete Failed"
+        message={notice || ''}
+        tone="error"
       />
     </>
   )

@@ -11,6 +11,7 @@ import {
   Bell,
   BellOff,
 } from 'lucide-react'
+import ConfirmModal from '@/components/ConfirmModal'
 
 // Discord icon SVG
 function DiscordIcon({ className }: { className?: string }) {
@@ -48,6 +49,7 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
   const [showWebhookInput, setShowWebhookInput] = useState(false)
   const [notifyOn, setNotifyOn] = useState<NotifyOn>('failure')
   const [enabled, setEnabled] = useState(false)
+  const [showRemoveModal, setShowRemoveModal] = useState(false)
 
   // Fetch current settings
   useEffect(() => {
@@ -60,8 +62,8 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
           setEnabled(data.enabled)
           setNotifyOn(data.notifyOn || 'failure')
         }
-      } catch (e) {
-        console.error('Failed to fetch Discord settings:', e)
+      } catch (error) {
+        console.error('Failed to fetch Discord settings:', error)
       } finally {
         setLoading(false)
       }
@@ -97,7 +99,7 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
       } else {
         setSuccess('Test message sent! Check your Discord channel.')
       }
-    } catch (e) {
+    } catch {
       setError('Failed to send test message')
     } finally {
       setTesting(false)
@@ -109,7 +111,7 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
     setSaving(true)
     
     try {
-      const body: Record<string, any> = { enabled, notifyOn }
+      const body: Record<string, unknown> = { enabled, notifyOn }
       if (webhookUrl.trim()) {
         body.webhookUrl = webhookUrl.trim()
       }
@@ -134,7 +136,7 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
           setSettings(await refreshRes.json())
         }
       }
-    } catch (e) {
+    } catch {
       setError('Failed to save settings')
     } finally {
       setSaving(false)
@@ -142,8 +144,7 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
   }
 
   const handleRemove = async () => {
-    if (!confirm('Remove Discord integration? You can add it back anytime.')) return
-    
+    setShowRemoveModal(false)
     clearMessages()
     setSaving(true)
     
@@ -159,7 +160,7 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
       } else {
         setError('Failed to remove integration')
       }
-    } catch (e) {
+    } catch {
       setError('Failed to remove integration')
     } finally {
       setSaving(false)
@@ -182,7 +183,7 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
         setEnabled(!newEnabled) // Revert
         setError('Failed to update')
       }
-    } catch (e) {
+    } catch {
       setEnabled(!newEnabled) // Revert
     }
   }
@@ -271,7 +272,7 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
                   Update
                 </button>
                 <button
-                  onClick={handleRemove}
+                  onClick={() => setShowRemoveModal(true)}
                   disabled={saving}
                   className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                 >
@@ -298,7 +299,7 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ notifyOn: opt.value }),
                         })
-                      } catch (e) {}
+                      } catch {}
                     }}
                     className={`
                       px-3 py-2 rounded-lg text-sm text-left transition border
@@ -385,6 +386,17 @@ export default function DiscordIntegration({ projectId }: { projectId: string })
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={showRemoveModal}
+        onClose={() => setShowRemoveModal(false)}
+        onConfirm={handleRemove}
+        title="Remove Discord Integration"
+        message="Remove Discord integration? You can add it back anytime."
+        confirmText="Remove Integration"
+        confirmStyle="warning"
+        isLoading={saving}
+      />
 
       {/* Status footer */}
       {settings?.hasWebhook && (

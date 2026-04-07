@@ -2,11 +2,15 @@
 import { useState } from "react";
 import { Copy, Check, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
+import ConfirmModal from "@/components/ConfirmModal";
+import NoticeModal from "@/components/NoticeModal";
 
 export default function ApiKeySection({ projectId }: { projectId: string }) {
     const [newKey, setNewKey] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [rotating, setRotating] = useState(false);
+    const [showRotateModal, setShowRotateModal] = useState(false);
+    const [notice, setNotice] = useState<string | null>(null);
     const router = useRouter();
 
     const handleCopy = () => {
@@ -17,15 +21,20 @@ export default function ApiKeySection({ projectId }: { projectId: string }) {
     };
 
     const handleRotate = async () => {
-        if (!confirm("Are you sure? This will INVALIDATE the old key immediately. You must update your CI/CD secrets.")) return;
-
+        setShowRotateModal(false);
         setRotating(true);
         try {
             const res = await fetch(`/api/projects/${projectId}/rotate`, { method: "POST" });
             const data = await res.json();
-            if (data.apiKey) {
+            if (!res.ok) {
+                setNotice(data.error || "Failed to rotate API key");
+            } else if (data.apiKey) {
                 setNewKey(data.apiKey);
+            } else {
+                setNotice("Failed to rotate API key");
             }
+        } catch {
+            setNotice("Failed to rotate API key");
         } finally {
             setRotating(false);
             router.refresh();
@@ -53,7 +62,7 @@ export default function ApiKeySection({ projectId }: { projectId: string }) {
 
             {newKey && (
                 <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                    Copy this key now — it won't be shown again.
+                    Copy this key now. It won&apos;t be shown again.
                 </p>
             )}
 
@@ -65,7 +74,7 @@ export default function ApiKeySection({ projectId }: { projectId: string }) {
 
             <div className="flex justify-end">
                 <button
-                    onClick={handleRotate}
+                    onClick={() => setShowRotateModal(true)}
                     disabled={rotating}
                     className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-md flex items-center gap-1.5 transition disabled:opacity-50"
                 >
@@ -73,6 +82,25 @@ export default function ApiKeySection({ projectId }: { projectId: string }) {
                     Rotate Key (Revoke Old)
                 </button>
             </div>
+
+            <ConfirmModal
+                isOpen={showRotateModal}
+                onClose={() => setShowRotateModal(false)}
+                onConfirm={handleRotate}
+                title="Rotate API Key"
+                message="This will invalidate the old key immediately. You must update your CI/CD secrets."
+                confirmText="Rotate Key"
+                confirmStyle="warning"
+                isLoading={rotating}
+            />
+
+            <NoticeModal
+                isOpen={notice !== null}
+                onClose={() => setNotice(null)}
+                title="Rotate Failed"
+                message={notice || ""}
+                tone="error"
+            />
         </div>
     )
 }
