@@ -55,7 +55,9 @@ export default function CreateProjectButton({ orgId }: { orgId: string }) {
   const [copied, setCopied] = useState(false)
 
   const normalizedUrl = normalizeGitHubUrl(repoUrl);
+  const hasRepoUrl = repoUrl.trim().length > 0;
   const isValidUrl = !!normalizedUrl;
+  const canCreate = !!name.trim() && (!hasRepoUrl || isValidUrl);
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -63,7 +65,7 @@ export default function CreateProjectButton({ orgId }: { orgId: string }) {
       return
     }
 
-    if (!normalizedUrl) {
+    if (hasRepoUrl && !normalizedUrl) {
       setError('Valid GitHub repository URL is required')
       return
     }
@@ -78,7 +80,7 @@ export default function CreateProjectButton({ orgId }: { orgId: string }) {
         body: JSON.stringify({
           org_id: orgId,
           name: name.trim(),
-          repo_url: normalizedUrl,
+          repo_url: normalizedUrl || null,
         }),
       })
 
@@ -93,7 +95,7 @@ export default function CreateProjectButton({ orgId }: { orgId: string }) {
       // Show the API key — this is the only time it's visible
       setCreatedApiKey(data.api_key)
       setLoading(false)
-    } catch (e) {
+    } catch {
       setError('Failed to create project')
       setLoading(false)
     }
@@ -129,6 +131,7 @@ export default function CreateProjectButton({ orgId }: { orgId: string }) {
   }
 
   const handleRepoUrlChange = (url: string) => {
+    setError('');
     setRepoUrl(url);
     if (!name.trim()) {
       const info = extractRepoInfo(url);
@@ -171,7 +174,7 @@ export default function CreateProjectButton({ orgId }: { orgId: string }) {
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                     <p className="text-xs text-amber-800 font-medium">
-                      This key will only be shown once. Copy it now — you won't be able to see it again.
+                      This key will only be shown once. Copy it now and you won&apos;t be able to see it again.
                     </p>
                   </div>
 
@@ -204,6 +207,13 @@ export default function CreateProjectButton({ orgId }: { orgId: string }) {
                       Or set <code className="bg-slate-100 px-1 rounded">SKYLOS_TOKEN</code> in your CI/CD environment.
                     </p>
                   </div>
+
+                  <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-semibold text-slate-700 mb-1">Optional next step:</p>
+                    <p className="text-xs text-slate-500">
+                      Link a GitHub repository later in project settings when you want PR blocking, GitHub App automation, or repo deep links.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="px-6 pb-6">
@@ -225,7 +235,9 @@ export default function CreateProjectButton({ orgId }: { orgId: string }) {
                     </div>
                     <div>
                       <h2 className="text-lg font-semibold text-slate-900">New Project</h2>
-                      <p className="text-sm text-slate-500">Add a GitHub repository to scan</p>
+                      <p className="text-sm text-slate-500">
+                        Create a project now. Link GitHub later if you need PR blocking or repo-aware automation.
+                      </p>
                     </div>
                   </div>
                   <button
@@ -240,9 +252,29 @@ export default function CreateProjectButton({ orgId }: { orgId: string }) {
                 <div className="p-6 space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Project Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => {
+                        setError('');
+                        setName(e.target.value);
+                      }}
+                      placeholder="e.g. Backend API"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !loading) handleCreate()
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       <span className="flex items-center gap-2">
                         <Github className="w-4 h-4" />
-                        Repository URL <span className="text-red-500">*</span>
+                        Repository URL <span className="text-slate-400">(optional)</span>
                       </span>
                     </label>
                     <input
@@ -257,7 +289,6 @@ export default function CreateProjectButton({ orgId }: { orgId: string }) {
                           ? 'border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500'
                           : 'border-slate-200 focus:ring-slate-900 focus:border-slate-900'
                       }`}
-                      autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !loading) handleCreate()
                       }}
@@ -274,25 +305,9 @@ export default function CreateProjectButton({ orgId }: { orgId: string }) {
                     )}
                     {!repoUrl && (
                       <p className="mt-2 text-xs text-slate-500">
-                        Required for GitHub integration and PR blocking
+                        Optional for basic uploads. Add it later for GitHub App setup, PR blocking, and deep links.
                       </p>
                     )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Project Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Backend API"
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !loading) handleCreate()
-                      }}
-                    />
                   </div>
 
                   {error && (
@@ -312,7 +327,7 @@ export default function CreateProjectButton({ orgId }: { orgId: string }) {
                   </button>
                   <button
                     onClick={handleCreate}
-                    disabled={loading || !name.trim() || !isValidUrl}
+                    disabled={loading || !canCreate}
                     className="px-5 py-2 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {loading ? (

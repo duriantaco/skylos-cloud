@@ -16,7 +16,7 @@ import NoticeModal from "@/components/NoticeModal";
 type Project = {
   id: string;
   name: string;
-  repo_url: string;
+  repo_url: string | null;
   created_at: string;
   org_id: string;
   scans: {
@@ -580,7 +580,7 @@ export default function ProjectsPage() {
               <>
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">No projects yet</h3>
                 <p className="text-slate-500 text-sm mb-6 max-w-sm mx-auto">
-                  Connect your first repository to start scanning for security issues.
+                  Create your first project to start uploading scans. GitHub linking is optional and can be added later.
                 </p>
                 {orgId && <CreateProjectButton orgId={orgId} />}
               </>

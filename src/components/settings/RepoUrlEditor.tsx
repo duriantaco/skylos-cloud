@@ -44,7 +44,7 @@ export default function RepoUrlEditor({
         <div>
           <h2 className="text-lg font-bold text-slate-900">Repository URL</h2>
           <p className="text-slate-500 text-sm mt-1">
-            Link this project to a GitHub repository for PR integration.
+            Optional for basic uploads. Link this project to GitHub when you want PR integration, deep links, or GitHub App setup.
           </p>
         </div>
       </div>
@@ -70,6 +70,10 @@ export default function RepoUrlEditor({
           {saved ? 'Saved!' : 'Save'}
         </button>
       </div>
+
+      <p className="mt-3 text-xs text-slate-500">
+        Leave this blank if you want to keep the project cloud-only and upload scans without GitHub binding.
+      </p>
     </div>
   )
 }
