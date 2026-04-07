@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { hashApiKey } from "@/lib/api-key";
 import { getEffectivePlan } from "@/lib/entitlements";
+import { resolveProjectFromToken } from "@/lib/project-api-keys";
 
 // GET /api/agent/validate — lightweight API key validation for MCP/agent clients
 // Accepts: Authorization: Bearer <project_api_key> or X-API-Key: <agent_key>
@@ -20,18 +20,25 @@ export async function GET(request: NextRequest) {
 
   try {
     // Try project API key first
-    const { data: project } = await supabaseAdmin
-      .from("projects")
-      .select("id, org_id, organizations(plan, credits, pro_expires_at)")
-      .eq("api_key_hash", hashApiKey(token))
-      .maybeSingle();
+    const resolved = await resolveProjectFromToken<{
+      id: string;
+      org_id: string;
+      organizations: { plan: string | null; credits: number | null; pro_expires_at: string | null } | { plan: string | null; credits: number | null; pro_expires_at: string | null }[] | null;
+    }>(
+      supabaseAdmin,
+      token,
+      "id, org_id, organizations(plan, credits, pro_expires_at)"
+    );
+    const project = resolved?.project;
 
     if (project) {
-      const org = (project as any).organizations;
-      const rawPlan = Array.isArray(org) ? org[0]?.plan : org?.plan;
-      const proExpiresAt = Array.isArray(org) ? org[0]?.pro_expires_at : org?.pro_expires_at;
+      const org = Array.isArray(project.organizations)
+        ? project.organizations[0]
+        : project.organizations;
+      const rawPlan = org?.plan;
+      const proExpiresAt = org?.pro_expires_at;
       const plan = getEffectivePlan({ plan: rawPlan || "free", pro_expires_at: proExpiresAt });
-      const credits = Array.isArray(org) ? org[0]?.credits : org?.credits;
+      const credits = org?.credits;
 
       const rateLimits: Record<string, number> = {
         free: 50,

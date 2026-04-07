@@ -1,8 +1,31 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
-import { hashApiKey } from "@/lib/api-key";
 import { getEffectivePlan } from "@/lib/entitlements";
+import { resolveProjectFromToken } from "@/lib/project-api-keys";
+
+type PolicyConfig = {
+  gate?: {
+    enabled?: boolean;
+    mode?: string;
+    by_category?: Record<string, number>;
+    by_severity?: Record<string, number>;
+  };
+  exclude_paths?: unknown[];
+  complexity_enabled?: boolean;
+  complexity_threshold?: number;
+  nesting_enabled?: boolean;
+  nesting_threshold?: number;
+  function_length_enabled?: boolean;
+  function_length_threshold?: number;
+  arg_count_enabled?: boolean;
+  arg_count_threshold?: number;
+  security_enabled?: boolean;
+  secrets_enabled?: boolean;
+  quality_enabled?: boolean;
+  dead_code_enabled?: boolean;
+  custom_rules?: unknown[];
+};
 
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -33,23 +56,31 @@ export async function GET(req: Request) {
 
     const token = authHeader.split(" ")[1];
 
-    const { data: project, error: projError } = await supabase
-      .from("projects")
-      .select("id, name, policy_config, strict_mode, organizations(plan, pro_expires_at)")
-      .eq("api_key_hash", hashApiKey(token))
-      .single();
+    const resolved = await resolveProjectFromToken<{
+      id: string;
+      name: string;
+      policy_config: Record<string, unknown> | null;
+      strict_mode: boolean | null;
+      organizations: { plan: string | null; pro_expires_at: string | null } | { plan: string | null; pro_expires_at: string | null }[] | null;
+    }>(
+      supabase,
+      token,
+      "id, name, policy_config, strict_mode, organizations(plan, pro_expires_at)"
+    );
 
-    if (projError || !project) {
+    const project = resolved?.project;
+
+    if (!project) {
       return NextResponse.json(
         { error: "Invalid token", code: "INVALID_TOKEN" },
         { status: 403 }
       );
     }
 
-    const pc = (project.policy_config ?? {}) as Record<string, any>;
-    const gate = (pc.gate ?? {}) as Record<string, any>;
+    const pc = (project.policy_config ?? {}) as PolicyConfig;
+    const gate = pc.gate ?? {};
 
-    const orgRef = (project as any).organizations;
+    const orgRef = project.organizations;
     const rawPlan = String(
       (Array.isArray(orgRef) ? orgRef?.[0]?.plan : orgRef?.plan) || "free"
     );

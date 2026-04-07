@@ -1,8 +1,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
-import { generateApiKey } from "@/lib/api-key";
 import { getEffectivePlan } from "@/lib/entitlements";
 import { requirePermission, isAuthError } from "@/lib/permissions";
+import { getSupabaseAdmin } from "@/utils/supabase/admin";
+import { issueProjectApiKey } from "@/lib/project-api-keys";
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -40,25 +41,27 @@ export async function POST(req: Request) {
   const auth = await requirePermission(supabase, "rotate:keys", project.org_id);
   if (isAuthError(auth)) return auth;
 
-  // Generate a new API key for CLI connection
-  // This ensures we always return a valid key, even for existing projects
-  const { plain: apiKey, hash: apiKeyHash } = generateApiKey();
-
-  // Update the project with the new API key hash
-  const { error: updateError } = await supabase
-    .from("projects")
-    .update({ api_key_hash: apiKeyHash })
-    .eq("id", project_id);
-
-  if (updateError) {
+  let apiKey: string;
+  try {
+    const admin = getSupabaseAdmin();
+    const issued = await issueProjectApiKey(admin, {
+      projectId: project_id,
+      label: "CLI connection",
+      role: "secondary",
+      source: "cli_connect",
+      createdBy: user.id,
+    });
+    apiKey = issued.plain;
+  } catch {
     return NextResponse.json(
       { error: "Failed to issue API key" },
       { status: 500 }
     );
   }
 
-  const org = (project as any).organizations;
-  const orgData = Array.isArray(org) ? org[0] : org;
+  const orgData = Array.isArray(project.organizations)
+    ? project.organizations[0]
+    : project.organizations;
 
   return NextResponse.json({
     token: apiKey,

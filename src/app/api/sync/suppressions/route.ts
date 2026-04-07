@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { serverError } from '@/lib/api-error';
-import { hashApiKey } from '@/lib/api-key';
+import { resolveProjectFromToken } from '@/lib/project-api-keys';
 
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -45,13 +45,14 @@ export async function GET(request: NextRequest) {
   }
   const token = authHeader.split(' ')[1]
 
-  const { data: project, error: projError } = await supabase
-    .from('projects')
-    .select('id')
-    .eq('api_key_hash', hashApiKey(token))
-    .single()
+  const resolved = await resolveProjectFromToken<{ id: string }>(
+    supabase,
+    token,
+    'id'
+  );
+  const project = resolved?.project;
 
-  if (projError || !project) {
+  if (!project) {
     return NextResponse.json(
       { error: 'Invalid or expired token', code: 'INVALID_TOKEN' },
       { status: 401 }

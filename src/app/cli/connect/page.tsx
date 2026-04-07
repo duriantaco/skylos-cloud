@@ -5,6 +5,11 @@ import { useSearchParams } from 'next/navigation'
 import { useState, useEffect, Suspense } from 'react'
 import { Loader2, Plus, FolderOpen, Check, Terminal } from 'lucide-react'
 
+type ProjectLite = {
+  id: string
+  name: string
+}
+
 function ConnectFlow() {
   const searchParams = useSearchParams()
   const port = searchParams.get('port')
@@ -13,9 +18,8 @@ function ConnectFlow() {
 
   const supabase = createClient()
 
-  const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [projects, setProjects] = useState<any[]>([])
+  const [projects, setProjects] = useState<ProjectLite[]>([])
   const [orgId, setOrgId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [connecting, setConnecting] = useState<string | null>(null)
@@ -24,37 +28,46 @@ function ConnectFlow() {
   const [done, setDone] = useState(false)
 
   useEffect(() => {
-    checkAuth()
-  }, [])
+    let cancelled = false
 
-  async function checkAuth() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      const currentUrl = `/cli/connect?${searchParams.toString()}`
-      await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(currentUrl)}`,
-        },
-      })
-      return
+    async function checkAuthAndLoad() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        const currentUrl = `/cli/connect?${searchParams.toString()}`
+        await supabase.auth.signInWithOAuth({
+          provider: 'github',
+          options: {
+            redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(currentUrl)}`,
+          },
+        })
+        return
+      }
+
+      const [projectsRes, orgRes] = await Promise.all([
+        fetch('/api/projects'),
+        fetch('/api/cli/org'),
+      ])
+      const projectsData = await projectsRes.json()
+      const orgData = await orgRes.json()
+
+      if (cancelled) {
+        return
+      }
+
+      setProjects(projectsData.projects || [])
+      setOrgId(orgData.org_id || null)
+      setLoading(false)
     }
 
-    setUser(user)
-    await loadData()
-    setLoading(false)
-  }
+    checkAuthAndLoad()
 
-  async function loadData() {
-    const [projectsRes, orgRes] = await Promise.all([
-      fetch('/api/projects'),
-      fetch('/api/cli/org'),
-    ])
-    const projectsData = await projectsRes.json()
-    const orgData = await orgRes.json()
-    setProjects(projectsData.projects || [])
-    setOrgId(orgData.org_id || null)
-  }
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, supabase])
 
   async function selectProject(projectId: string) {
     setConnecting(projectId)
@@ -134,7 +147,7 @@ function ConnectFlow() {
     callbackUrl.searchParams.set('project_name', data.project_name)
     callbackUrl.searchParams.set('org_name', data.org_name)
     callbackUrl.searchParams.set('plan', data.plan)
-    window.location.href = callbackUrl.toString()
+    window.location.assign(callbackUrl.toString())
   }
 
   if (!port) {
@@ -158,7 +171,7 @@ function ConnectFlow() {
           <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check className="w-8 h-8 text-emerald-400" />
           </div>
-          <h2 className="text-xl font-bold text-white mb-2">Connected!</h2>
+          <h2 className="text-xl font-bold text-white mb-2">Project linked!</h2>
           <p className="text-slate-400 text-sm">
             Return to your terminal. You can close this tab.
           </p>
@@ -188,11 +201,11 @@ function ConnectFlow() {
             <Terminal className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">Connect to Skylos CLI</h1>
+            <h1 className="text-xl font-bold text-white">Choose a Skylos Project</h1>
             <p className="text-slate-400 text-sm">
               {repoName
-                ? <>Select a project for <code className="text-white">{repoName}</code></>
-                : 'Select a project to connect'}
+                ? <>Use or create the project for <code className="text-white">{repoName}</code></>
+                : 'Use an existing project or create a new one for this repo'}
             </p>
           </div>
         </div>
@@ -228,12 +241,20 @@ function ConnectFlow() {
               ) : (
                 <Plus className="w-4 h-4" />
               )}
-              Create & Connect
+              Create & Use
             </button>
           </div>
           {repoUrl && (
             <p className="text-xs text-slate-500 mt-1.5">
-              Repo: {repoUrl}
+              Detected repo URL: {repoUrl}
+            </p>
+          )}
+          <p className="text-xs text-slate-500 mt-1.5">
+            GitHub repo binding is optional for basic uploads. Add it later for GitHub App setup, PR blocking, and OIDC uploads.
+          </p>
+          {repoUrl && (
+            <p className="text-xs text-slate-600 mt-1">
+              This detected repo can be linked later in project settings if you want GitHub-specific features.
             </p>
           )}
         </div>
@@ -243,10 +264,10 @@ function ConnectFlow() {
           <>
             <div className="relative mb-4">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-white/10"></div>
+              <div className="w-full border-t border-white/10"></div>
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="px-3 bg-[#0A0A0A] text-slate-500">or connect to existing</span>
+                <span className="px-3 bg-[#0A0A0A] text-slate-500">or use an existing project</span>
               </div>
             </div>
 

@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { hashApiKey } from '@/lib/api-key'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { resolveActiveOrganizationForRequest } from '@/lib/active-org'
 import { resolveOidcProject } from '@/lib/oidc-project'
+import { resolveProjectFromToken } from '@/lib/project-api-keys'
 
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -13,6 +13,7 @@ function getSupabaseAdmin() {
 }
 
 const VALID_COMMANDS = ['scan', 'verify', 'remediate', 'cleanup']
+type TokenProject = { id: string; name: string; org_id: string }
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     const token = authHeader.split(' ')[1]
     const authMode = req.headers.get('x-skylos-auth')
 
-    let project: any
+    let project: TokenProject
 
     if (authMode === 'oidc') {
       const { verifyGitHubOIDC } = await import('@/lib/github-oidc')
@@ -64,19 +65,23 @@ export async function POST(req: NextRequest) {
 
       project = resolution.project
     } else {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, name, org_id')
-        .eq('api_key_hash', hashApiKey(token))
-        .single()
+      const resolved = await resolveProjectFromToken<{
+        id: string;
+        name: string;
+        org_id: string;
+      }>(
+        supabase,
+        token,
+        'id, name, org_id'
+      )
 
-      if (error || !data) {
+      if (!resolved?.project) {
         return NextResponse.json({
           error: 'Invalid API Token. Check your SKYLOS_TOKEN.',
           code: 'INVALID_TOKEN'
         }, { status: 403 })
       }
-      project = data
+      project = resolved.project
     }
 
     const body = await req.json()
@@ -111,8 +116,9 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ id: run.id, success: true })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'Internal error' }, { status: 500 })
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : 'Internal error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -147,7 +153,8 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ runs: runs || [] })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'Internal error' }, { status: 500 })
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : 'Internal error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

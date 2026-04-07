@@ -11,12 +11,12 @@ import { groupFindings  } from '@/lib/grouping';
 import crypto from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { serverError } from "@/lib/api-error";
-import { hashApiKey } from "@/lib/api-key";
 import { isClaudeSecurityReport } from "@/lib/claude-security";
 import { getEffectivePlan, getCapabilities as getEntitlementCaps } from "@/lib/entitlements";
 import { normalizeIncomingReport } from "@/lib/report-normalization";
 import { resolveOidcProject } from "@/lib/oidc-project";
 import { resolveGitHubDefaultBranch } from "@/lib/github-repo";
+import { resolveProjectFromToken } from "@/lib/project-api-keys";
 import {
   buildActiveSuppressionKeys,
   buildSuppressionKey,
@@ -429,17 +429,35 @@ export async function POST(req: Request) {
 
       project = resolution.project
     } else {
-      const { data: apiKeyProject, error: projError } = await supabase
-        .from('projects')
-        .select(`
+      const resolved = await resolveProjectFromToken<{
+        id: string;
+        name: string;
+        org_id: string;
+        strict_mode: boolean | null;
+        repo_url: string | null;
+        policy_config: Record<string, unknown> | null;
+        ai_assurance_enabled: boolean | null;
+        github_installation_id: number | null;
+        slack_webhook_url: string | null;
+        slack_notifications_enabled: boolean | null;
+        slack_notify_on: string | null;
+        discord_webhook_url: string | null;
+        discord_notifications_enabled: boolean | null;
+        discord_notify_on: string | null;
+        organizations: unknown;
+      }>(
+        supabase,
+        token,
+        `
           id, name, org_id, strict_mode, repo_url, policy_config, ai_assurance_enabled,
           github_installation_id, slack_webhook_url, slack_notifications_enabled,
           slack_notify_on, discord_webhook_url, discord_notifications_enabled,
-          discord_notify_on, organizations(plan, pro_expires_at)`)
-        .eq('api_key_hash', hashApiKey(token))
-        .single()
+          discord_notify_on, organizations(plan, pro_expires_at)`
+      );
 
-      if (projError || !apiKeyProject) {
+      const apiKeyProject = resolved?.project;
+
+      if (!apiKeyProject) {
         return NextResponse.json({
           error: 'Invalid API Token. Check your SKYLOS_TOKEN.',
           code: 'INVALID_TOKEN'
