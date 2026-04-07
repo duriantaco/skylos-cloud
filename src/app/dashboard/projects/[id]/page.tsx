@@ -22,7 +22,23 @@ type ScanRow = {
   commit_hash?: string | null;
   quality_gate_passed?: boolean | null;
   is_overridden?: boolean | null;
-  stats?: any;
+  stats?: {
+    danger_count?: number | null;
+    new_issues?: number | null;
+    legacy_issues?: number | null;
+  } | null;
+};
+
+type FindingRow = {
+  id: string;
+  rule_id?: string | null;
+  file_path: string;
+  line_number?: number | null;
+  message?: string | null;
+  severity?: string | null;
+  category?: string | null;
+  is_new?: boolean | null;
+  is_suppressed?: boolean | null;
 };
 
 export default async function ProjectPage({
@@ -76,12 +92,12 @@ export default async function ProjectPage({
     .order("created_at", { ascending: false })
     .limit(50);
 
-  const scans: ScanRow[] = (scansRaw || []) as any[];
+  const scans = (scansRaw || []) as ScanRow[];
 
   const latestScan = scans[0] || null;
 
   // ---- Load latest scan findings for charts
-  let latestFindings: any[] = [];
+  let latestFindings: FindingRow[] = [];
   if (latestScan?.id) {
     const { data: findingsRaw } = await supabase
       .from("findings")
@@ -91,7 +107,7 @@ export default async function ProjectPage({
       .eq("scan_id", latestScan.id)
       .limit(5000);
 
-    latestFindings = findingsRaw || [];
+    latestFindings = (findingsRaw || []) as FindingRow[];
   }
 
   return (
@@ -125,7 +141,16 @@ export default async function ProjectPage({
                   <ExternalLink className="w-3 h-3" />
                 </a>
               ) : (
-                <div className="text-xs text-slate-400">No repo_url</div>
+                <div className="text-xs text-slate-400">
+                  No GitHub repository linked yet.{' '}
+                  <Link
+                    href={`/dashboard/settings?project=${id}`}
+                    className="text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                  >
+                    Add one in settings
+                  </Link>{' '}
+                  when you want PR integration and repo deep links.
+                </div>
               )}
             </div>
           </div>
