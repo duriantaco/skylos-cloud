@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { serverError } from "@/lib/api-error";
-import { hashApiKey } from "@/lib/api-key";
 import { getEffectivePlan } from "@/lib/entitlements";
+import { resolveProjectFromToken } from "@/lib/project-api-keys";
 
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -33,20 +33,27 @@ export async function GET(request: NextRequest) {
   
     const token = authHeader.split(' ')[1]
 
-    const { data: project, error: projError } = await supabase
-        .from('projects')
-        .select('id, name, org_id, organizations(id, name, plan, pro_expires_at)')
-        .eq('api_key_hash', hashApiKey(token))
-        .single()
+    const resolved = await resolveProjectFromToken<{
+      id: string;
+      name: string;
+      org_id: string;
+      organizations: { id: string; name: string; plan: string | null; pro_expires_at: string | null } | { id: string; name: string; plan: string | null; pro_expires_at: string | null }[] | null;
+    }>(
+      supabase,
+      token,
+      'id, name, org_id, organizations(id, name, plan, pro_expires_at)'
+    );
 
-  if (projError || !project) {
+  const project = resolved?.project;
+
+  if (!project) {
     return NextResponse.json(
       { error: 'Invalid API token', code: 'INVALID_TOKEN' },
       { status: 401 }
     )
   }
 
-  const orgRef = project.organizations as any
+  const orgRef = project.organizations
   const org = Array.isArray(orgRef) ? orgRef[0] : orgRef
   const plan = getEffectivePlan({ plan: org?.plan || 'free', pro_expires_at: org?.pro_expires_at })
   const orgId = org?.id

@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { generateApiKey } from "@/lib/api-key";
 import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
+import { getSupabaseAdmin } from "@/utils/supabase/admin";
+import { storeProjectApiKeyHash } from "@/lib/project-api-keys";
 
 
 export async function POST(
@@ -26,8 +28,9 @@ export async function POST(
   if (isAuthError(auth)) return auth;
 
   const { plain: newKey, hash: newKeyHash } = generateApiKey();
+  const admin = getSupabaseAdmin();
 
-  const { data: updated, error: updErr } = await supabase
+  const { data: updated, error: updErr } = await admin
     .from("projects")
     .update({ api_key_hash: newKeyHash })
     .eq("id", id)
@@ -39,6 +42,20 @@ export async function POST(
 
   if (!updated || updated.length === 0) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    await storeProjectApiKeyHash(admin, {
+      projectId: id,
+      keyHash: newKeyHash,
+      label: "Primary API key",
+      role: "primary",
+      source: "dashboard_rotate",
+      createdBy: auth.user.id,
+      replaceActivePrimary: true,
+    });
+  } catch (error) {
+    return serverError(error, "Store rotated API key");
   }
 
   return NextResponse.json({ success: true, apiKey: newKey });

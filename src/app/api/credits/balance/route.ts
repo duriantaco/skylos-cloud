@@ -2,8 +2,8 @@ import { createClient } from '@/utils/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { requirePermission, isAuthError } from '@/lib/permissions';
-import { hashApiKey } from '@/lib/api-key';
 import { getEffectivePlan } from '@/lib/entitlements';
+import { resolveProjectFromToken } from '@/lib/project-api-keys';
 
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -23,18 +23,36 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
     }
 
-    const { data: project } = await admin
-      .from('projects')
-      .select('org_id, organizations(id, name, credits, credits_updated_at, plan, pro_expires_at)')
-      .eq('api_key_hash', hashApiKey(token))
-      .limit(1)
-      .maybeSingle();
+    const resolved = await resolveProjectFromToken<{
+      org_id: string;
+      organizations: {
+        id: string;
+        name: string;
+        credits: number | null;
+        credits_updated_at: string | null;
+        plan: string | null;
+        pro_expires_at: string | null;
+      } | {
+        id: string;
+        name: string;
+        credits: number | null;
+        credits_updated_at: string | null;
+        plan: string | null;
+        pro_expires_at: string | null;
+      }[] | null;
+    }>(
+      admin,
+      token,
+      'org_id, organizations(id, name, credits, credits_updated_at, plan, pro_expires_at)'
+    );
+
+    const project = resolved?.project;
 
     if (!project) {
       return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
     }
 
-    const org: any = Array.isArray(project.organizations)
+    const org = Array.isArray(project.organizations)
       ? project.organizations[0]
       : project.organizations;
 

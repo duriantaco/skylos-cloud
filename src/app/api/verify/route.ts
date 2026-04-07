@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
-import { hashApiKey } from "@/lib/api-key";
 import { getEffectivePlan } from "@/lib/entitlements";
+import { resolveProjectFromToken } from "@/lib/project-api-keys";
 
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -14,8 +14,37 @@ function getSupabaseAdmin() {
 }
 
 type Plan = "free" | "pro" | "enterprise";
+type VerifyProject = {
+  id: string;
+  name: string;
+  repo_url: string | null;
+  github_token: string | null;
+  organizations:
+    | { id: string; plan: string | null; pro_expires_at: string | null }
+    | { id: string; plan: string | null; pro_expires_at: string | null }[]
+    | null;
+};
 
 type VerifyLimitRow = { allowed: boolean; new_count: number };
+type RepoTreeEntry = { type?: string; path?: string };
+type IncomingFinding = {
+  finding_id?: string;
+  rule_id?: string;
+  file_path?: string;
+  file?: string;
+  line_number?: number | string;
+  line?: number | string;
+};
+type VerifyResult = {
+  finding_id: string;
+  rule_id: string | undefined;
+  file_path: string;
+  line_number: number;
+  verdict: "VERIFIED" | "REFUTED" | "UNKNOWN";
+  reason: string;
+  evidence: unknown;
+  containing_function?: string;
+};
 
 function parseRepo(repoUrl: string) {
   const m = String(repoUrl || "").match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
@@ -154,23 +183,25 @@ export async function POST(req: Request) {
 
     const token = authHeader.split(" ")[1];
 
-    const { data: project, error: projError } = await supabase
-      .from("projects")
-      .select(`
+    const resolved = await resolveProjectFromToken<VerifyProject>(
+      supabase,
+      token,
+      `
         id, name, repo_url, github_token,
         organizations(id, plan, pro_expires_at)
-      `)
-      .eq("api_key_hash", hashApiKey(token))
-      .single();
+      `
+    );
 
-    if (projError || !project) {
+    const project = resolved?.project;
+
+    if (!project) {
       return NextResponse.json(
         { error: "Invalid token", code: "INVALID_TOKEN" },
         { status: 403 }
       );
     }
 
-    const orgRef: any = (project as any).organizations;
+    const orgRef = project.organizations;
     const orgId = String(Array.isArray(orgRef) ? orgRef?.[0]?.id : orgRef?.id || "");
     const rawPlan = String((Array.isArray(orgRef) ? orgRef?.[0]?.plan : orgRef?.plan) || "free");
     const proExpiresAt = Array.isArray(orgRef) ? orgRef?.[0]?.pro_expires_at : orgRef?.pro_expires_at;
@@ -241,8 +272,8 @@ export async function POST(req: Request) {
     const MAX_TREE_FILES = p === "free" ? 120 : 250;
     const MAX_FETCH_FILES = p === "free" ? 30 : 80;
 
-    const pyFiles = blobs
-      .filter((x: any) => x?.type === "blob" && typeof x?.path === "string" && x.path.endsWith(".py"))
+    const pyFiles = (blobs as RepoTreeEntry[])
+      .filter((x): x is RepoTreeEntry & { path: string } => x?.type === "blob" && typeof x?.path === "string" && x.path.endsWith(".py"))
       .slice(0, MAX_TREE_FILES);
 
     const fileMap: Record<string, string> = {};
@@ -312,7 +343,7 @@ export async function POST(req: Request) {
       return chain.reverse();
     }
 
-    const results = findings.slice(0, 200).map((f: any) => {
+    const results: VerifyResult[] = (findings as IncomingFinding[]).slice(0, 200).map((f) => {
         const file_path = String(f.file_path || f.file || "");
         const line_number = Number(f.line_number || f.line || 1);
 
@@ -386,13 +417,13 @@ export async function POST(req: Request) {
         plan,
         commit_hash,
         scan_id: scan_id || null,
-        verified_count: results.filter((r: any) => r.verdict === "VERIFIED").length,
-        suppressed_count: results.filter((r: any) => r.verdict === "REFUTED").length,
-        unknown_count: results.filter((r: any) => r.verdict === "UNKNOWN").length,
+        verified_count: results.filter((r) => r.verdict === "VERIFIED").length,
+        suppressed_count: results.filter((r) => r.verdict === "REFUTED").length,
+        unknown_count: results.filter((r) => r.verdict === "UNKNOWN").length,
         results,
     });
 
-  } catch (e: any) {
+  } catch (e: unknown) {
     return serverError(e, "Verify API");
   }
 }

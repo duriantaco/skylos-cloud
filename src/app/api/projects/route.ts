@@ -9,6 +9,8 @@ import {
 } from "@/lib/github-repo";
 import { requirePermission, isAuthError } from "@/lib/permissions";
 import { getCapabilities, getEffectivePlan } from "@/lib/entitlements";
+import { getSupabaseAdmin } from "@/utils/supabase/admin";
+import { storeProjectApiKeyHash } from "@/lib/project-api-keys";
 
 export const dynamic = "force-dynamic";
 
@@ -117,6 +119,20 @@ export async function POST(req: Request) {
 
     if (insertError) {
       return serverError(insertError, "Create project");
+    }
+
+    try {
+      const admin = getSupabaseAdmin();
+      await storeProjectApiKeyHash(admin, {
+        projectId: project.id,
+        keyHash: apiKeyHash,
+        label: "Primary API key",
+        role: "primary",
+        source: "project_create",
+        createdBy: auth.user.id,
+      });
+    } catch (keyError) {
+      console.error("Failed to seed project API key row:", keyError);
     }
 
     trackEvent("project_created", org_id);
