@@ -1,5 +1,8 @@
 'use client'
-import { useState, type ReactNode } from "react";
+import {
+  useState,
+  type ReactNode,
+} from "react";
 import { Plus, Trash2, Save, Loader2, ChevronDown, ChevronRight, Lock } from "lucide-react";
 
 type GateMode = "zero-new" | "category" | "severity" | "both";
@@ -48,10 +51,18 @@ type ThresholdRowProps = {
 
 function Section({ title, open, onToggle, children }: SectionProps) {
   return (
-    <div className="border border-slate-200 rounded-lg overflow-hidden">
+    <div
+      className="border border-slate-200 rounded-lg overflow-hidden"
+      style={{ overflowAnchor: "none" }}
+    >
       <button
         type="button"
+        aria-expanded={open}
         onClick={onToggle}
+        onMouseDown={(event) => {
+          // Prevent mouse focus from pinning the accordion header during expansion.
+          event.preventDefault();
+        }}
         className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition text-left"
       >
         <span className="font-medium text-slate-900">{title}</span>
@@ -222,7 +233,10 @@ export default function PolicyEditor({
   };
 
   return (
-    <div className="space-y-4">
+    <div
+      className="space-y-4"
+      style={{ overflowAnchor: "none" }}
+    >
       
       {/* Quality Thresholds */}
       <Section title="Quality Thresholds" open={showThresholds} onToggle={() => setShowThresholds(!showThresholds)}>
