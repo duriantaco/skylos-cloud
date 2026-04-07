@@ -1,8 +1,135 @@
 'use client'
-import { useState } from "react";
+import {
+  useState,
+  type ReactNode,
+} from "react";
 import { Plus, Trash2, Save, Loader2, ChevronDown, ChevronRight, Lock } from "lucide-react";
 
 type GateMode = "zero-new" | "category" | "severity" | "both";
+type GateThresholds = Record<string, number>;
+
+type PolicyConfig = {
+  custom_rules?: string[];
+  complexity_enabled?: boolean;
+  complexity_threshold?: number;
+  nesting_enabled?: boolean;
+  nesting_threshold?: number;
+  function_length_enabled?: boolean;
+  function_length_threshold?: number;
+  arg_count_enabled?: boolean;
+  arg_count_threshold?: number;
+  security_enabled?: boolean;
+  secrets_enabled?: boolean;
+  quality_enabled?: boolean;
+  dead_code_enabled?: boolean;
+  ai_assurance_enabled?: boolean;
+  gate?: {
+    enabled?: boolean;
+    mode?: GateMode;
+    by_category?: GateThresholds;
+    by_severity?: GateThresholds;
+  };
+};
+
+type SectionProps = {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+};
+
+type ThresholdRowProps = {
+  label: string;
+  desc: string;
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+  value: number;
+  onValueChange: (value: number) => void;
+  min: number;
+  max: number;
+};
+
+function Section({ title, open, onToggle, children }: SectionProps) {
+  return (
+    <div
+      className="border border-slate-200 rounded-lg overflow-hidden"
+      style={{ overflowAnchor: "none" }}
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        onMouseDown={(event) => {
+          // Prevent mouse focus from pinning the accordion header during expansion.
+          event.preventDefault();
+        }}
+        className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition text-left"
+      >
+        <span className="font-medium text-slate-900">{title}</span>
+        {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+      </button>
+      {open && <div className="p-4 space-y-4">{children}</div>}
+    </div>
+  );
+}
+
+function ThresholdRow({
+  label,
+  desc,
+  enabled,
+  onEnabledChange,
+  value,
+  onValueChange,
+  min,
+  max,
+}: ThresholdRowProps) {
+  return (
+    <div className="flex items-center justify-between gap-4 p-3 bg-white border border-slate-100 rounded-lg">
+      <div className="flex items-center gap-3 flex-1">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => onEnabledChange(e.target.checked)}
+          className="h-4 w-4 rounded border-slate-300"
+        />
+        <div>
+          <div className="text-sm font-medium text-slate-800">{label}</div>
+          <div className="text-xs text-slate-500">{desc}</div>
+        </div>
+      </div>
+      <div className="flex items-center">
+        <button
+          type="button"
+          onClick={() => onValueChange(Math.max(min, value - 1))}
+          disabled={!enabled || value <= min}
+          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-l-lg border border-slate-200 text-slate-600 font-medium"
+        >
+          -
+        </button>
+        <input
+          type="number"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(e) => {
+            const v = Math.min(max, Math.max(min, Number(e.target.value) || min));
+            onValueChange(v);
+          }}
+          disabled={!enabled}
+          className="w-16 text-center bg-white border-y border-slate-200 py-1.5 text-sm font-mono disabled:opacity-40"
+        />
+        <button
+          type="button"
+          onClick={() => onValueChange(Math.min(max, value + 1))}
+          disabled={!enabled || value >= max}
+          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-r-lg border border-slate-200 text-slate-600 font-medium"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function PolicyEditor({
   initialConfig,
@@ -10,7 +137,7 @@ export default function PolicyEditor({
   projectId,
   plan = "free",
 }: {
-  initialConfig: Record<string, any>,
+  initialConfig: PolicyConfig,
   initialExcludePaths?: string[],
   projectId: string,
   plan?: string,
@@ -105,68 +232,11 @@ export default function PolicyEditor({
     }
   };
 
-  const Section = ({ title, open, onToggle, children }: { title: string, open: boolean, onToggle: () => void, children: React.ReactNode }) => (
-    <div className="border border-slate-200 rounded-lg overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition text-left"
-      >
-        <span className="font-medium text-slate-900">{title}</span>
-        {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-      </button>
-      {open && <div className="p-4 space-y-4">{children}</div>}
-    </div>
-  );
-
-  const ThresholdRow = ({ label, desc, enabled, onEnabledChange, value, onValueChange, min, max }: any) => (
-    <div className="flex items-center justify-between gap-4 p-3 bg-white border border-slate-100 rounded-lg">
-      <div className="flex items-center gap-3 flex-1">
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => onEnabledChange(e.target.checked)}
-          className="h-4 w-4 rounded border-slate-300"
-        />
-        <div>
-          <div className="text-sm font-medium text-slate-800">{label}</div>
-          <div className="text-xs text-slate-500">{desc}</div>
-        </div>
-      </div>
-      <div className="flex items-center">
-        <button
-          type="button"
-          onClick={() => onValueChange(Math.max(min, value - 1))}
-          disabled={!enabled || value <= min}
-          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-l-lg border border-slate-200 text-slate-600 font-medium"
-        >
-          −
-        </button>
-        <input
-          type="number"
-          min={min}
-          max={max}
-          value={value}
-          onChange={(e) => {
-            const v = Math.min(max, Math.max(min, Number(e.target.value) || min));
-            onValueChange(v);
-          }}
-          disabled={!enabled}
-          className="w-16 text-center bg-white border-y border-slate-200 py-1.5 text-sm font-mono disabled:opacity-40"
-        />
-        <button
-          type="button"
-          onClick={() => onValueChange(Math.min(max, value + 1))}
-          disabled={!enabled || value >= max}
-          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-r-lg border border-slate-200 text-slate-600 font-medium"
-        >
-          +
-        </button>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="space-y-4">
+    <div
+      className="space-y-4"
+      style={{ overflowAnchor: "none" }}
+    >
       
       {/* Quality Thresholds */}
       <Section title="Quality Thresholds" open={showThresholds} onToggle={() => setShowThresholds(!showThresholds)}>
