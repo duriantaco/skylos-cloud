@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { MessageCircle, Send, Edit2, Trash2 } from 'lucide-react';
+import ConfirmModal from '@/components/ConfirmModal';
+import NoticeModal from '@/components/NoticeModal';
 
 type Comment = {
   id: string;
@@ -21,6 +23,10 @@ type Props = {
   currentUserId: string;
 };
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export default function IssueComments({ issueGroupId, currentUserId }: Props) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +34,8 @@ export default function IssueComments({ issueGroupId, currentUserId }: Props) {
   const [newComment, setNewComment] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Comment | null>(null);
 
   const fetchComments = useCallback(async () => {
     try {
@@ -35,7 +43,7 @@ export default function IssueComments({ issueGroupId, currentUserId }: Props) {
       if (!response.ok) throw new Error('Failed to fetch comments');
       const data = await response.json();
       setComments(data.comments || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching comments:', error);
     } finally {
       setLoading(false);
@@ -65,8 +73,8 @@ export default function IssueComments({ issueGroupId, currentUserId }: Props) {
       const data = await response.json();
       setComments([...comments, data.comment]);
       setNewComment('');
-    } catch (error: any) {
-      alert(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      setNotice(getErrorMessage(error, 'Failed to post comment'));
     } finally {
       setSubmitting(false);
     }
@@ -94,17 +102,17 @@ export default function IssueComments({ issueGroupId, currentUserId }: Props) {
       setComments(comments.map(c => c.id === commentId ? data.comment : c));
       setEditingId(null);
       setEditText('');
-    } catch (error: any) {
-      alert(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      setNotice(getErrorMessage(error, 'Failed to update comment'));
     }
   }
 
-  async function handleDeleteComment(commentId: string) {
-    if (!confirm('Are you sure you want to delete this comment?')) return;
+  async function handleDeleteComment() {
+    if (!pendingDelete) return;
 
     try {
       const response = await fetch(
-        `/api/issue-groups/${issueGroupId}/comments/${commentId}`,
+        `/api/issue-groups/${issueGroupId}/comments/${pendingDelete.id}`,
         { method: 'DELETE' }
       );
 
@@ -113,9 +121,10 @@ export default function IssueComments({ issueGroupId, currentUserId }: Props) {
         throw new Error(data.error || 'Failed to delete comment');
       }
 
-      setComments(comments.filter(c => c.id !== commentId));
-    } catch (error: any) {
-      alert(`Error: ${error.message}`);
+      setComments(comments.filter(c => c.id !== pendingDelete.id));
+      setPendingDelete(null);
+    } catch (error: unknown) {
+      setNotice(getErrorMessage(error, 'Failed to delete comment'));
     }
   }
 
@@ -179,7 +188,7 @@ export default function IssueComments({ issueGroupId, currentUserId }: Props) {
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDeleteComment(comment.id)}
+                      onClick={() => setPendingDelete(comment)}
                       className="text-slate-400 hover:text-red-600 transition"
                       title="Delete"
                     >
@@ -243,6 +252,24 @@ export default function IssueComments({ issueGroupId, currentUserId }: Props) {
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={handleDeleteComment}
+        title="Delete Comment"
+        message="Are you sure you want to delete this comment?"
+        confirmText="Delete Comment"
+        confirmStyle="danger"
+      />
+
+      <NoticeModal
+        isOpen={notice !== null}
+        onClose={() => setNotice(null)}
+        title="Comment Action Failed"
+        message={notice || ''}
+        tone="error"
+      />
     </div>
   );
 }

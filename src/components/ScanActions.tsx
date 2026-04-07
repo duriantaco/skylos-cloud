@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Trash2, Download, MoreVertical, Lock } from 'lucide-react'
 import ConfirmModal from './ConfirmModal'
+import NoticeModal from './NoticeModal'
 
 type Props = {
   scanId: string
@@ -23,8 +24,7 @@ export default function ScanActions({ scanId, scanCommit, onDeleted, showLabels 
   const [showMenu, setShowMenu] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const [showSuccess, setShowSuccess] = useState(false)
-  const [successMsg, setSuccessMsg] = useState('Successfully deleted.')
+  const [notice, setNotice] = useState<{ title: string; message: string; tone: 'info' | 'success' | 'warning' | 'error' } | null>(null)
 
   const [pos, setPos] = useState<{ top: number; left: number; placement: 'down' | 'up' }>({
     top: 0,
@@ -89,22 +89,37 @@ export default function ScanActions({ scanId, scanCommit, onDeleted, showLabels 
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {
-        alert(data.error || 'Failed to delete scan')
+        setNotice({
+          title: 'Delete Failed',
+          message: data.error || 'Failed to delete scan',
+          tone: 'error',
+        })
         return
       }
 
       if (data?.success === true && data?.deleted) {
-        setSuccessMsg(`Successfully deleted scan ${String(data.deleted).slice(0, 8)}.`)
         setShowModal(false)
-        setShowSuccess(true)
+        setNotice({
+          title: 'Scan Deleted',
+          message: `Successfully deleted scan ${String(data.deleted).slice(0, 8)}.`,
+          tone: 'success',
+        })
 
         onDeleted?.()
         router.refresh()
       } else {
-        alert('Delete did not confirm. Please retry.')
+        setNotice({
+          title: 'Delete Failed',
+          message: 'Delete did not confirm. Please retry.',
+          tone: 'error',
+        })
       }
     } catch {
-      alert('Failed to delete scan')
+      setNotice({
+        title: 'Delete Failed',
+        message: 'Failed to delete scan',
+        tone: 'error',
+      })
     } finally {
       setIsDeleting(false)
       setShowModal(false)
@@ -113,7 +128,11 @@ export default function ScanActions({ scanId, scanCommit, onDeleted, showLabels 
 
   const handleExport = (format: 'json' | 'csv') => {
     if (!canExport) {
-      alert('Findings export is a Pro feature. Buy any credit pack at skylos.dev/dashboard/billing to unlock.')
+      setNotice({
+        title: 'Export Locked',
+        message: 'Findings export is a Pro feature. Buy any credit pack at skylos.dev/dashboard/billing to unlock.',
+        tone: 'warning',
+      })
       setShowMenu(false)
       return
     }
@@ -208,14 +227,12 @@ export default function ScanActions({ scanId, scanCommit, onDeleted, showLabels 
         isLoading={isDeleting}
       />
 
-      <ConfirmModal
-        isOpen={showSuccess}
-        onClose={() => setShowSuccess(false)}
-        onConfirm={() => setShowSuccess(false)}
-        title="Deleted"
-        message={successMsg}
-        confirmText="OK"
-        isLoading={false}
+      <NoticeModal
+        isOpen={notice !== null}
+        onClose={() => setNotice(null)}
+        title={notice?.title || 'Notice'}
+        message={notice?.message || ''}
+        tone={notice?.tone || 'info'}
       />
     </>
   )

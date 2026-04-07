@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { UserCircle, Users, Check, X } from 'lucide-react';
+import NoticeModal from '@/components/NoticeModal';
 
 type Assignment = {
   id: string;
@@ -33,12 +34,17 @@ type Props = {
   orgId: string;
 };
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export default function AssignIssue({ issueGroupId, orgId }: Props) {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const fetchAssignment = useCallback(async () => {
     try {
@@ -46,7 +52,7 @@ export default function AssignIssue({ issueGroupId, orgId }: Props) {
       if (!response.ok) throw new Error('Failed to fetch assignment');
       const data = await response.json();
       setAssignment(data.assignment);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching assignment:', error);
     } finally {
       setLoading(false);
@@ -59,7 +65,7 @@ export default function AssignIssue({ issueGroupId, orgId }: Props) {
       if (!response.ok) throw new Error('Failed to fetch members');
       const data = await response.json();
       setMembers(data.members || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching members:', error);
     }
   }, [orgId]);
@@ -90,8 +96,8 @@ export default function AssignIssue({ issueGroupId, orgId }: Props) {
 
       const data = await response.json();
       setAssignment(data.assignment);
-    } catch (error: any) {
-      alert(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      setNotice(getErrorMessage(error, 'Failed to assign'));
     } finally {
       setAssigning(false);
     }
@@ -114,8 +120,8 @@ export default function AssignIssue({ issueGroupId, orgId }: Props) {
 
       const data = await response.json();
       setAssignment(data.assignment);
-    } catch (error: any) {
-      alert(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      setNotice(getErrorMessage(error, 'Failed to update status'));
     } finally {
       setAssigning(false);
     }
@@ -215,6 +221,14 @@ export default function AssignIssue({ issueGroupId, orgId }: Props) {
           </select>
         </div>
       )}
+
+      <NoticeModal
+        isOpen={notice !== null}
+        onClose={() => setNotice(null)}
+        title="Assignment Failed"
+        message={notice || ''}
+        tone="error"
+      />
     </div>
   );
 }

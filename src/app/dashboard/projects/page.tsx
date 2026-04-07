@@ -2,17 +2,16 @@
 
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useState, useMemo } from "react";
 import { 
-  ArrowLeft, ArrowRight, Search, CheckCircle, XCircle, 
+  ArrowRight, Search, CheckCircle, XCircle, 
   Clock, GitBranch, ChevronDown, LayoutGrid, LayoutList, 
   FolderOpen, RefreshCw, Trash2, Square, CheckSquare, X
 } from "lucide-react";
 import CreateProjectButton from "@/components/CreateProjectButton";
 import CreateWorkspaceModal from "@/components/CreateWorkspaceModal";
-import dogImg from "../../../../public/assets/favicon-96x96.png";
 import ConfirmModal from "@/components/ConfirmModal";
+import NoticeModal from "@/components/NoticeModal";
 
 type Project = {
   id: string;
@@ -36,6 +35,10 @@ type Project = {
 type SortOption = "name" | "recent" | "issues" | "created";
 type FilterStatus = "all" | "passing" | "failing" | "no-scans";
 type ViewMode = "list" | "grid";
+type DashboardUser = {
+  id: string;
+  email?: string | null;
+};
 
 function timeAgo(dateString: string) {
   const date = new Date(dateString);
@@ -47,6 +50,31 @@ function timeAgo(dateString: string) {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
   return date.toLocaleDateString();
+}
+
+function SelectionToggle({
+  isSelected,
+  onToggleSelect,
+}: {
+  isSelected: boolean;
+  onToggleSelect: () => void;
+}) {
+  return (
+    <button
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggleSelect();
+      }}
+      className={`p-1.5 rounded-lg transition ${
+        isSelected
+          ? 'bg-indigo-100 text-gray-700'
+          : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
+      }`}
+    >
+      {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+    </button>
+  );
 }
 
 function ProjectCard({ 
@@ -78,23 +106,6 @@ function ProjectCard({
     }
   };
 
-  const SelectBox = () => (
-    <button
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onToggleSelect();
-      }}
-      className={`p-1.5 rounded-lg transition ${
-        isSelected 
-          ? 'bg-indigo-100 text-gray-700' 
-          : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
-      }`}
-    >
-      {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-    </button>
-  );
-
   if (view === "grid") {
     return (
       <div 
@@ -117,7 +128,7 @@ function ProjectCard({
               <XCircle className="w-5 h-5 text-red-600" />
             )}
           </div>
-          <SelectBox />
+          <SelectionToggle isSelected={isSelected} onToggleSelect={onToggleSelect} />
         </div>
 
         <Link href={selectionMode ? '#' : `/dashboard/projects/${project.id}`}>
@@ -164,7 +175,7 @@ function ProjectCard({
           : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
       }`}
     >
-      <SelectBox />
+      <SelectionToggle isSelected={isSelected} onToggleSelect={onToggleSelect} />
       
       <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${
         !latestScan ? 'bg-slate-100' : passed ? 'bg-emerald-50' : 'bg-red-50'
@@ -231,7 +242,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [orgId, setOrgId] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<DashboardUser | null>(null);
 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOption>("recent");
@@ -242,6 +253,7 @@ export default function ProjectsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
 
   const selectionMode = selectedIds.size > 0;
 
@@ -380,10 +392,16 @@ export default function ProjectsPage() {
         await loadProjects();
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || 'Failed to delete projects');
+        setNotice({
+          title: 'Delete Failed',
+          message: data.error || 'Failed to delete projects',
+        });
       }
     } catch {
-      alert('Failed to delete projects');
+      setNotice({
+        title: 'Delete Failed',
+        message: 'Failed to delete projects',
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -626,6 +644,14 @@ export default function ProjectsPage() {
         confirmText={`Delete ${selectedIds.size} project${selectedIds.size !== 1 ? 's' : ''}`}
         confirmStyle="danger"
         isLoading={isDeleting}
+      />
+
+      <NoticeModal
+        isOpen={notice !== null}
+        onClose={() => setNotice(null)}
+        title={notice?.title || 'Notice'}
+        message={notice?.message || ''}
+        tone="error"
       />
     </main>
   );

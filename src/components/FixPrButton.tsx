@@ -4,8 +4,13 @@ import { useState } from "react";
 import { GitPullRequest, Loader2, Sparkles } from "lucide-react";
 import CreditActionButton from "./CreditActionButton";
 import { FEATURE_KEYS } from "@/lib/credits";
+import ConfirmModal from "./ConfirmModal";
 
 type Phase = "idle" | "generating" | "creating" | "done" | "error";
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Network error";
+}
 
 export default function FixPrButton({
   findingId,
@@ -16,15 +21,10 @@ export default function FixPrButton({
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleFix = async () => {
-    if (
-      !confirm(
-        "This will create a new branch and open a Pull Request with the fix. Continue?"
-      )
-    )
-      return;
-
+    setShowConfirm(false);
     setPhase("generating");
     setError(null);
 
@@ -45,8 +45,8 @@ export default function FixPrButton({
       window.open(data.pr_url, "_blank");
 
       setTimeout(() => setPhase("idle"), 3000);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (error: unknown) {
+      setError(getErrorMessage(error));
       setPhase("error");
       setTimeout(() => {
         setPhase("idle");
@@ -56,34 +56,46 @@ export default function FixPrButton({
   };
 
   return (
-    <CreditActionButton
-      featureKey={FEATURE_KEYS.PR_REVIEW}
-      label={
-        phase === "generating"
-          ? "Generating fix\u2026"
-          : phase === "creating"
-          ? "Creating PR\u2026"
-          : phase === "done"
-          ? "PR Created!"
-          : phase === "error"
-          ? `Failed: ${(error || "").slice(0, 40)}`
-          : "Fix in PR"
-      }
-      icon={
-        phase === "generating" || phase === "creating" ? (
-          <Loader2 className="w-3 h-3 animate-spin" />
-        ) : phase === "done" ? (
-          <Sparkles className="w-3 h-3" />
-        ) : (
-          <GitPullRequest className="w-3 h-3" />
-        )
-      }
-      onAction={handleFix}
-      plan={plan}
-      disabled={phase === "generating" || phase === "creating" || phase === "done"}
-      variant={phase === "error" ? "danger" : "primary"}
-      proFeatureName="PR Auto-Fix"
-      proFeatureDescription="LLM generates a code fix and opens a pull request"
-    />
+    <>
+      <CreditActionButton
+        featureKey={FEATURE_KEYS.PR_REVIEW}
+        label={
+          phase === "generating"
+            ? "Generating fix\u2026"
+            : phase === "creating"
+            ? "Creating PR\u2026"
+            : phase === "done"
+            ? "PR Created!"
+            : phase === "error"
+            ? `Failed: ${(error || "").slice(0, 40)}`
+            : "Fix in PR"
+        }
+        icon={
+          phase === "generating" || phase === "creating" ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : phase === "done" ? (
+            <Sparkles className="w-3 h-3" />
+          ) : (
+            <GitPullRequest className="w-3 h-3" />
+          )
+        }
+        onAction={async () => setShowConfirm(true)}
+        plan={plan}
+        disabled={phase === "generating" || phase === "creating" || phase === "done"}
+        variant={phase === "error" ? "danger" : "primary"}
+        proFeatureName="PR Auto-Fix"
+        proFeatureDescription="LLM generates a code fix and opens a pull request"
+      />
+
+      <ConfirmModal
+        isOpen={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={handleFix}
+        title="Create Fix PR"
+        message="This will create a new branch and open a Pull Request with the fix. Continue?"
+        confirmText="Create PR"
+        confirmStyle="warning"
+      />
+    </>
   );
 }

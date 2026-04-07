@@ -1,5 +1,7 @@
 'use client'
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import ConfirmModal from "@/components/ConfirmModal";
+import NoticeModal from "@/components/NoticeModal";
 
 type Row = {
   project_id: string;
@@ -29,12 +31,15 @@ function isExpired(expires_at: string | null) {
 export default function SuppressionsTable({ projectId }: { projectId: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingRevoke, setPendingRevoke] = useState<Row | null>(null);
+  const [isRevoking, setIsRevoking] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [q, setQ] = useState("");
   const [includeRevoked, setIncludeRevoked] = useState(false);
   const [includeExpired, setIncludeExpired] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/projects/${projectId}/suppressions?includeRevoked=${includeRevoked ? "true" : "false"}`);
@@ -43,9 +48,9 @@ export default function SuppressionsTable({ projectId }: { projectId: string }) 
     } finally {
       setLoading(false);
     }
-  }
+  }, [includeRevoked, projectId]);
 
-  useEffect(() => { load(); }, [includeRevoked]);
+  useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -58,115 +63,160 @@ export default function SuppressionsTable({ projectId }: { projectId: string }) 
       });
   }, [rows, q, includeExpired]);
 
-  async function revoke(r: Row) {
-    const ok = confirm(`Revoke suppression?\n\n${r.rule_id} @ ${r.file_path}:${r.line_number}`);
-    if (!ok) return;
+  async function revokePending() {
+    if (!pendingRevoke) return;
 
-    await fetch(`/api/projects/${projectId}/suppressions/revoke`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        rule_id: r.rule_id,
-        file_path: r.file_path,
-        line_number: r.line_number,
-      })
-    });
+    setIsRevoking(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/suppressions/revoke`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rule_id: pendingRevoke.rule_id,
+          file_path: pendingRevoke.file_path,
+          line_number: pendingRevoke.line_number,
+        })
+      });
 
-    await load();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to revoke suppression");
+      }
+
+      setPendingRevoke(null);
+      await load();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Failed to revoke suppression");
+    } finally {
+      setIsRevoking(false);
+    }
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-      <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by rule / file / reason / user..."
-          className="w-full md:w-[420px] bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-500 transition shadow-sm"
-        />
+    <>
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by rule / file / reason / user..."
+            className="w-full md:w-[420px] bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-500 transition shadow-sm"
+          />
 
-        <div className="flex flex-wrap gap-4 items-center text-sm text-slate-600">
-          <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={includeRevoked} onChange={(e) => setIncludeRevoked(e.target.checked)} />
-            Include revoked
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={includeExpired} onChange={(e) => setIncludeExpired(e.target.checked)} />
-            Include expired
-          </label>
-          <button
-            onClick={load}
-            className="px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition text-slate-700 font-medium"
-          >
-            Refresh
-          </button>
+          <div className="flex flex-wrap gap-4 items-center text-sm text-slate-600">
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={includeRevoked} onChange={(e) => setIncludeRevoked(e.target.checked)} />
+              Include revoked
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={includeExpired} onChange={(e) => setIncludeExpired(e.target.checked)} />
+              Include expired
+            </label>
+            <button
+              onClick={load}
+              className="px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition text-slate-700 font-medium"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
+
+        {loading ? (
+          <div className="p-6 text-sm text-slate-500">Loading suppressions…</div>
+        ) : filtered.length === 0 ? (
+          <div className="p-6 text-sm text-slate-500">No suppressions found.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-slate-400">
+                <tr className="border-b border-slate-100">
+                  <th className="text-left py-3 px-4">Where</th>
+                  <th className="text-left py-3 px-4">Why</th>
+                  <th className="text-left py-3 px-4">Meta</th>
+                  <th className="text-right py-3 px-4">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((r) => {
+                  const expired = isExpired(r.expires_at);
+                  const revoked = !!r.revoked_at;
+
+                  return (
+                    <tr key={`${r.rule_id}::${r.file_path}::${r.line_number}`} className="border-b border-slate-50 hover:bg-slate-50/60">
+                      <td className="py-3 px-4 align-top">
+                        <div className="font-mono text-slate-900">{r.file_path}:{r.line_number}</div>
+                        <div className="text-xs text-slate-500 mt-1">Rule {r.rule_id}</div>
+                        <div className="flex gap-2 mt-2">
+                          {revoked ? <Tag text="REVOKED" /> : <Tag text="ACTIVE" />}
+                          {expired ? <Tag text="EXPIRED" /> : (r.expires_at ? <Tag text="HAS EXPIRY" /> : <Tag text="NO EXPIRY" />)}
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-4 align-top">
+                        <div className="text-slate-800">{r.reason || "—"}</div>
+                      </td>
+
+                      <td className="py-3 px-4 align-top">
+                        <div className="text-xs text-slate-500">Created: {fmtDate(r.created_at)}</div>
+                        <div className="text-xs text-slate-500 mt-1">By: {r.created_by}</div>
+                        <div className="text-xs text-slate-500 mt-1">Expires: {fmtDate(r.expires_at)}</div>
+                        <div className="text-xs text-slate-500 mt-1">Revoked: {fmtDate(r.revoked_at)}</div>
+                      </td>
+
+                      <td className="py-3 px-4 align-top text-right">
+                        <button
+                          disabled={revoked}
+                          onClick={() => setPendingRevoke(r)}
+                          className={[
+                            "px-3 py-2 rounded-lg border text-sm font-medium transition",
+                            revoked
+                              ? "border-slate-200 text-slate-400 bg-slate-50 cursor-not-allowed"
+                              : "border-red-200 text-red-700 hover:bg-red-50"
+                          ].join(" ")}
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {loading ? (
-        <div className="p-6 text-sm text-slate-500">Loading suppressions…</div>
-      ) : filtered.length === 0 ? (
-        <div className="p-6 text-sm text-slate-500">No suppressions found.</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-slate-400">
-              <tr className="border-b border-slate-100">
-                <th className="text-left py-3 px-4">Where</th>
-                <th className="text-left py-3 px-4">Why</th>
-                <th className="text-left py-3 px-4">Meta</th>
-                <th className="text-right py-3 px-4">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => {
-                const expired = isExpired(r.expires_at);
-                const revoked = !!r.revoked_at;
+      <ConfirmModal
+        isOpen={pendingRevoke !== null}
+        onClose={() => {
+          if (isRevoking) return;
+          setPendingRevoke(null);
+        }}
+        onConfirm={revokePending}
+        title="Revoke Suppression"
+        message={pendingRevoke ? (
+          <>
+            <p>
+              Revoke suppression for <span className="font-mono">{pendingRevoke.rule_id}</span>?
+            </p>
+            <p className="mt-2 font-mono text-xs text-slate-500">
+              {pendingRevoke.file_path}:{pendingRevoke.line_number}
+            </p>
+          </>
+        ) : ""}
+        confirmText="Revoke Suppression"
+        confirmStyle="warning"
+        isLoading={isRevoking}
+      />
 
-                return (
-                  <tr key={`${r.rule_id}::${r.file_path}::${r.line_number}`} className="border-b border-slate-50 hover:bg-slate-50/60">
-                    <td className="py-3 px-4 align-top">
-                      <div className="font-mono text-slate-900">{r.file_path}:{r.line_number}</div>
-                      <div className="text-xs text-slate-500 mt-1">Rule {r.rule_id}</div>
-                      <div className="flex gap-2 mt-2">
-                        {revoked ? <Tag text="REVOKED" /> : <Tag text="ACTIVE" />}
-                        {expired ? <Tag text="EXPIRED" /> : (r.expires_at ? <Tag text="HAS EXPIRY" /> : <Tag text="NO EXPIRY" />)}
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-4 align-top">
-                      <div className="text-slate-800">{r.reason || "—"}</div>
-                    </td>
-
-                    <td className="py-3 px-4 align-top">
-                      <div className="text-xs text-slate-500">Created: {fmtDate(r.created_at)}</div>
-                      <div className="text-xs text-slate-500 mt-1">By: {r.created_by}</div>
-                      <div className="text-xs text-slate-500 mt-1">Expires: {fmtDate(r.expires_at)}</div>
-                      <div className="text-xs text-slate-500 mt-1">Revoked: {fmtDate(r.revoked_at)}</div>
-                    </td>
-
-                    <td className="py-3 px-4 align-top text-right">
-                      <button
-                        disabled={revoked}
-                        onClick={() => revoke(r)}
-                        className={[
-                          "px-3 py-2 rounded-lg border text-sm font-medium transition",
-                          revoked
-                            ? "border-slate-200 text-slate-400 bg-slate-50 cursor-not-allowed"
-                            : "border-red-200 text-red-700 hover:bg-red-50"
-                        ].join(" ")}
-                      >
-                        Revoke
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+      <NoticeModal
+        isOpen={notice !== null}
+        onClose={() => setNotice(null)}
+        title="Revoke Failed"
+        message={notice || ""}
+        tone="error"
+      />
+    </>
   );
 }
 

@@ -8,7 +8,7 @@ import {
   GitCommit, FileCode, Shield, Eye, History,
   ChevronRight, Copy, Check, Sparkles, Ban, GitPullRequest,
   Layers, Code2, ArrowUpRight, Trash2, Bug,
-  Key, Zap, Loader2
+  Key, Zap
 } from 'lucide-react';
 import IssueComments from '@/components/IssueComments';
 import AssignIssue from '@/components/AssignIssue';
@@ -16,6 +16,7 @@ import FlowVisualizerButton from '@/components/FlowVisualizerButton';
 import ProFeatureLock from '@/components/ProFeatureLock';
 import CreditActionButton from '@/components/CreditActionButton';
 import { FEATURE_KEYS } from '@/lib/credits';
+import NoticeModal from '@/components/NoticeModal';
 
 
 type IssueGroup = {
@@ -30,7 +31,7 @@ type IssueGroup = {
   affected_files: string[];
   verification_status: string | null;
   suggested_fix: { before: string; after: string; explanation: string } | null;
-  data_flow: any | null;
+  data_flow: unknown;
   status: string;
   first_seen_at: string | null;
   last_seen_at: string | null;
@@ -55,7 +56,7 @@ type Project = {
 };
 
 const CATEGORY_CONTEXT: Record<string, {
-  icon: any;
+  icon: import('lucide-react').LucideIcon;
   color: string;
   bgColor: string;
   borderColor: string;
@@ -290,6 +291,10 @@ function formatRuleName(ruleId: string): string {
   return ruleId.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 function timeAgo(dateString: string | null) {
   if (!dateString) return 'Unknown';
   const date = new Date(dateString);
@@ -307,16 +312,6 @@ function formatDate(dateString: string | null) {
   return new Date(dateString).toLocaleDateString('en-US', { 
     month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
-}
-
-function getLanguage(filePath: string): string {
-  const ext = filePath.split('.').pop()?.toLowerCase();
-  const map: Record<string, string> = {
-    ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
-    py: 'python', go: 'go', rs: 'rust', java: 'java', rb: 'ruby',
-    php: 'php', cs: 'csharp', cpp: 'cpp', c: 'c', swift: 'swift',
-  };
-  return map[ext || ''] || 'plaintext';
 }
 
 function getGitHubUrl(repoUrl: string | null, filePath: string, line: number) {
@@ -450,7 +445,7 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
   const [isActioning, setIsActioning] = useState(false);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [isCreatingPR, setIsCreatingPR] = useState(false);
+  const [, setIsCreatingPR] = useState(false);
   const [prResult, setPrResult] = useState<{ success: boolean; url?: string; error?: string } | null>(null);
   const [triageResult, setTriageResult] = useState<{
     priority: string;
@@ -460,6 +455,10 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
     reasoning: string;
   } | null>(null);
   const [triageError, setTriageError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [suppressOpen, setSuppressOpen] = useState(false);
+  const [suppressReason, setSuppressReason] = useState('');
+  const [suppressExpiryDays, setSuppressExpiryDays] = useState('');
 
   const ruleInfo = getRuleInfo(group.rule_id, group.category);
   const categoryContext = getCategoryContext(group.category);
@@ -474,8 +473,9 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
         .eq('id', group.project_id)
         .single();
       if (data) {
-        setProject(data);
-        setOrgId((data as any).org_id);
+        const projectRecord = data as Project & { org_id: string | null };
+        setProject(projectRecord);
+        setOrgId(projectRecord.org_id);
       }
     }
     loadProject();
@@ -545,8 +545,8 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
       } else {
         setPrResult({ success: false, error: data.error || 'Failed to create PR' });
       }
-    } catch (err: any) {
-      setPrResult({ success: false, error: err.message || 'Network error' });
+    } catch (error: unknown) {
+      setPrResult({ success: false, error: getErrorMessage(error, 'Network error') });
     } finally {
       setIsCreatingPR(false);
     }
@@ -570,39 +570,42 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
       }
 
       window.location.reload();
-    } catch (error: any) {
-      alert(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      setNotice(getErrorMessage(error, 'Failed to mark as false positive'));
     } finally {
       setIsActioning(false);
     }
   }
 
-  async function handleSuppress() {
-    setIsActioning(true);
-    try {
-      const reason = prompt('Reason for suppression (optional):');
-      if (reason === null) {
-        setIsActioning(false);
+  function handleSuppress() {
+    setSuppressReason('');
+    setSuppressExpiryDays('');
+    setSuppressOpen(true);
+  }
+
+  async function submitSuppress() {
+    let expires_at: string | null = null;
+    const trimmedDays = suppressExpiryDays.trim();
+
+    if (trimmedDays) {
+      const days = Number.parseInt(trimmedDays, 10);
+      if (!Number.isFinite(days) || days <= 0) {
+        setNotice('Expiry days must be a positive number.');
         return;
       }
 
-      const expiryDays = prompt('Suppress for how many days? (leave empty for permanent):');
-      let expires_at: string | null = null;
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + days);
+      expires_at = expiryDate.toISOString();
+    }
 
-      if (expiryDays && expiryDays.trim()) {
-        const days = parseInt(expiryDays.trim());
-        if (!isNaN(days) && days > 0) {
-          const expiryDate = new Date();
-          expiryDate.setDate(expiryDate.getDate() + days);
-          expires_at = expiryDate.toISOString();
-        }
-      }
-
+    setIsActioning(true);
+    try {
       const response = await fetch(`/api/issue-groups/${group.id}/suppress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reason: reason.trim() || null,
+          reason: suppressReason.trim() || null,
           expires_at
         })
       });
@@ -612,9 +615,10 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
         throw new Error(data.error || 'Failed to suppress issue');
       }
 
+      setSuppressOpen(false);
       window.location.reload();
-    } catch (error: any) {
-      alert(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      setNotice(getErrorMessage(error, 'Failed to suppress issue'));
     } finally {
       setIsActioning(false);
     }
@@ -630,8 +634,8 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
       } else {
         setTriageError(data.error || 'AI triage failed');
       }
-    } catch (err: any) {
-      setTriageError(err.message || 'Network error');
+    } catch (error: unknown) {
+      setTriageError(getErrorMessage(error, 'Network error'));
     }
   }
 
@@ -693,6 +697,81 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
           </div>
         </div>
       </header>
+
+      {suppressOpen && (
+        <div className="fixed inset-0 z-[90]">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => {
+              if (isActioning) return;
+              setSuppressOpen(false);
+            }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+              <div className="flex items-start gap-4 border-b border-slate-200 px-6 py-4">
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-slate-900">Suppress Issue</div>
+                  <div className="mt-0.5 text-xs text-slate-500">Hide this issue group across future scans.</div>
+                </div>
+                <button
+                  onClick={() => setSuppressOpen(false)}
+                  disabled={isActioning}
+                  className="ml-auto rounded-lg p-2 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <XCircle className="h-4 w-4 text-slate-500" />
+                </button>
+              </div>
+              <div className="space-y-4 p-6">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700">
+                  {group.rule_id} :: {group.canonical_file}:{group.canonical_line}
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700">Reason</label>
+                  <textarea
+                    value={suppressReason}
+                    onChange={(event) => setSuppressReason(event.target.value)}
+                    rows={3}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none"
+                    placeholder="Optional context for why this issue is safe to ignore"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700">Expiry Days</label>
+                  <input
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    value={suppressExpiryDays}
+                    onChange={(event) => setSuppressExpiryDays(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none"
+                    placeholder="Leave blank for permanent suppression"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setSuppressOpen(false)}
+                    disabled={isActioning}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={submitSuppress}
+                    disabled={isActioning}
+                    className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    {isActioning ? 'Saving...' : 'Suppress'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
@@ -1086,6 +1165,14 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
           </div>
         </div>
       </main>
+
+      <NoticeModal
+        isOpen={notice !== null}
+        onClose={() => setNotice(null)}
+        title="Issue Action Failed"
+        message={notice || ''}
+        tone="error"
+      />
     </div>
   );
 }

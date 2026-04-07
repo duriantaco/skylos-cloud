@@ -1,5 +1,6 @@
 "use client";
 
+import NoticeModal from "@/components/NoticeModal";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
@@ -11,7 +12,6 @@ import {
   Loader2,
   Shield,
   Clock,
-  AlertTriangle,
   Check,
 } from "lucide-react";
 
@@ -32,7 +32,7 @@ type Transaction = {
   transaction_type: string;
   description: string;
   created_at: string;
-  metadata?: any;
+  metadata?: unknown;
 };
 
 const PRO_FEATURES = [
@@ -73,6 +73,7 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [successPack, setSuccessPack] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -125,10 +126,16 @@ export default function BillingPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.error || "Failed to create checkout session");
+        setNotice({
+          title: "Checkout Error",
+          message: data.error || "Failed to create checkout session",
+        });
       }
     } catch {
-      alert("Network error. Please try again.");
+      setNotice({
+        title: "Checkout Error",
+        message: "Network error. Please try again.",
+      });
     } finally {
       setPurchasing(null);
     }
@@ -404,6 +411,14 @@ export default function BillingPage() {
           )}
         </div>
       </div>
+
+      <NoticeModal
+        isOpen={notice !== null}
+        onClose={() => setNotice(null)}
+        title={notice?.title || "Notice"}
+        message={notice?.message || ""}
+        tone="error"
+      />
     </div>
   );
 }
