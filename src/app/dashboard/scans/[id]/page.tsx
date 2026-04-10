@@ -8,6 +8,7 @@ import {
   ArrowLeft, CheckCircle, XCircle, FileText, ChevronRight, ChevronDown,
   Search, ExternalLink, AlertTriangle, Lock, Unlock, Ban, Shield, Terminal, X, ChevronUp,
   Share2, Link2, Check, Fingerprint, Building2,
+  Download,
 } from "lucide-react";
 import FlowVisualizerButton from "@/components/FlowVisualizerButton";
 import FixPrButton from "@/components/FixPrButton";
@@ -451,6 +452,7 @@ export default function ScanDetailsPage() {
   const [shareLoading, setShareLoading] = useState(false);
   const [sharePopoverOpen, setSharePopoverOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
 
   const addDaysIso = (days: number) => {
     const d = new Date();
@@ -501,6 +503,22 @@ export default function ScanDetailsPage() {
     await navigator.clipboard.writeText(shareUrl);
     setShareCopied(true);
     setTimeout(() => setShareCopied(false), 2000);
+  };
+
+  const canExport = userPlan === "pro" || userPlan === "enterprise";
+
+  const handleExport = (format: "json" | "csv") => {
+    if (!canExport) {
+      setToast({
+        type: "error",
+        message: "Findings export is a Pro feature. Buy any credit pack at skylos.dev/dashboard/billing to unlock.",
+      });
+      setExportPopoverOpen(false);
+      return;
+    }
+
+    window.open(`/api/scans/${scan?.id}/export?format=${format}`, "_blank");
+    setExportPopoverOpen(false);
   };
 
   const fetchData = async () => {
@@ -851,6 +869,42 @@ export default function ScanDetailsPage() {
           <div className="relative">
             <button
               onClick={() => {
+                setSharePopoverOpen(false);
+                if (!canExport) {
+                  handleExport("json");
+                  return;
+                }
+                setExportPopoverOpen(!exportPopoverOpen);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 text-xs font-bold rounded-lg border border-slate-200 hover:bg-slate-50 transition-all"
+            >
+              <Download className="w-3 h-3" />
+              Export
+              {!canExport && <Lock className="w-3 h-3" />}
+            </button>
+            {exportPopoverOpen && (
+              <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-xl border border-slate-200 shadow-lg p-1 z-50">
+                <button
+                  onClick={() => handleExport("json")}
+                  className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Export JSON
+                </button>
+                <button
+                  onClick={() => handleExport("csv")}
+                  className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Export CSV
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Share button */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setExportPopoverOpen(false);
                 if (scan?.share_token && scan?.is_public) {
                   setSharePopoverOpen(!sharePopoverOpen);
                 } else {
