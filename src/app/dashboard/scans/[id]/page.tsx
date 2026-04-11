@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, CheckCircle, XCircle, FileText, ChevronRight, ChevronDown,
   Search, ExternalLink, AlertTriangle, Lock, Unlock, Ban, Shield, Terminal, X, ChevronUp,
-  Share2, Link2, Check, Fingerprint, Building2,
+  Share2, Link2, Check, Fingerprint,
   Download,
 } from "lucide-react";
 import FlowVisualizerButton from "@/components/FlowVisualizerButton";
@@ -856,15 +856,6 @@ export default function ScanDetailsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* City View button */}
-          <Link
-            href={`/dashboard/scans/${scan.id}/city`}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 text-xs font-bold rounded-lg border border-slate-200 hover:bg-slate-50 transition-all"
-          >
-            <Building2 className="w-3 h-3" />
-            City View
-          </Link>
-
           {/* Share button */}
           <div className="relative">
             <button
