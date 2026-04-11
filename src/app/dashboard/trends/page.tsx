@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   AreaChart,
   Area,
@@ -23,6 +24,7 @@ import {
   Loader2,
   BarChart3,
   Lock,
+  type LucideIcon,
 } from "lucide-react";
 
 type TrendDataPoint = {
@@ -63,6 +65,10 @@ type Project = {
   name: string;
 };
 
+type TooltipPayload = {
+  payload: TrendDataPoint;
+};
+
 function StatCard({
   label,
   icon: Icon,
@@ -71,7 +77,7 @@ function StatCard({
   color,
 }: {
   label: string;
-  icon: any;
+  icon: LucideIcon;
   value: number;
   change: number | null;
   color: string;
@@ -122,13 +128,22 @@ function StatCard({
   );
 }
 
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
   const data = payload[0]?.payload;
+  const labelValue = label || "";
   return (
     <div className="bg-slate-900 text-white rounded-lg px-4 py-3 shadow-xl text-xs">
       <p className="font-medium mb-2">
-        {new Date(label).toLocaleDateString(undefined, {
+        {new Date(labelValue).toLocaleDateString(undefined, {
           month: "short",
           day: "numeric",
           hour: "numeric",
@@ -157,6 +172,8 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export default function TrendsPage() {
+  const searchParams = useSearchParams();
+  const requestedProjectId = searchParams.get("projectId") || "";
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [range, setRange] = useState("7");
@@ -175,8 +192,12 @@ export default function TrendsPage() {
         const json = await res.json();
         const list = json.projects || json || [];
         setProjects(list);
-        if (list.length > 0 && !selectedProject) {
-          setSelectedProject(list[0].id);
+        if (list.length > 0) {
+          const preferredProject =
+            requestedProjectId && list.some((project: Project) => project.id === requestedProjectId)
+              ? requestedProjectId
+              : list[0].id;
+          setSelectedProject((current) => current || preferredProject);
         }
       }
     }
@@ -193,7 +214,7 @@ export default function TrendsPage() {
     }
     loadProjects();
     loadPlan();
-  }, []);
+  }, [requestedProjectId]);
 
   // Load trends data
   useEffect(() => {
@@ -213,8 +234,8 @@ export default function TrendsPage() {
         if (!res.ok) throw new Error("Failed to load trends");
         const json = await res.json();
         setData(json);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load trends");
       } finally {
         setLoading(false);
       }
@@ -246,10 +267,10 @@ export default function TrendsPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
               <BarChart3 className="w-6 h-6 text-slate-400" />
-              Trends
+              Historical Analytics
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              Track how your code quality changes over time.
+              Longer-range analytics for one project. Use the project overview for day-to-day triage.
             </p>
           </div>
 
