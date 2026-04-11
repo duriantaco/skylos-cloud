@@ -10,7 +10,7 @@ import { ArrowRight, Terminal, Shield, AlertTriangle, Code2, GitBranch, Timer, S
 
 export const metadata: Metadata = {
   title: 'Skylos | AI Code Security for Python, Dead Code Detection & Security Scanning',
-  description: 'Open source Python static analysis for teams shipping AI-generated code. Catch dead code, hallucinated imports, risky patterns, removed auth, CSRF, or rate-limit controls, and add MCP guardrails before merge.',
+  description: 'Open source Python static analysis and security scanning for AI-generated code. Catch dead code, hallucinated imports, and removed auth, CSRF, or rate limits before merge.',
   keywords: [
     'python static analysis tool',
     'python security scanner',
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     title: 'Skylos — AI Code Security for Python',
-    description: 'Catch dead code, AI-generated mistakes, removed security controls, and MCP workflow risk before merge.',
+    description: 'Catch dead code, hallucinated imports, and removed security controls before merge.',
     type: 'website',
   },
 }
@@ -342,9 +342,9 @@ export default async function Home() {
             </h1>
 
             <p className="mt-8 text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto leading-relaxed font-medium">
-              Skylos is the open source Python security and static analysis tool for teams shipping AI-generated code.
+              Skylos is the open source Python security scanner for teams shipping AI-generated code.
               <br className="hidden sm:block" />
-              <span className="text-slate-500">Find dead code, hallucinated imports, risky patterns, and removed auth, CSRF, or rate-limit controls before merge, and add guardrails around MCP-driven workflows.</span>
+              <span className="text-slate-500">Find dead code, hallucinated imports, and removed auth, CSRF, or rate limits before merge.</span>
             </p>
 
             <div className="mt-12 flex flex-col sm:flex-row gap-5 justify-center items-center">
