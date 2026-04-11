@@ -36,14 +36,112 @@ code, pre, .font-mono {
   border-radius: 3px;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
+/* ---------- Hero animations ---------- */
+
+@keyframes blob-drift {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  33%      { transform: translate(50px, -60px) scale(1.12); }
+  66%      { transform: translate(-40px, 40px) scale(0.95); }
 }
-.animate-float {
-  animation: float 3s ease-in-out infinite;
+.animate-blob {
+  animation: blob-drift 22s ease-in-out infinite;
+  will-change: transform;
 }
-.animate-float-delayed {
-  animation: float 3s ease-in-out infinite;
-  animation-delay: 1.5s;
+.animation-delay-2000 { animation-delay: -7s; }
+.animation-delay-4000 { animation-delay: -14s; }
+
+@keyframes word-rise {
+  from { opacity: 0; transform: translateY(0.55em) rotate(-2deg); }
+  to   { opacity: 1; transform: translateY(0) rotate(0); }
+}
+.hero-word {
+  display: inline-block;
+  animation: word-rise 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
+@keyframes hero-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-hero-rise {
+  animation: hero-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.hero-rise-delay-0 { animation-delay: 0.00s; }
+.hero-rise-delay-1 { animation-delay: 0.10s; }
+.hero-rise-delay-2 { animation-delay: 1.45s; }
+.hero-rise-delay-3 { animation-delay: 1.60s; }
+.hero-rise-delay-4 { animation-delay: 1.75s; }
+
+@keyframes draw-stroke {
+  from { stroke-dashoffset: 1000; }
+  to   { stroke-dashoffset: 0; }
+}
+.animate-draw-stroke {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: draw-stroke 1.4s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation-delay: 1.30s;
+}
+.animate-draw-doodle {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: draw-stroke 1.1s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+.doodle-delay-circle { animation-delay: 1.95s; }
+.doodle-delay-arrow  { animation-delay: 2.90s; }
+
+@keyframes sparkle-pop {
+  0%   { opacity: 0; transform: scale(0.2) rotate(-30deg); }
+  60%  { opacity: 1; transform: scale(1.2) rotate(5deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+.animate-sparkle {
+  transform-origin: center;
+  animation: sparkle-pop 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes shine-sweep {
+  0%   { transform: translateX(-130%) skewX(-20deg); }
+  100% { transform: translateX(230%)  skewX(-20deg); }
+}
+.shine { position: relative; overflow: hidden; isolation: isolate; }
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 35%,
+    rgba(56, 189, 248, 0.45) 50%,
+    transparent 65%
+  );
+  transform: translateX(-130%) skewX(-20deg);
+  pointer-events: none;
+  z-index: 1;
+}
+.shine-light::after {
+  background: linear-gradient(
+    110deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.30) 50%,
+    transparent 65%
+  );
+}
+.shine:hover::after {
+  animation: shine-sweep 0.9s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-blob,
+  .animate-hero-rise,
+  .hero-word,
+  .animate-draw-stroke,
+  .animate-draw-doodle,
+  .animate-sparkle,
+  .shine::after {
+    animation: none !important;
+  }
+  .animate-draw-stroke,
+  .animate-draw-doodle { stroke-dashoffset: 0 !important; }
 }

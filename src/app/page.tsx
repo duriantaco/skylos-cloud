@@ -295,8 +295,18 @@ export default async function Home() {
       <Script id="ld-breadcrumb" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
 
       {/* HERO SECTION */}
-      <section aria-label="Skylos Introduction" className="relative overflow-hidden pt-24 md:pt-28 pb-32">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/50 to-purple-50/30" />
+      <section aria-label="Skylos Introduction" className="relative overflow-hidden bg-[#091126] pt-24 md:pt-28 pb-28">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.22),_transparent_34%),linear-gradient(180deg,_rgba(9,17,38,0.92)_0%,_rgba(9,17,38,1)_100%)]" />
+        <div className="absolute left-[12%] top-28 h-56 w-56 rounded-full bg-sky-500/25 blur-3xl" />
+        <div className="absolute right-[14%] top-32 h-52 w-52 rounded-full bg-emerald-400/20 blur-3xl" />
+        <div className="absolute left-[38%] top-[55%] h-60 w-60 rounded-full bg-violet-500/18 blur-3xl" />
+        <div
+          className="absolute inset-0 opacity-[0.16]"
+          style={{
+            backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.24) 1px, transparent 0)',
+            backgroundSize: '30px 30px',
+          }}
+        />
 
         <div className="relative mx-auto max-w-7xl px-6">
           <div className="mb-10 flex justify-center">
@@ -304,9 +314,9 @@ export default async function Home() {
               href="https://github.com/duriantaco/skylos/releases"
               target="_blank"
               rel="noopener noreferrer"
-              className="group inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm shadow-sm transition-colors hover:border-slate-300"
+              className="group inline-flex items-center gap-3 rounded-full border border-white/12 bg-white/8 px-5 py-2.5 text-sm text-white/90 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)] backdrop-blur transition-colors hover:border-white/20 hover:bg-white/10"
             >
-              <span className="flex items-center gap-2 text-slate-900 font-semibold">
+              <span className="flex items-center gap-2 font-semibold">
                 <span className="relative flex h-2.5 w-2.5">
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                 </span>
@@ -314,8 +324,8 @@ export default async function Home() {
               </span>
               {typeof stars === 'number' && (
                 <>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-slate-600 font-medium flex items-center gap-1">
+                  <span className="text-white/20">|</span>
+                  <span className="font-medium flex items-center gap-1 text-white/70">
                     <span className="inline-block">⭐</span>
                     {stars.toLocaleString()} stars
                   </span>
@@ -324,36 +334,83 @@ export default async function Home() {
             </a>
           </div>
 
-          <div className="relative max-w-5xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50/80 px-4 py-2 text-sm font-semibold text-blue-900">
-              Built for teams shipping with Cursor, Copilot, and Claude Code
+          <div className="relative mx-auto max-w-4xl text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/8 px-4 py-2 text-sm font-semibold text-cyan-100 animate-hero-rise hero-rise-delay-0">
+              Open source Python security scanner
             </div>
 
-            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.02]">
-              <span className="block mt-6 text-slate-900">Catch what AI</span>
-              <span className="block mt-2 text-slate-900">writes wrong.</span>
-              <span className="block mt-2 text-slate-900">
-                Catch what it
-                <span className="relative inline-block ml-3">
-                  silently removes.
-                  <span className="absolute bottom-2 left-0 right-0 h-4 bg-blue-400/35 -z-10 -rotate-1"></span>
-                </span>
+            <h1 className="relative mt-6 text-4xl font-black tracking-tight leading-tight text-white sm:text-5xl md:text-6xl lg:text-7xl">
+              <svg aria-hidden="true" className="pointer-events-none absolute -top-6 left-[6%] h-6 w-6 text-cyan-300 animate-sparkle" style={{ animationDelay: '0.20s' }} viewBox="0 0 24 24" fill="none">
+                <path d="M12 2 L13.5 10.5 L22 12 L13.5 13.5 L12 22 L10.5 13.5 L2 12 L10.5 10.5 Z" fill="currentColor" fillOpacity="0.85" />
+              </svg>
+              <svg aria-hidden="true" className="pointer-events-none absolute top-2 right-[4%] h-4 w-4 text-emerald-300 animate-sparkle" style={{ animationDelay: '0.45s' }} viewBox="0 0 24 24" fill="none">
+                <path d="M12 2 L13.5 10.5 L22 12 L13.5 13.5 L12 22 L10.5 13.5 L2 12 L10.5 10.5 Z" fill="currentColor" fillOpacity="0.85" />
+              </svg>
+              <svg aria-hidden="true" className="pointer-events-none absolute -bottom-2 left-[22%] h-5 w-5 text-violet-300 animate-sparkle" style={{ animationDelay: '0.70s' }} viewBox="0 0 24 24" fill="none">
+                <path d="M12 2 L13.5 10.5 L22 12 L13.5 13.5 L12 22 L10.5 13.5 L2 12 L10.5 10.5 Z" fill="currentColor" fillOpacity="0.85" />
+              </svg>
+
+              <span className="hero-word" style={{ animationDelay: '0.15s' }}>Catch</span>{' '}
+              <span className="relative inline-block">
+                <span className="hero-word" style={{ animationDelay: '0.27s' }}>security</span>{' '}
+                <span className="hero-word" style={{ animationDelay: '0.39s' }}>regressions</span>
+                <svg
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -inset-x-3 -inset-y-3 h-[calc(100%+1.5rem)] w-[calc(100%+1.5rem)]"
+                  viewBox="0 0 600 140"
+                  preserveAspectRatio="none"
+                  fill="none"
+                >
+                  <path
+                    d="M 300 14 C 130 10, 22 30, 18 72 C 14 116, 180 134, 312 128 C 460 122, 588 104, 584 66 C 580 28, 440 14, 296 16"
+                    stroke="#fb923c"
+                    strokeOpacity="0.85"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    className="animate-draw-doodle doodle-delay-circle"
+                  />
+                </svg>
+              </span>{' '}
+              <span className="hero-word" style={{ animationDelay: '0.51s' }}>in</span>{' '}
+              <span className="relative inline-block">
+                <span className="hero-word" style={{ animationDelay: '0.63s' }}>AI-generated</span>{' '}
+                <span className="hero-word" style={{ animationDelay: '0.75s' }}>code</span>
+                <svg
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-0 right-0 -bottom-2 w-full h-[0.4em]"
+                  viewBox="0 0 600 40"
+                  preserveAspectRatio="none"
+                  fill="none"
+                >
+                  <path
+                    d="M6 26 C 120 8, 260 38, 380 20 S 560 12, 594 24"
+                    stroke="url(#hero-stroke-gradient)"
+                    strokeWidth="14"
+                    strokeLinecap="round"
+                    className="animate-draw-stroke"
+                  />
+                  <defs>
+                    <linearGradient id="hero-stroke-gradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.85" />
+                      <stop offset="50%" stopColor="#22d3ee" stopOpacity="0.85" />
+                      <stop offset="100%" stopColor="#34d399" stopOpacity="0.85" />
+                    </linearGradient>
+                  </defs>
+                </svg>
               </span>
             </h1>
 
-            <p className="mt-8 text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto leading-relaxed font-medium">
-              Skylos is the open source Python security scanner for teams shipping AI-generated code.
-              <br className="hidden sm:block" />
-              <span className="text-slate-500">Find dead code, hallucinated imports, and removed auth, CSRF, or rate limits before merge.</span>
+            <p className="mx-auto mt-6 max-w-3xl text-lg font-medium leading-relaxed text-slate-300 md:text-xl animate-hero-rise hero-rise-delay-2">
+              Scan Python repos for dead code, hallucinated imports, and removed auth, CSRF, or rate limits before merge.
             </p>
 
-            <div className="mt-12 flex flex-col sm:flex-row gap-5 justify-center items-center">
+            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row animate-hero-rise hero-rise-delay-3">
               <Link
                 href="/scan"
-                className="group inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-10 py-5 text-lg font-bold text-white shadow-sm transition-colors hover:bg-slate-800"
+                className="shine group inline-flex items-center gap-2 rounded-2xl bg-white px-9 py-4 text-base font-bold text-slate-950 shadow-[0_28px_55px_-28px_rgba(255,255,255,0.6)] transition-all hover:-translate-y-0.5 hover:bg-slate-100 hover:shadow-[0_34px_65px_-28px_rgba(56,189,248,0.75)]"
                 aria-label="Run your first Skylos scan"
               >
-                <span className="flex items-center gap-2">
+                <span className="relative z-10 flex items-center gap-2">
                   Run your first scan
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </span>
@@ -361,57 +418,55 @@ export default async function Home() {
 
               <Link
                 href="#proof"
-                className="group inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-white px-10 py-5 text-lg font-bold text-slate-900 transition-colors hover:border-slate-300 hover:bg-slate-50"
+                className="shine shine-light group inline-flex items-center gap-2 rounded-2xl border border-white/16 bg-white/6 px-9 py-4 text-base font-bold text-white backdrop-blur transition-all hover:-translate-y-0.5 hover:border-white/24 hover:bg-white/10"
               >
-                See proof
-                <ArrowRight className="w-5 h-5 text-slate-400 group-hover:translate-x-1 group-hover:text-slate-900 transition-all" />
+                <span className="relative z-10 flex items-center gap-2">
+                  See proof
+                  <ArrowRight className="w-5 h-5 text-white/60 group-hover:translate-x-1 group-hover:text-white transition-all" />
+                </span>
               </Link>
             </div>
 
             <div className="mt-6 flex justify-center">
               <CopyInstallButton command="pip install skylos" />
             </div>
-            <p className="mt-3 text-sm text-slate-500">
-              Local scan is free — run <code className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-slate-900">skylos . -a</code> on a repo you care about. No login required.
+            <p className="mt-3 text-sm text-slate-400">
+              Local scan is free. Run <code className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-slate-900">skylos . -a</code> on a repo you care about. No login required.
             </p>
 
-            <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm text-slate-500">
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500" />
-                <span>Open source CLI, no signup required</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-amber-500" />
-                <span>Try locally first, then add PR gates</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <GitBranch className="w-4 h-4 text-blue-500" />
-                <span>Framework-aware for Django, Flask, FastAPI, and Pydantic</span>
-              </div>
+            <div className="mt-7 flex flex-wrap items-center justify-center gap-4 text-sm text-slate-400">
+              <span>Dead code and hallucinated imports</span>
+              <span className="hidden h-1 w-1 rounded-full bg-slate-600 sm:block" />
+              <span>Removed auth, CSRF, and rate limits</span>
+              <span className="hidden h-1 w-1 rounded-full bg-slate-600 sm:block" />
+              <span>Local CLI, PR gates, and cloud triage</span>
             </div>
-
-            <Link
-              href="/blog/3-merged-prs-dead-code-in-black-flagsmith-pypdf"
-              className="mt-8 mx-auto flex max-w-4xl items-start gap-4 rounded-2xl border border-slate-200 bg-white px-6 py-5 text-left shadow-sm transition-colors hover:border-slate-300"
-            >
-              <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
-                <GitBranch className="h-5 w-5 text-emerald-600" />
-              </div>
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Maintainer-validated proof</div>
-                <p className="mt-2 text-base font-semibold text-slate-900">
-                  Merged cleanup PRs into Black, networkx, mitmproxy, pypdf, and Flagsmith.
-                </p>
-                <p className="mt-1 text-sm text-slate-600">
-                  This is stronger than a testimonial: maintainers reviewed the findings, merged the changes, and kept the code.
-                </p>
-              </div>
-              <ArrowRight className="mt-1 hidden h-5 w-5 shrink-0 text-slate-400 sm:block" />
-            </Link>
           </div>
 
-          <div className="mt-16 md:mt-20" id="example-output">
-            <SkylosHeroSandboxLoader />
+          <div className="relative mt-16 md:mt-20" id="example-output">
+            <div className="pointer-events-none absolute inset-x-[18%] -top-12 h-48 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.32),rgba(16,185,129,0.12),transparent_72%)] blur-3xl" />
+            <div className="pointer-events-none absolute left-[18%] top-20 h-12 w-12 rounded-full border border-white/12 bg-white/8" />
+            <div className="pointer-events-none absolute right-[16%] top-24 h-10 w-10 rounded-full border border-white/10 bg-white/6" />
+            <div className="relative rounded-[28px] border border-white/10 bg-white/5 p-3 shadow-[0_45px_120px_-42px_rgba(0,0,0,0.85)] backdrop-blur-sm">
+              <SkylosHeroSandboxLoader />
+            </div>
+            <Link
+              href="/blog/3-merged-prs-dead-code-in-black-flagsmith-pypdf"
+              className="mx-auto mt-6 flex w-full max-w-2xl items-center gap-4 rounded-2xl border border-emerald-400/18 bg-emerald-400/8 px-5 py-4 text-white/90 transition-all hover:border-emerald-300/28 hover:bg-emerald-400/10"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10">
+                <GitBranch className="h-4 w-4 text-emerald-300" />
+              </div>
+              <div className="min-w-0 flex-1 text-center">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200">Maintainer-validated proof</div>
+                <p className="mt-1 text-sm font-semibold text-white">
+                  Merged cleanup PRs into Black, networkx, mitmproxy, pypdf, and Flagsmith.
+                </p>
+              </div>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/6">
+                <ArrowRight className="h-5 w-5 text-emerald-200" />
+              </div>
+            </Link>
           </div>
         </div>
       </section>
