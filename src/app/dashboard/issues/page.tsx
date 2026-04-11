@@ -3,6 +3,22 @@ import Link from "next/link";
 import { ShieldAlert, Search } from "lucide-react";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
+type IssueGroupRow = {
+  id: string;
+  rule_id: string;
+  severity: string;
+  category: string;
+  source?: string | null;
+  canonical_file: string | null;
+  canonical_line: number | null;
+  occurrence_count: number | null;
+  verification_status: string | null;
+  last_seen_at: string;
+  last_seen_scan_id: string | null;
+  author_email: string | null;
+  projects?: { name: string | null; repo_url: string | null } | null;
+};
+
 function sevRank(sev: string) {
   const s = String(sev || "").toUpperCase();
   if (s === "CRITICAL") 
@@ -71,7 +87,7 @@ export default async function IssuesInboxPage() {
     .order("last_seen_at", { ascending: false })
     .limit(200);
 
-  const sorted = (groups || []).slice().sort((a: any, b: any) => {
+  const sorted = ((groups || []) as unknown as IssueGroupRow[]).slice().sort((a, b) => {
     const d = sevRank(b.severity) - sevRank(a.severity);
     if (d !== 0) 
       return d;
@@ -83,9 +99,9 @@ export default async function IssuesInboxPage() {
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-start justify-between gap-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Issue Inbox</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Open Issues</h1>
             <p className="text-slate-500 mt-1">
-              Open issue groups (root causes). Click one to triage.
+              Persistent root causes across scans. Open one for recurrence history, ownership, and group-level suppression.
             </p>
           </div>
 
@@ -112,11 +128,11 @@ export default async function IssuesInboxPage() {
               <ShieldAlert className="w-7 h-7" />
             </div>
             <h2 className="text-lg font-bold text-slate-900">No open issues</h2>
-            <p className="text-slate-500">Your inbox is empty.</p>
+            <p className="text-slate-500">Your issue registry is empty.</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {sorted.map((g: any) => (
+            {sorted.map((g) => (
               <Link
                 key={g.id}
                 href={`/dashboard/issues/${g.id}`}

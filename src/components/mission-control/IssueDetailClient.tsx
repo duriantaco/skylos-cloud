@@ -55,6 +55,13 @@ type Project = {
   github_installation_id: number | null;
 };
 
+type NoticeState = {
+  title: string;
+  message: React.ReactNode;
+  tone: 'success' | 'error';
+  reloadOnClose?: boolean;
+};
+
 const CATEGORY_CONTEXT: Record<string, {
   icon: import('lucide-react').LucideIcon;
   color: string;
@@ -455,7 +462,7 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
     reasoning: string;
   } | null>(null);
   const [triageError, setTriageError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<NoticeState | null>(null);
   const [suppressOpen, setSuppressOpen] = useState(false);
   const [suppressReason, setSuppressReason] = useState('');
   const [suppressExpiryDays, setSuppressExpiryDays] = useState('');
@@ -524,6 +531,15 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
 
   const githubUrl = getGitHubUrl(project?.repo_url || null, group.canonical_file, group.canonical_line);
   const canCreatePR = project?.github_installation_id && findings.length > 0;
+  const lastSeenScanHref = group.last_seen_scan_id ? `/dashboard/scans/${group.last_seen_scan_id}` : null;
+
+  function closeNotice() {
+    const shouldReload = notice?.reloadOnClose;
+    setNotice(null);
+    if (shouldReload) {
+      window.location.reload();
+    }
+  }
 
   const findingsByFile = findings.reduce((acc, f) => {
     if (!acc[f.file_path]) acc[f.file_path] = [];
@@ -569,9 +585,18 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
         throw new Error(data.error || 'Failed to mark as false positive');
       }
 
-      window.location.reload();
+      setNotice({
+        title: 'Issue Marked False Positive',
+        message: 'This recurring issue record has been marked false positive. Dismiss this notice to refresh the page.',
+        tone: 'success',
+        reloadOnClose: true,
+      });
     } catch (error: unknown) {
-      setNotice(getErrorMessage(error, 'Failed to mark as false positive'));
+      setNotice({
+        title: 'Issue Action Failed',
+        message: getErrorMessage(error, 'Failed to mark as false positive'),
+        tone: 'error',
+      });
     } finally {
       setIsActioning(false);
     }
@@ -590,7 +615,11 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
     if (trimmedDays) {
       const days = Number.parseInt(trimmedDays, 10);
       if (!Number.isFinite(days) || days <= 0) {
-        setNotice('Expiry days must be a positive number.');
+        setNotice({
+          title: 'Invalid Suppression Expiry',
+          message: 'Expiry days must be a positive number.',
+          tone: 'error',
+        });
         return;
       }
 
@@ -616,9 +645,18 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
       }
 
       setSuppressOpen(false);
-      window.location.reload();
+      setNotice({
+        title: 'Issue Suppressed',
+        message: 'This recurring issue record has been suppressed across future scans. Dismiss this notice to refresh the page.',
+        tone: 'success',
+        reloadOnClose: true,
+      });
     } catch (error: unknown) {
-      setNotice(getErrorMessage(error, 'Failed to suppress issue'));
+      setNotice({
+        title: 'Issue Action Failed',
+        message: getErrorMessage(error, 'Failed to suppress issue'),
+        tone: 'error',
+      });
     } finally {
       setIsActioning(false);
     }
@@ -646,7 +684,7 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
           <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
             <Link href="/dashboard/issues" className="hover:text-slate-900 transition flex items-center gap-1">
               <ArrowLeft className="w-4 h-4" />
-              Mission Control
+              Open Issues
             </Link>
             <ChevronRight className="w-4 h-4" />
             <span>{project?.name || 'Loading...'}</span>
@@ -667,22 +705,31 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
               </p>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              {findings.length > 0 && (
-                <FlowVisualizerButton
+	            <div className="flex items-center gap-2 shrink-0">
+	              {lastSeenScanHref && (
+	                <Link
+	                  href={lastSeenScanHref}
+	                  className="flex items-center gap-2 px-3 py-2 text-sm text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 rounded-lg transition shadow-sm"
+	                >
+	                  <History className="w-4 h-4" />
+	                  Open last seen scan
+	                </Link>
+	              )}
+	              {findings.length > 0 && (
+	                <FlowVisualizerButton
                   findingId={findings[0].id}
                   ruleId={group.rule_id}
                   category={group.category}
                   repoUrl={project?.repo_url || undefined}
                 />
               )}
-              {githubUrl && (
-                <a href={githubUrl} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition shadow-sm">
-                  <ExternalLink className="w-4 h-4" />
-                  View on GitHub
-                </a>
-              )}
+	              {githubUrl && (
+	                <a href={githubUrl} target="_blank" rel="noopener noreferrer"
+	                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition shadow-sm">
+	                  <ExternalLink className="w-4 h-4" />
+	                  View current file on GitHub
+	                </a>
+	              )}
               <button onClick={handleMarkFalsePositive} disabled={isActioning}
                 className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition shadow-sm disabled:opacity-50">
                 <XCircle className="w-4 h-4" />
@@ -773,9 +820,39 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
         </div>
       )}
 
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+	      {/* Main content */}
+	      <main className="max-w-7xl mx-auto px-6 py-8">
+	        <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 px-5 py-4">
+	          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+	            <div>
+	              <div className="text-xs font-bold uppercase tracking-wide text-sky-700">Recurring Issue Record</div>
+	              <p className="mt-1 text-sm text-sky-900">
+	                This page tracks the same root cause across scans. Use it for recurrence history, ownership, comments,
+	                and group-level suppression. Use the scan view when you want to work blockers from one specific upload.
+	              </p>
+	            </div>
+	            <div className="flex flex-wrap gap-2">
+	              {lastSeenScanHref ? (
+	                <Link
+	                  href={lastSeenScanHref}
+	                  className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+	                >
+	                  <History className="w-3.5 h-3.5" />
+	                  Open scan occurrence
+	                </Link>
+	              ) : null}
+	              <Link
+	                href={`/dashboard/projects/${group.project_id}`}
+	                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+	              >
+	                <Layers className="w-3.5 h-3.5" />
+	                Project overview
+	              </Link>
+	            </div>
+	          </div>
+	        </div>
+
+	        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column */}
           <div className="lg:col-span-2 space-y-6">
             <section className={`bg-white border ${categoryContext.borderColor} rounded-xl shadow-sm overflow-hidden`}>
@@ -1168,10 +1245,10 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
 
       <NoticeModal
         isOpen={notice !== null}
-        onClose={() => setNotice(null)}
-        title="Issue Action Failed"
-        message={notice || ''}
-        tone="error"
+        onClose={closeNotice}
+        title={notice?.title || 'Issue Action'}
+        message={notice?.message || ''}
+        tone={notice?.tone || 'info'}
       />
     </div>
   );
