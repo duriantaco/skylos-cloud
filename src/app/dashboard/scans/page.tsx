@@ -258,7 +258,7 @@ export default async function ScansPage() {
                 <p className="text-indigo-700/70 mt-1">
                   Looking for persistent issues across scans? Go to{" "}
                   <Link href="/dashboard/issues" className="font-medium text-gray-700 hover:text-indigo-800 underline">
-                    Mission Control →
+                    Open Issues →
                   </Link>
                 </p>
               </div>

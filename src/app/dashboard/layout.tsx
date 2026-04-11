@@ -81,7 +81,7 @@ export default async function DashboardLayout({
             </Link>
 
             <div className="hidden md:flex items-center gap-1">
-              <NavLink href="/dashboard" icon={Target}>Mission Control</NavLink>
+              <NavLink href="/dashboard" icon={Target}>Overview</NavLink>
               <NavLink href="/dashboard/projects" icon={FolderOpen}>Projects</NavLink>
               <NavLink href="/dashboard/agent-activity" icon={Bot}>Agent</NavLink>
             </div>

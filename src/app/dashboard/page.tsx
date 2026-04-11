@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getEffectivePlan } from "@/lib/entitlements";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
 import {
   ShieldAlert,
@@ -25,7 +24,15 @@ type ScanRow = {
   created_at: string;
   commit_hash: string | null;
   quality_gate_passed: boolean | null;
-  stats: any;
+  stats: {
+    danger_count?: number | null;
+    quality_count?: number | null;
+    dead_code_count?: number | null;
+    secret_count?: number | null;
+    new_issues?: number | null;
+    legacy_issues?: number | null;
+    suppressed_new_issues?: number | null;
+  } | null;
   projects?: { name: string | null; repo_url: string | null } | null;
 };
 
@@ -140,10 +147,6 @@ export default async function DashboardPage() {
     .eq("id", orgId)
     .single();
 
-  const effectivePlan = getEffectivePlan({
-    plan: orgData?.plan || "free",
-    pro_expires_at: orgData?.pro_expires_at || null,
-  });
   const proExpiresAt = orgData?.pro_expires_at ? new Date(orgData.pro_expires_at) : null;
   const now = new Date();
   const proExpired = orgData?.plan === "pro" && (!proExpiresAt || proExpiresAt <= now);
@@ -212,7 +215,7 @@ export default async function DashboardPage() {
 
   const lastScanAt = latestScan?.created_at ? new Date(latestScan.created_at) : null;
   const daysSinceLastScan = lastScanAt
-    ? Math.floor((Date.now() - lastScanAt.getTime()) / (1000 * 60 * 60 * 24))
+    ? Math.floor((now.getTime() - lastScanAt.getTime()) / (1000 * 60 * 60 * 24))
     : null;
   const isStale = daysSinceLastScan === null || daysSinceLastScan >= 3;
 
@@ -257,7 +260,7 @@ export default async function DashboardPage() {
                 href="/dashboard/issues"
                 className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-500 transition shadow-sm"
               >
-                <Layers className="w-4 h-4" /> Mission Control
+                <Layers className="w-4 h-4" /> Open Issues
               </Link>
               <Link
                 href="/dashboard/scans"
@@ -367,11 +370,11 @@ export default async function DashboardPage() {
                     <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-100 text-gray-700">
                       <Layers className="w-5 h-5" />
                     </div>
-                    <h2 className="text-xl font-bold text-slate-900">Mission Control</h2>
+                    <h2 className="text-xl font-bold text-slate-900">Open Issues</h2>
                   </div>
                   <p className="mt-2 text-sm text-slate-500 max-w-md">
                     <span className="text-slate-700 font-medium">Issues are persistent problems</span> that exist across multiple scans. 
-                    Each issue is deduplicated — fix it once, it's gone everywhere.
+                    Each issue is deduplicated — fix it once, it&apos;s gone everywhere.
                   </p>
                 </div>
                 <Link
@@ -664,7 +667,7 @@ export default async function DashboardPage() {
                   <div className="text-xs text-slate-600 leading-relaxed">
                     <span className="text-slate-900 font-medium">Scans are events, not entities.</span> Use scans 
                     for audit trails, quality gate decisions, debugging ingestion, and historical evidence 
-                    ("it was clean on Jan 29, broken on Jan 30").
+                    (&quot;it was clean on Jan 29, broken on Jan 30&quot;).
                   </div>
                 </div>
               </div>

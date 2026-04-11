@@ -3,11 +3,11 @@
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, CheckCircle, XCircle, FileText, ChevronRight, ChevronDown,
   Search, ExternalLink, AlertTriangle, Lock, Unlock, Ban, Shield, Terminal, X, ChevronUp,
-  Share2, Link2, Check, Fingerprint,
+  Share2, Link2, Check, Fingerprint, Building2, Layers,
   Download,
 } from "lucide-react";
 import FlowVisualizerButton from "@/components/FlowVisualizerButton";
@@ -93,6 +93,7 @@ type Finding = {
   message: string;
   file_path: string;
   line_number: number;
+  group_id?: string | null;
   rule_id: string;
   snippet?: string | null;
   is_new: boolean;
@@ -101,7 +102,9 @@ type Finding = {
   finding_id?: string | null;
   verification_verdict?: "VERIFIED" | "REFUTED" | "UNKNOWN" | null;
   verification_reason?: string | null;
-  verification_evidence?: any;
+  verification_evidence?: {
+    chain?: Array<{ fn?: string | null }>;
+  } | null;
   verified_at?: string | null;
 
   analysis_source?: "static" | "llm" | "static+llm" | null;
@@ -134,6 +137,17 @@ type Finding = {
 
   author_email?: string | null;
 };
+
+type TabButtonProps = {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count: number;
+};
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
 function generateGitHubUrl(repoUrl: string, sha: string, filePath: string, line: number) {
   if (!repoUrl || !sha || sha === 'local') return '#';
@@ -196,7 +210,7 @@ function SeverityBadge({ severity }: { severity: string }) {
   );
 }
 
-function TabButton({ active, onClick, label, count }: any) {
+function TabButton({ active, onClick, label, count }: TabButtonProps) {
   return (
     <button
       onClick={onClick}
@@ -236,7 +250,7 @@ function getGateStatus(scan: Scan): GateStatus {
   return scan.quality_gate_passed ? "PASS" : "FAIL";
 }
 
-function safeNum(x: any, fallback = 0) {
+function safeNum(x: unknown, fallback = 0) {
   const n = Number(x);
   return Number.isFinite(n) ? n : fallback;
 }
@@ -521,7 +535,7 @@ export default function ScanDetailsPage() {
     setExportPopoverOpen(false);
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
 
@@ -554,7 +568,7 @@ export default function ScanDetailsPage() {
       .eq("agent_authored", true);
 
     if (provFiles) {
-      setProvenanceFiles(provFiles.map((f: any) => f.file_path));
+      setProvenanceFiles(provFiles.map((f: { file_path: string }) => f.file_path));
     }
 
     // Fetch plan for gating
@@ -567,11 +581,11 @@ export default function ScanDetailsPage() {
     } catch {}
 
     setLoading(false);
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchData();
-  }, [id]);
+  }, [fetchData]);
 
   const handleOverride = () => {
     setOverrideReason("Manual Override");
@@ -598,8 +612,8 @@ export default function ScanDetailsPage() {
       setOverrideOpen(false);
       await fetchData();
       setToast({ type: 'success', message: "Override applied. Gate marked as passed." });
-    } catch (e: any) {
-      setToast({ type: 'error', message: `Override failed: ${e.message}` });
+    } catch (error: unknown) {
+      setToast({ type: 'error', message: `Override failed: ${getErrorMessage(error, "Unknown error")}` });
     } finally {
       setIsOverriding(false);
     }
@@ -636,8 +650,8 @@ export default function ScanDetailsPage() {
       setSuppressOpen(false);
       await fetchData();
       setToast({ type: 'success', message: "Suppressed. Future scans will ignore this signature." });
-    } catch (e: any) {
-      setToast({ type: 'error', message: `Suppress failed: ${e.message}` });
+    } catch (error: unknown) {
+      setToast({ type: 'error', message: `Suppress failed: ${getErrorMessage(error, "Unknown error")}` });
     } finally {
       setIsSuppressing(false);
     }
@@ -692,12 +706,17 @@ export default function ScanDetailsPage() {
     return grouped;
   }, [filteredFindings]);
 
+  const groupedFindingKeys = useMemo(
+    () => Object.keys(groupedFindings).join('|'),
+    [groupedFindings]
+  );
+
   useEffect(() => {
     const uniqueFiles = Object.keys(groupedFindings);
     const expandState: Record<string, boolean> = {};
     uniqueFiles.forEach(f => (expandState[f] = true));
     if (Object.keys(expandedFiles).length === 0) setExpandedFiles(expandState);
-  }, [Object.keys(groupedFindings).join('|')]);
+  }, [expandedFiles, groupedFindingKeys, groupedFindings]);
 
   const counts = useMemo(() => ({
     ALL: viewFindings.length,
@@ -707,6 +726,7 @@ export default function ScanDetailsPage() {
     DEPENDENCY: viewFindings.filter(f => f.category === 'DEPENDENCY').length,
     REVIEW: viewFindings.filter(f => f.needs_review).length,
   }), [viewFindings]);
+  const verificationChain = selectedFinding?.verification_evidence?.chain ?? [];
 
   const toggleFile = (filePath: string) => {
     setExpandedFiles(prev => ({ ...prev, [filePath]: !prev[filePath] }));
@@ -803,7 +823,7 @@ export default function ScanDetailsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-slate-700">Expiry</label>
-                    <select value={suppressExpiry} onChange={(e) => setSuppressExpiry(e.target.value as any)} className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:outline-none">
+                    <select value={suppressExpiry} onChange={(e) => setSuppressExpiry(e.target.value as 'NEVER' | '7' | '30' | '90')} className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:outline-none">
                       <option value="NEVER">Never</option>
                       <option value="7">7 days</option>
                       <option value="30">30 days</option>
@@ -856,7 +876,14 @@ export default function ScanDetailsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Share button */}
+          <Link
+            href={`/dashboard/scans/${scan.id}/city`}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 text-xs font-bold rounded-lg border border-slate-200 hover:bg-slate-50 transition-all"
+          >
+            <Building2 className="w-3 h-3" />
+            City View
+          </Link>
+
           <div className="relative">
             <button
               onClick={() => {
@@ -1001,8 +1028,8 @@ export default function ScanDetailsPage() {
         </div>
       )}
 
-      {/* AI Provenance Panel */}
-      {scan.provenance_agent_count != null && scan.provenance_agent_count > 0 && scan.provenance_summary && (
+	      {/* AI Provenance Panel */}
+	      {scan.provenance_agent_count != null && scan.provenance_agent_count > 0 && scan.provenance_summary && (
         <div className="mx-4 mb-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1238,8 +1265,8 @@ export default function ScanDetailsPage() {
               <p className="text-sm">Select a finding</p>
             </div>
           ) : (
-            <div className="max-w-4xl mx-auto p-6 lg:p-8">
-              {/* Alert banners */}
+	            <div className="max-w-4xl mx-auto p-6 lg:p-8">
+	              {/* Alert banners */}
               {selectedFinding.is_new && !selectedFinding.is_suppressed && (
                 <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-3 flex gap-3">
                   <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
@@ -1250,18 +1277,39 @@ export default function ScanDetailsPage() {
                 </div>
               )}
 
-              {selectedFinding.is_suppressed && (
-                <div className="mb-6 rounded-lg border border-slate-200 bg-white p-3 flex gap-3 opacity-75">
+	              {selectedFinding.is_suppressed && (
+	                <div className="mb-6 rounded-lg border border-slate-200 bg-white p-3 flex gap-3 opacity-75">
                   <Ban className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                   <div>
                     <div className="text-sm font-semibold text-slate-700">Suppressed</div>
-                    <p className="text-xs text-slate-500 mt-0.5">Won't block future gates.</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Won&apos;t block future gates.</p>
                   </div>
-                </div>
-              )}
+	                </div>
+	              )}
 
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div>
+	              <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 p-4">
+	                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+	                  <div>
+	                    <div className="text-xs font-bold uppercase tracking-wide text-sky-700">Scan Occurrence</div>
+	                    <p className="mt-1 text-sm text-sky-900">
+	                      This page is the workbench for one upload. Use it to clear blockers in this scan.
+	                      Recurrence history, assignment, and group-level suppression live in the persistent issue record.
+	                    </p>
+	                  </div>
+	                  {selectedFinding.group_id ? (
+	                    <Link
+	                      href={`/dashboard/issues/${selectedFinding.group_id}`}
+	                      className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+	                    >
+	                      <Layers className="w-3.5 h-3.5" />
+	                      Open recurring issue
+	                    </Link>
+	                  ) : null}
+	                </div>
+	              </div>
+
+	              <div className="flex items-start justify-between gap-4 mb-4">
+	                <div>
                   <div className="flex items-center gap-2 mb-2">
                     <SeverityBadge severity={selectedFinding.severity} />
                     <span className="font-mono text-xs text-slate-500 px-2 py-0.5 rounded bg-white border border-slate-200">{selectedFinding.rule_id}</span>
@@ -1310,11 +1358,11 @@ export default function ScanDetailsPage() {
                     </div>
                   )}
 
-                  {selectedFinding.verification_evidence?.chain?.length > 0 && (
+                  {verificationChain.length > 0 && (
                     <div className="mt-3 text-xs font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-x-auto">
-                      {selectedFinding.verification_evidence.chain
+                      {verificationChain
                         .slice(0, 12)
-                        .map((x: any) => x.fn)
+                        .map((x) => x.fn || "unknown")
                         .join(" → ")}
                     </div>
                   )}
