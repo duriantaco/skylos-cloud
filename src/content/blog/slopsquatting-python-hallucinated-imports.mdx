@@ -1,0 +1,223 @@
+---
+title: "Slopsquatting in Python: What 205,474 Hallucinated Package Names Mean for Your Supply Chain"
+excerpt: "LLMs invent Python packages that don't exist. Attackers register them. Academic research shows 43% of hallucinated names recur on every re-run of the same prompt — turning a model quirk into a repeatable attack surface. Here's what the peer-reviewed data says, and how to catch hallucinated imports at PR time."
+publishedAt: "2026-04-11"
+updatedAt: "2026-04-11"
+author:
+  name: "Skylos team"
+  role: "Product engineering"
+  type: "Organization"
+tags: ["python", "security", "ai", "supply-chain"]
+keywords:
+  - slopsquatting
+  - slopsquatting python
+  - python package hallucination
+  - ai hallucinated imports
+  - llm package hallucination python
+  - pypi supply chain attack ai
+  - python ai code security
+  - hallucinated imports python
+  - ai generated code security python
+  - package hallucination attack
+  - skylos hallucinated imports
+  - spracklen package hallucination
+canonicalUrl: "/blog/slopsquatting-python-hallucinated-imports"
+---
+
+Your AI coding assistant wrote this line:
+
+```python
+from huggingface_cli import login
+```
+
+It looks fine. It looks like something that should exist. You run `pip install huggingface-cli`, the install succeeds, your tests pass, and you merge.
+
+In March 2024, that exact package was a proof-of-concept attack by Bar Lanyado at Lasso Security. He'd noticed GPT-based assistants repeatedly recommending `huggingface-cli` to developers — a package that didn't exist on PyPI. He registered an empty placeholder package under that name and waited.
+
+**Three months later, it had been downloaded over 30,000 times.** An Alibaba research repository was among the adopters — it recommended the install in its README. ([Lasso Security, March 28 2024](https://www.lasso.security/blog/ai-package-hallucinations))
+
+This is slopsquatting: the class of software supply chain attack where an attacker registers a package name that AI coding assistants repeatedly hallucinate, then waits for devs to `pip install` it into production.
+
+## Who named it, and why it's its own category
+
+The term was coined by **Seth Larson**, the Python Software Foundation's Security Developer-in-Residence. "Slop" is the common pejorative for low-quality generative-AI output; "squatting" comes from typosquatting, the long-standing attack where malicious actors register names one keystroke away from real packages (`reqeusts`, `numpi`, `djnago`).
+
+The distinction matters:
+
+| | Typosquatting | Slopsquatting |
+|---|---|---|
+| Attacker needs | A real, popular package with typo-prone spelling | An LLM-hallucinated name |
+| Who "types" the bad name | Human developer | AI assistant |
+| Catch point | Spellcheckers, eye-catching diffs | Almost nothing — the name looks plausible |
+| Repeatability | Relies on human error | Relies on model determinism |
+
+Typosquatting has existed for decades. Slopsquatting is new because its delivery channel — the LLM — is new, and because LLMs are consistent enough that attackers can pre-compute which hallucinated names are worth registering.
+
+## The data: Spracklen et al., USENIX Security 2025
+
+The foundational empirical study is ["We Have a Package for You! A Comprehensive Analysis of Package Hallucinations by Code Generating LLMs"](https://arxiv.org/abs/2406.10279) by Joseph Spracklen, Raveen Wijewickrama, A H M Nazmus Sakib, Anindya Maiti, Bimal Viswanath, and Murtuza Jadliwala. It was accepted to USENIX Security 2025.
+
+The numbers, directly from the paper's abstract:
+
+- **16 LLMs** tested, spanning commercial and open-source models
+- **576,000** Python and JavaScript code samples generated
+- **205,474 unique hallucinated package names** observed across those samples
+- **At least 5.2%** hallucination rate across commercial models (the paper's stated floor)
+- **21.7%** hallucination rate across open-source models
+
+That's the headline. But the more interesting question is what happens when the same prompt is run more than once.
+
+## Why recurrence is the load-bearing fact
+
+If hallucinated names were random — if every generation produced a fresh nonexistent package — slopsquatting wouldn't be economically viable. An attacker would have to register tens of thousands of variants and hope some unlucky dev's LLM happens to emit one on some given day.
+
+The Spracklen study dismantled that defense. When the same prompt was run ten times through the same model, the researchers observed a **bimodal distribution**:
+
+- **43%** of hallucinated package names appeared in **every single run**
+- **39%** never reappeared at all
+- **58%** were repeated more than once
+
+([Socket.dev, April 8 2025](https://socket.dev/blog/slopsquatting-how-ai-hallucinations-are-fueling-a-new-class-of-supply-chain-attacks), summarizing the Spracklen paper)
+
+Almost half the hallucinations are stable. The model invents the same fake package every time you ask. That's all an attacker needs — run a popular prompt 100 times, take the top 10 hallucinated names, register them, and let the users come to you.
+
+## Which models hallucinate most
+
+The Spracklen paper breaks the per-model performance down. Per Socket's reporting of the paper's findings:
+
+| Model | Hallucination Rate |
+|---|---|
+| **GPT-4 Turbo** | **3.59%** (best observed) |
+| Commercial average | ≥ 5.2% |
+| Open-source average | 21.7% |
+| **CodeLlama 7B / 34B** | **Over a third of outputs** (worst observed) |
+
+CodeLlama matters here because Llama-family code models have historically shipped in local-first coding assistants and self-hosted pair programmers. A team that picked a privacy-preserving open-source model over a commercial API is likely accepting a **6× to 9× higher hallucination rate** than a GPT-4 Turbo user — and therefore a 6× to 9× larger slopsquatting surface.
+
+One caveat worth stating up front: **the Spracklen lineup is 2024-vintage models.** GPT-4 Turbo, CodeLlama, WizardCoder, DeepSeek-Coder, Mistral, and friends — not GPT-4o, Claude 3.5/4, or Llama 3.x/Qwen-Coder 2.5. Newer frontier models may hallucinate less; no peer-reviewed replication on the 2025-generation models exists yet, so treat the numbers above as an **order-of-magnitude baseline**, not a live leaderboard.
+
+An interesting footnote from Socket's writeup: **only 0.17% of the hallucinated names matched packages that had been removed from PyPI between 2020 and 2022**. The vast majority of hallucinations are pure invention — names the model constructed from learned patterns, not faint memories of deleted packages.
+
+## Why Python is a particularly exposed target
+
+Three structural reasons.
+
+### 1. PyPI's namespace is flat
+
+Unlike npm's `@org/package` scoped packages, PyPI is a flat, first-come-first-served namespace under [PEP 541](https://peps.python.org/pep-0541/). Any name a model hallucinates can be claimed by anyone in under a minute. There is no `@huggingface/cli` that only Hugging Face can publish — `huggingface-cli` is just a string, and whoever types it into `twine upload` first owns it.
+
+### 2. The AI crowd is disproportionately Python
+
+The developers most likely to be prompting an LLM for code — ML engineering, data science, LLMOps, agent frameworks — are also the ones working with the churniest, least-stable corner of the Python ecosystem. `langchain`, `llama-index`, `transformers`, the `autogen`/`crewai` neighborhood. These libraries restructure their module layout frequently, which means the LLM's training data disagrees with today's reality, which means the LLM confidently writes imports that no longer exist.
+
+### 3. The install step has no friction
+
+Python culture is `pip install X && python`. Most devs don't open PyPI's web UI to vet a package an LLM suggested before installing it. Compare with Rust (`cargo add` surfaces crates.io metadata) or Go (`go get` shows you the full module path with the VCS host embedded). Python's frictionless install is its slopsquatting vulnerability.
+
+## What a hallucinated import actually looks like
+
+There's more than one failure mode, and they call for different fixes. Skylos's rule **SKY-D222** ("hallucinated dependency imports") fires on imports that don't resolve against your declared dependencies. In AI-generated code, that typically catches three distinct patterns:
+
+**Pure hallucination.** The package simply doesn't exist anywhere:
+
+```python
+from cryptoutils import secure_hash        # no such package
+from flask_permissions import require      # no such package
+```
+
+**Stale module path.** The package exists, but the model remembers an older layout:
+
+```python
+from langchain.chat_models import ChatAnthropic
+# Pre-0.1 location. LangChain 0.1 (January 2024) split integrations out
+# into separate partner packages — the modern import is:
+#     from langchain_anthropic import ChatAnthropic
+# The old top-level shim is deprecated and fails outright on fresh installs
+# that don't carry the legacy compatibility layer.
+```
+
+**Alias confusion.** The package exists on PyPI but under a different distribution name than its import name — and isn't in your requirements:
+
+```python
+import sklearn
+# sklearn is the import name; the distribution on PyPI is scikit-learn.
+# If your requirements.txt declares neither, this import fails at runtime
+# no matter how obvious the name looks. The same trap catches cv2/opencv-python
+# and yaml/PyYAML — three of the most misremembered import/distribution splits
+# in Python.
+```
+
+Only the first pattern is a strict "package doesn't exist on PyPI" case — the one slopsquatters directly target. But all three matter, because all three are symptoms of an LLM generating code that references a world that isn't yours.
+
+## Catching it at lint time, not install time
+
+Existing tooling tends to be install-time:
+
+- **`pip-audit`** ([PyPA](https://github.com/pypa/pip-audit)) checks installed packages against known vulnerabilities. Useless against a hallucinated name, because the name isn't in any advisory database — there's no CVE for "this package doesn't exist."
+- **Lockfiles** (`uv.lock`, `poetry.lock`, hash-pinned `requirements.txt`) pin *what you've already installed*. If a dev ran `pip install cryptoutils` to make the AI-generated import work, the lockfile now enshrines that decision.
+- **Trusted publishing / Sigstore** ([PyPI docs](https://docs.pypi.org/trusted-publishers/)) guarantees provenance for packages you know you want. It can't tell you that `cryptoutils` shouldn't be on your want-list to begin with.
+
+Every one of these layers runs too late. By the time lockfile hashing kicks in, the slopsquatted package is already resolved as a legitimate dependency.
+
+**The cheap detection layer is static.** Parse every `import X` and `from X import Y` in the diff. Resolve against the declared dependency graph — `requirements.txt`, `pyproject.toml`, `uv.lock`, whatever you use. If an import has no matching distribution, fail the PR.
+
+That's what Skylos's **SKY-D222** does:
+
+```bash
+pip install skylos
+skylos .
+```
+
+Every unresolved import in the codebase becomes a finding. On an AI-generated PR, that's exactly the layer that catches a hallucinated name before anyone reaches for `pip install`.
+
+## A workflow you can drop in today
+
+A minimal GitHub Action that blocks a PR when hallucinated imports are present:
+
+```yaml
+name: skylos scan
+on: [pull_request]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install skylos
+      - run: skylos defend . --fail-on high
+```
+
+`skylos defend` runs the AI-code security checks (hallucinated imports, removed auth, hardcoded secrets, weak crypto, disabled SSL) and `--fail-on high` fails the job if any high-severity finding is present.
+
+Pair it with a lockfile — `uv.lock`, `poetry.lock`, or `pip-tools`-generated `requirements.txt --generate-hashes` — so that any `pip install` a dev might run to "fix" the failing import also has to pass code review. The lockfile catches the second-order supply chain risk; the static scan catches the first-order hallucination.
+
+## Bottom line
+
+- LLMs hallucinate Python imports. [Commercial models do it in ~5% of generations; open-source models in >20%](https://arxiv.org/abs/2406.10279).
+- **Roughly 43% of those hallucinations recur on every re-run of the same prompt.** That determinism is what makes pre-computing attack targets profitable. ([Socket.dev](https://socket.dev/blog/slopsquatting-how-ai-hallucinations-are-fueling-a-new-class-of-supply-chain-attacks))
+- The attack is not hypothetical. Bar Lanyado [demonstrated 30,000+ downloads](https://www.lasso.security/blog/ai-package-hallucinations) of a single hallucinated package name in three months, including an Alibaba research repo recommending the install in its README.
+- PyPI's flat namespace under [PEP 541](https://peps.python.org/pep-0541/) makes claiming a hallucinated name trivial, and the Python ML/AI crowd is the group most exposed by habit.
+- Lockfiles and `pip-audit` catch known vulnerable packages after install. **They do not catch nonexistent names at lint time.** Static import resolution against your declared dependencies is the cheap layer that does.
+
+Run it on a repo you care about:
+
+```bash
+pip install skylos
+skylos . -a
+```
+
+If Skylos flags an unresolved import in an AI-generated diff, nothing was lost — you caught the exact class of bug that makes slopsquatting possible.
+
+*(Disclosure: we build Skylos. The Spracklen, Lasso, and Socket findings cited above are independent third-party research.)*
+
+## Sources
+
+- Spracklen, J., Wijewickrama, R., Sakib, A. H. M. N., Maiti, A., Viswanath, B., Jadliwala, M. *We Have a Package for You! A Comprehensive Analysis of Package Hallucinations by Code Generating LLMs.* USENIX Security 2025. [arXiv:2406.10279](https://arxiv.org/abs/2406.10279)
+- Lanyado, B. *AI Package Hallucinations.* Lasso Security, March 28 2024. [https://www.lasso.security/blog/ai-package-hallucinations](https://www.lasso.security/blog/ai-package-hallucinations)
+- Gooding, S. *The Rise of Slopsquatting: How AI Hallucinations Are Fueling a New Class of Supply Chain Attacks.* Socket.dev, April 8 2025. [https://socket.dev/blog/slopsquatting-how-ai-hallucinations-are-fueling-a-new-class-of-supply-chain-attacks](https://socket.dev/blog/slopsquatting-how-ai-hallucinations-are-fueling-a-new-class-of-supply-chain-attacks)
+- PSF. *PEP 541 — Package Index Name Retention.* [https://peps.python.org/pep-0541/](https://peps.python.org/pep-0541/)
+- PyPA. *pip-audit.* [https://github.com/pypa/pip-audit](https://github.com/pypa/pip-audit)
+- PyPI. *Trusted Publishers.* [https://docs.pypi.org/trusted-publishers/](https://docs.pypi.org/trusted-publishers/)
