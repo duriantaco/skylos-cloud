@@ -36,12 +36,18 @@ type IssueGroup = {
 
 type Finding = {
   id: string;
+  scan_id: string | null;
   file_path: string;
   line_number: number;
   message: string;
   snippet: string | null;
   is_new: boolean;
   created_at: string;
+  scans?: {
+    branch: string | null;
+    commit_hash: string | null;
+    created_at: string | null;
+  } | null;
 };
 
 type Project = {
@@ -412,21 +418,22 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
       const supabase = createClient();
       const { data } = await supabase
         .from('findings')
-        .select('id, file_path, line_number, message, snippet, is_new, created_at')
+        .select('id, scan_id, file_path, line_number, message, snippet, is_new, created_at, scans(branch, commit_hash, created_at)')
         .eq('group_id', group.id)
-        .order('file_path')
+        .order('created_at', { ascending: false })
         .limit(100);
-      setFindings(data || []);
+      setFindings(
+        ((data || []) as Array<Finding & { scans?: Array<Finding["scans"]> | Finding["scans"] }>).map((finding) => ({
+          ...finding,
+          scans: Array.isArray(finding.scans) ? (finding.scans[0] ?? null) : (finding.scans ?? null),
+        }))
+      );
     }
     loadFindings();
   }, [group.id]);
   const lastSeenScanHref = group.last_seen_scan_id ? `/dashboard/scans/${group.last_seen_scan_id}` : null;
-
-  const findingsByFile = findings.reduce((acc, f) => {
-    if (!acc[f.file_path]) acc[f.file_path] = [];
-    acc[f.file_path].push(f);
-    return acc;
-  }, {} as Record<string, Finding[]>);
+  const affectedFileCount = new Set(findings.map((finding) => finding.file_path)).size;
+  const findingsByScan = findings;
 
   return (
     <div className="min-h-screen bg-gray-50 text-slate-900 font-sans">
@@ -435,7 +442,7 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
           <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
             <Link href="/dashboard/issues" className="hover:text-slate-900 transition flex items-center gap-1">
               <ArrowLeft className="w-4 h-4" />
-              Open Issues
+              Recurring Issues
             </Link>
             <ChevronRight className="w-4 h-4" />
             <span>{project?.name || 'Loading...'}</span>
@@ -453,6 +460,9 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
               <h1 className="text-2xl font-bold text-slate-900 mb-1">{ruleInfo.title}</h1>
               <p className="text-slate-500 text-sm">
                 Rule: <code className="text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-xs">{group.rule_id}</code>
+              </p>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mt-2">
+                Secondary view: recurring record across scans
               </p>
             </div>
 
@@ -481,6 +491,11 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
                 and verification context. Use the scan view when you need to suppress, fix, verify, inspect flow,
                 or clear blockers from one specific upload.
               </p>
+              {group.last_seen_at ? (
+                <p className="mt-2 text-xs text-sky-800">
+                  Last seen {timeAgo(group.last_seen_at)} in this project. Open the latest scan occurrence when you need the live upload context.
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -488,6 +503,57 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column */}
           <div className="lg:col-span-2 space-y-6">
+            <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-purple-600" />
+                  Instances Across Scans
+                </h2>
+                <span className="text-sm text-slate-500">
+                  {group.occurrence_count} total in {affectedFileCount} files
+                </span>
+              </div>
+              {findingsByScan.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">No occurrences found</div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {findingsByScan.map((finding) => (
+                    <div key={finding.id} className="p-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                            <span className="font-semibold text-slate-800">{finding.scans?.branch || "Unknown branch"}</span>
+                            {finding.scans?.commit_hash ? (
+                              <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">
+                                {finding.scans.commit_hash.slice(0, 7)}
+                              </code>
+                            ) : null}
+                            <span>{formatDate(finding.scans?.created_at || finding.created_at)}</span>
+                            {finding.is_new ? (
+                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">NEW IN THAT SCAN</span>
+                            ) : null}
+                          </div>
+                          <div className="text-sm font-mono text-slate-700 break-all">
+                            {finding.file_path}:L{finding.line_number}
+                          </div>
+                          <p className="text-sm text-slate-600">{finding.message}</p>
+                        </div>
+                        {finding.scan_id ? (
+                          <Link
+                            href={`/dashboard/scans/${finding.scan_id}`}
+                            className="inline-flex items-center gap-1.5 self-start rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            Open scan occurrence
+                            <ArrowUpRight className="w-3.5 h-3.5" />
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
             <section className={`bg-white border ${categoryContext.borderColor} rounded-xl shadow-sm overflow-hidden`}>
               <div className={`px-6 py-4 border-b ${categoryContext.borderColor} ${categoryContext.lightBg}`}>
                 <h2 className={`text-lg font-semibold flex items-center gap-2 ${categoryContext.color}`}>
@@ -517,44 +583,6 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
                       <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded">{ruleInfo.owasp}</span>
                     )}
                   </div>
-                )}
-              </div>
-            </section>
-
-            {/* All occurrences */}
-            <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-purple-600" />
-                  All Occurrences
-                </h2>
-                <span className="text-sm text-slate-500">
-                  {group.occurrence_count} total in {Object.keys(findingsByFile).length} files
-                </span>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {Object.entries(findingsByFile).map(([filePath, fileFindings]) => (
-                  <div key={filePath} className="p-4">
-                    <div className="flex items-center gap-2 text-sm font-mono text-slate-700 mb-3">
-                      <FileCode className="w-4 h-4 text-slate-400" />
-                      {filePath}
-                      <span className="text-xs text-slate-400">({fileFindings.length})</span>
-                    </div>
-                    <div className="space-y-2 pl-6">
-                      {fileFindings.map(f => (
-                        <div key={f.id} className="flex items-center gap-3 text-sm">
-                          <span className="text-slate-400 font-mono w-12">L{f.line_number}</span>
-                          <span className="text-slate-600 truncate flex-1">{f.message}</span>
-                          {f.is_new && (
-                            <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">NEW</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {findings.length === 0 && (
-                  <div className="p-8 text-center text-slate-500">No occurrences found</div>
                 )}
               </div>
             </section>
@@ -591,7 +619,7 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <StatCard icon={<Eye className="w-4 h-4" />} label="Occurrences" value={group.occurrence_count}
-                subtext={`${group.affected_files?.length || 0} files`} />
+                subtext={`${affectedFileCount || group.affected_files?.length || 0} files`} />
               <StatCard icon={<Zap className="w-4 h-4" />} label="Status"
                 value={group.status === 'open' ? 'Open' : 'Resolved'} />
             </div>

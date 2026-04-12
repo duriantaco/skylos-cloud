@@ -246,15 +246,15 @@ export default async function ScansPage() {
               </div>
               <div className="text-sm">
                 <p className="text-indigo-900">
-                  <strong>Scans are events, not entities.</strong> Each scan captures the state of your code at a specific moment.
+                  <strong>Use this page for upload history and audit trail.</strong> Each scan captures the state of your code at a specific moment.
                 </p>
                 <p className="text-indigo-700/70 mt-1">
-                  Start from the project overview when you need compare.
+                  Use project overview to decide where to start or when you need compare.
                 </p>
                 <p className="text-indigo-700/70 mt-1">
-                  Looking for persistent issues across scans? Go to{" "}
+                  Looking for recurring root causes across scans? Go to{" "}
                   <Link href="/dashboard/issues" className="font-medium text-gray-700 hover:text-indigo-800 underline">
-                    Open Issues →
+                    Recurring Issues →
                   </Link>
                 </p>
               </div>

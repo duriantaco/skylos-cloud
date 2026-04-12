@@ -99,9 +99,9 @@ export default async function IssuesInboxPage() {
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-start justify-between gap-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Open Issues</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Recurring Issues</h1>
             <p className="text-slate-500 mt-1">
-              Persistent root causes across scans. Use this backlog after scan triage for recurrence history, ownership, and follow-up.
+              Deduped root causes across scans. Use this backlog after scan review for recurrence history, ownership, and follow-up.
             </p>
           </div>
 
@@ -118,7 +118,7 @@ export default async function IssuesInboxPage() {
             <Search className="w-4 h-4" />
           </div>
           <div className="text-sm text-slate-500">
-            Review the failing scan first. Come here when you need the recurring record for ownership or history.
+            This is not the first-stop triage surface. Review the failing scan first, then come here for the recurring record.
           </div>
         </div>
 
@@ -153,7 +153,7 @@ export default async function IssuesInboxPage() {
                       {g.category} • {g.canonical_file}:{g.canonical_line}
                     </div>
                   </div>
-                  <div className="shrink-0 text-xs text-gray-700 font-semibold">Open →</div>
+                  <div className="shrink-0 text-xs text-gray-700 font-semibold">View record →</div>
                 </div>
               </Link>
             ))}

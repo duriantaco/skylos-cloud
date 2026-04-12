@@ -267,7 +267,7 @@ export default async function DashboardPage() {
                 href="/dashboard/issues"
                 className="flex items-center gap-2 bg-white text-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition border border-slate-200 shadow-sm"
               >
-                <Layers className="w-4 h-4" /> Open Issues
+                <Layers className="w-4 h-4" /> Recurring Issues
               </Link>
             </div>
           </header>
@@ -321,10 +321,10 @@ export default async function DashboardPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
               <div className="flex items-center gap-2 text-slate-500 text-xs font-medium uppercase tracking-wider">
-                <Layers className="w-3.5 h-3.5" /> Open Issues
+                <Layers className="w-3.5 h-3.5" /> Recurring Issues
               </div>
               <div className="mt-2 text-3xl font-bold text-slate-900">{openCount}</div>
-              <div className="mt-1 text-xs text-slate-500">Unique problems to triage</div>
+              <div className="mt-1 text-xs text-slate-500">Recurring root causes</div>
               <MiniSparkline data={totalSparkline} color="#64748b" />
             </div>
 
@@ -370,7 +370,7 @@ export default async function DashboardPage() {
                   Start from the project overview, then drill into the failing scan.
                 </h2>
                 <p className="mt-2 text-sm text-sky-900">
-                  Projects are the entry point. Use scan detail to clear blockers in one upload. Use Open Issues only after scan triage when you need the recurring record for ownership or history.
+                  Projects are the entry point. Use scan detail to clear blockers in one upload. Use Recurring Issues only after scan triage when you need the recurring record for ownership or history.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -394,7 +394,7 @@ export default async function DashboardPage() {
             </div>
           </section>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.9fr] gap-8">
             <section className="space-y-6 order-2 xl:order-2">
               {/* Section Header */}
               <div className="flex items-start justify-between">
@@ -403,17 +403,17 @@ export default async function DashboardPage() {
                     <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-100 text-gray-700">
                       <Layers className="w-5 h-5" />
                     </div>
-                    <h2 className="text-xl font-bold text-slate-900">Open Issues Backlog</h2>
+                    <h2 className="text-xl font-bold text-slate-900">Recurring Issues</h2>
                   </div>
                   <p className="mt-2 text-sm text-slate-500 max-w-md">
-                    <span className="text-slate-700 font-medium">Open Issues is the recurring backlog.</span> Use it after scan triage when you need recurrence history, ownership, or a project-wide follow-up record.
+                    <span className="text-slate-700 font-medium">Recurring issues are deduped root causes across scans.</span> Use this backlog after reviewing the failing scan.
                   </p>
                 </div>
                 <Link
                   href="/dashboard/issues"
                   className="text-xs font-medium text-gray-700 hover:text-indigo-700 flex items-center gap-1"
                 >
-                  View all <ArrowUpRight className="w-3 h-3" />
+                  View backlog <ArrowUpRight className="w-3 h-3" />
                 </Link>
               </div>
 
@@ -427,7 +427,7 @@ export default async function DashboardPage() {
                     {criticalHighGroups.slice(0, 3).map((g) => (
                       <Link
                         key={g.id}
-                        href={g.project_id ? `/dashboard/projects/${g.project_id}` : "/dashboard/projects"}
+                        href={`/dashboard/issues/${g.id}`}
                         className="block bg-white border border-rose-200 rounded-lg p-3 hover:border-rose-300 hover:shadow-sm transition group"
                       >
                         <div className="flex items-start gap-3">
@@ -452,7 +452,7 @@ export default async function DashboardPage() {
                       href="/dashboard/issues?severity=critical,high"
                       className="mt-3 block text-center text-xs font-medium text-rose-700 hover:text-rose-800"
                     >
-                      +{urgentCount - 3} more urgent issues →
+                      +{urgentCount - 3} more recurring issues →
                     </Link>
                   )}
                 </div>
@@ -461,7 +461,7 @@ export default async function DashboardPage() {
               {/* Open Issues List */}
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                 <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-900">Open Issues</span>
+                  <span className="text-sm font-semibold text-slate-900">Recurring Issues</span>
                   <span className="text-xs text-slate-500">{openCount} total</span>
                 </div>
 
@@ -478,7 +478,7 @@ export default async function DashboardPage() {
                     {openSorted.slice(0, 6).map((g) => (
                       <Link
                         key={g.id}
-                        href={g.project_id ? `/dashboard/projects/${g.project_id}` : "/dashboard/projects"}
+                        href={`/dashboard/issues/${g.id}`}
                         className="block p-4 hover:bg-slate-50 transition group"
                       >
                         <div className="flex items-start gap-3">
@@ -525,7 +525,7 @@ export default async function DashboardPage() {
                       href="/dashboard/issues"
                       className="text-xs font-medium text-gray-700 hover:text-indigo-700 flex items-center justify-center gap-1"
                     >
-                      View all {openCount} issues <ArrowUpRight className="w-3 h-3" />
+                      View all {openCount} recurring issues <ArrowUpRight className="w-3 h-3" />
                     </Link>
                   </div>
                 )}
@@ -538,9 +538,8 @@ export default async function DashboardPage() {
                     <FileSearch className="w-4 h-4" />
                   </div>
                   <div className="text-xs text-slate-600 leading-relaxed">
-                    <span className="text-slate-900 font-medium">Issues are entities, not events.</span> The same vulnerability 
-                    appearing in 10 scans = 1 issue with 10 occurrences. Track lifecycle (open → fixed → reintroduced), 
-                    assign owners, verify/refute, and add notes.
+                    <span className="text-slate-900 font-medium">Recurring issues are secondary to scan triage.</span> Use this surface for recurrence history,
+                    ownership, and follow-up after you know which upload needs action.
                   </div>
                 </div>
               </div>
@@ -557,7 +556,7 @@ export default async function DashboardPage() {
                     <div className="p-2.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-600">
                       <History className="w-5 h-5" />
                     </div>
-                    <h2 className="text-xl font-bold text-slate-900">Scan Activity</h2>
+                    <h2 className="text-xl font-bold text-slate-900">Latest Scan Activity</h2>
                   </div>
                   <p className="mt-2 text-sm text-slate-500 max-w-md">
                     <span className="text-slate-700 font-medium">Scans are where active triage happens.</span> Start from the latest failed upload when you need to clear blockers or understand what changed in one run.
@@ -696,9 +695,8 @@ export default async function DashboardPage() {
                     <GitPullRequest className="w-4 h-4" />
                   </div>
                   <div className="text-xs text-slate-600 leading-relaxed">
-                    <span className="text-slate-900 font-medium">Scans are events, not entities.</span> Use scans 
-                    for audit trails, quality gate decisions, debugging ingestion, and historical evidence 
-                    (&quot;it was clean on Jan 29, broken on Jan 30&quot;).
+                    <span className="text-slate-900 font-medium">Use scans for upload history and evidence.</span> Use project overview to decide where to start,
+                    then open a scan when you need to act on one specific upload.
                   </div>
                 </div>
               </div>
