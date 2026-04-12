@@ -3,7 +3,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Plus, Trash2, Save, Loader2, ChevronDown, ChevronRight, Lock } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, ChevronDown, ChevronRight, Lock, Check, CheckCircle2, Copy, Terminal, XCircle } from "lucide-react";
 
 type GateMode = "zero-new" | "category" | "severity" | "both";
 type GateThresholds = Record<string, number>;
@@ -147,6 +147,9 @@ export default function PolicyEditor({
   
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [showSyncNotice, setShowSyncNotice] = useState(false);
+  const [copiedSyncCommand, setCopiedSyncCommand] = useState(false);
   const [showThresholds, setShowThresholds] = useState(true);
   const [showGate, setShowGate] = useState(true);
   const [showCategories, setShowCategories] = useState(false);
@@ -196,8 +199,9 @@ export default function PolicyEditor({
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
+    setSaveError(null);
     try {
-      await fetch('/api/policy', {
+      const res = await fetch('/api/policy', {
         method: 'POST',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -225,12 +229,32 @@ export default function PolicyEditor({
           ai_assurance_enabled: aiAssuranceEnabled,
         }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to save policy");
+      }
+
       setSaved(true);
+      setShowSyncNotice(true);
+      setCopiedSyncCommand(false);
       setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Failed to save policy");
     } finally {
       setSaving(false);
     }
   };
+
+  async function copySyncCommand() {
+    try {
+      await navigator.clipboard.writeText("skylos sync pull");
+      setCopiedSyncCommand(true);
+      window.setTimeout(() => setCopiedSyncCommand(false), 1500);
+    } catch {
+      setSaveError("Failed to copy skylos sync pull");
+    }
+  }
 
   return (
     <div
@@ -471,6 +495,49 @@ export default function PolicyEditor({
       </Section>
 
       {/* Save Button */}
+      {showSyncNotice && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-emerald-900">Policy saved</div>
+              <p className="mt-1 text-sm text-emerald-800">
+                If you use the CLI for local quality gates or uploads, run <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-800">skylos sync pull</code> before your next scan so the CLI picks up the new policy.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={copySyncCommand}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  {copiedSyncCommand ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedSyncCommand ? "Copied" : "Copy command"}
+                </button>
+                <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                  <Terminal className="w-3.5 h-3.5" />
+                  Web-only users can ignore this step.
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {saveError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-red-100 p-2 text-red-700">
+              <XCircle className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-red-900">Save failed</div>
+              <p className="mt-1 text-sm text-red-800">{saveError}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between pt-4 border-t border-slate-100">
         <p className="text-xs text-slate-500">
           After saving, run <code className="bg-slate-100 px-1 rounded">skylos sync pull</code> to update CLI
