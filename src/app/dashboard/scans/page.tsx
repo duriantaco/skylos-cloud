@@ -73,16 +73,22 @@ function GateBadge({ passed }: { passed: boolean | null }) {
 
 function SourceBadge({ tool }: { tool?: string | null }) {
   if (!tool || tool === "skylos") return null;
+  const isDefense = tool === "skylos-defend";
+  const isDebt = tool === "skylos-debt";
   const isClaudeSecurity = tool === "claude-code-security";
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-md border ${
-        isClaudeSecurity
+        isDefense
+          ? "bg-sky-50 text-sky-700 border-sky-200"
+          : isDebt
+          ? "bg-amber-50 text-amber-800 border-amber-200"
+          : isClaudeSecurity
           ? "bg-blue-50 text-blue-700 border-blue-200"
           : "bg-slate-50 text-slate-600 border-slate-200"
       }`}
     >
-      {isClaudeSecurity ? "Claude Security" : tool.toUpperCase()}
+      {isDefense ? "AI Defense" : isDebt ? "Technical Debt" : isClaudeSecurity ? "Claude Security" : tool.toUpperCase()}
     </span>
   );
 }

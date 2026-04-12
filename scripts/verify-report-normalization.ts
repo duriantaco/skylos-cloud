@@ -29,6 +29,77 @@ function verifyNativePayload() {
   assert.deepEqual(normalized.defense_findings, [{ id: "df-1" }]);
 }
 
+function verifyDefensePayload() {
+  const normalized = normalizeIncomingReport({
+    tool: "skylos-defend",
+    actor: "cli-user",
+    commit_hash: "deadbeef",
+    branch: "main",
+    summary: {},
+    findings: [],
+    defense_score: {
+      integrations_found: 1,
+      files_scanned: 1,
+      weighted_score: 16,
+      weighted_max: 16,
+      score_pct: 100,
+      risk_rating: "SECURE",
+      total_checks: 3,
+      passed: 3,
+      by_severity: {
+        critical: { passed: 1, failed: 0, weight: 8 },
+      },
+    },
+    ops_score: {
+      passed: 2,
+      total: 2,
+      score_pct: 100,
+      rating: "EXCELLENT",
+    },
+    owasp_coverage: {
+      LLM02: { name: "Insecure Output Handling", status: "covered" },
+    },
+    defense_findings: [
+      { plugin_id: "model-pinned", passed: true, severity: "medium" },
+    ],
+    defense_integrations: [
+      { provider: "OpenAI", integration_type: "chat", location: "app.py:10" },
+    ],
+  });
+
+  assert.equal(normalized.tool, "skylos-defend");
+  assert.equal(normalized.source, "skylos");
+  assert.equal(normalized.actor, "cli-user");
+  assert.equal(normalized.commit_hash, "deadbeef");
+  assert.equal(normalized.branch, "main");
+  assert.equal(normalized.findings.length, 0);
+  assert.deepEqual(normalized.defense_score, {
+    integrations_found: 1,
+    files_scanned: 1,
+    weighted_score: 16,
+    weighted_max: 16,
+    score_pct: 100,
+    risk_rating: "SECURE",
+    total_checks: 3,
+    passed: 3,
+    by_severity: {
+      critical: { passed: 1, failed: 0, weight: 8 },
+    },
+  });
+  assert.deepEqual(normalized.ops_score, {
+    passed: 2,
+    total: 2,
+    score_pct: 100,
+    rating: "EXCELLENT",
+  });
+  assert.deepEqual(normalized.defense_findings, [
+    { plugin_id: "model-pinned", passed: true, severity: "medium" },
+  ]);
+  assert.deepEqual(normalized.defense_integrations, [
+    { provider: "OpenAI", integration_type: "chat", location: "app.py:10" },
+  ]);
+}
+
 function verifySarifPayload() {
   const normalized = normalizeIncomingReport({
     actor: "ci-bot",
@@ -116,6 +187,7 @@ function verifyClaudePayload() {
 
 function main() {
   verifyNativePayload();
+  verifyDefensePayload();
   verifySarifPayload();
   verifyClaudePayload();
   console.log("verify-report-normalization: ok");

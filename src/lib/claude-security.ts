@@ -1,6 +1,6 @@
 import type { NormalizedFinding, NormalizedPayload } from "./sarif";
 
-type AnyObj = Record<string, any>;
+type AnyObj = Record<string, unknown>;
 
 
 const SEVERITY_MAP: Record<string, NormalizedFinding["severity"]> = {
@@ -18,13 +18,30 @@ function mapSeverity(raw?: string): NormalizedFinding["severity"] {
 }
 
 
-export function isClaudeSecurityReport(body: any): boolean {
+export function isClaudeSecurityReport(body: unknown): boolean {
   if (!body || typeof body !== "object") 
     return false;
 
-  let findings: any[] | null = null;
+  const record = body as AnyObj;
+
+  const toolStr = String(record.tool || record.scanner || record.source || "");
+  const lowerTool = toolStr.toLowerCase();
+  const hasDefensePayload =
+    "defense_score" in record ||
+    "ops_score" in record ||
+    "owasp_coverage" in record ||
+    "defense_findings" in record ||
+    "defense_integrations" in record;
+
+  // Native Skylos defense uploads also carry a tool key and findings array.
+  // Exclude them before applying Claude Security heuristics.
+  if (hasDefensePayload || lowerTool === "skylos-defend") {
+    return false;
+  }
+
+  let findings: unknown[] | null = null;
   for (const key of ["findings", "vulnerabilities", "results"]) {
-    const val = body[key];
+    const val = record[key];
     if (Array.isArray(val)) {
       findings = val;
       break;
@@ -33,11 +50,13 @@ export function isClaudeSecurityReport(body: any): boolean {
   if (findings === null) 
     return false;
 
-  const toolStr = String(body.tool || body.scanner || "");
-  const hasToolKey = !!toolStr || "scan_metadata" in body;
+  const claudeToolHint =
+    lowerTool.includes("claude") ||
+    lowerTool.includes("anthropic") ||
+    "scan_metadata" in record;
 
   if (findings.length === 0) 
-    return hasToolKey;
+    return claudeToolHint;
 
   const sample = findings[0];
   if (typeof sample !== "object" || sample === null) 
@@ -48,7 +67,7 @@ export function isClaudeSecurityReport(body: any): boolean {
     "confidence" in sample ||
     "exploit_scenario" in sample ||
     "exploit" in sample ||
-    hasToolKey
+    claudeToolHint
   );
 }
 
@@ -64,27 +83,33 @@ export function claudeSecurityToSkylosPayload(data: AnyObj): NormalizedPayload &
   source: "claude-code-security";
   source_metadata: ClaudeSecurityMetadata[];
 } {
-  const rawFindings: AnyObj[] =
+  const rawFindingsValue =
     data.findings ?? data.vulnerabilities ?? data.results ?? [];
+  const rawFindings: AnyObj[] = Array.isArray(rawFindingsValue)
+    ? rawFindingsValue.filter((item): item is AnyObj => !!item && typeof item === "object")
+    : [];
 
   const findings: NormalizedFinding[] = [];
   const source_metadata: ClaudeSecurityMetadata[] = [];
   const seen = new Set<string>();
 
   for (const f of rawFindings) {
-    if (!f || typeof f !== "object") 
-      continue;
+    const location =
+      f.location && typeof f.location === "object"
+        ? (f.location as AnyObj)
+        : null;
 
     let ruleId = String(f.rule_id || f.id || f.type || "unknown");
     if (!ruleId.startsWith("CCS:")) ruleId = `CCS:${ruleId}`;
 
-    const filePath =
+    const filePath = String(
       f.file_path ||
       f.file ||
-      f.location?.file ||
-      "unknown";
+      location?.file ||
+      "unknown"
+    );
 
-    let line = Number(f.line_number ?? f.line ?? f.location?.line ?? 0);
+    let line = Number(f.line_number ?? f.line ?? location?.line ?? 0);
     if (!Number.isFinite(line) || line < 1) line = 1;
 
     const dedupKey = `${ruleId}::${filePath}::${line}`;
@@ -96,7 +121,13 @@ export function claudeSecurityToSkylosPayload(data: AnyObj): NormalizedPayload &
       f.message || f.description || f.title || "Security issue"
     );
 
-    const severity = mapSeverity(f.severity || f.level);
+    const severity = mapSeverity(
+      typeof f.severity === "string"
+        ? f.severity
+        : typeof f.level === "string"
+        ? f.level
+        : undefined
+    );
 
     const snippet =
       typeof (f.snippet ?? f.code ?? f.vulnerable_code) === "string"
