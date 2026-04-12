@@ -76,6 +76,18 @@ const SARIF_REPORT = {
   runs: [{ tool: { driver: { name: "eslint" } } }],
 };
 
+const SKYLOS_DEFEND_REPORT = {
+  tool: "skylos-defend",
+  summary: {},
+  findings: [],
+  defense_score: {
+    score_pct: 100,
+    risk_rating: "SECURE",
+  },
+  defense_findings: [{ plugin_id: "model-pinned", passed: true }],
+  defense_integrations: [{ provider: "OpenAI", location: "app.py:10" }],
+};
+
 // ── Detection tests ─────────────────────────────────────────────────────────
 
 describe("isClaudeSecurityReport", () => {
@@ -109,6 +121,10 @@ describe("isClaudeSecurityReport", () => {
 
   it("rejects empty findings without tool key", () => {
     expect(isClaudeSecurityReport({ findings: [] })).toBe(false);
+  });
+
+  it("rejects skylos defend payloads even with a tool key", () => {
+    expect(isClaudeSecurityReport(SKYLOS_DEFEND_REPORT)).toBe(false);
   });
 });
 
