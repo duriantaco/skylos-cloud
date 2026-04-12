@@ -101,7 +101,7 @@ export default async function IssuesInboxPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Open Issues</h1>
             <p className="text-slate-500 mt-1">
-              Persistent root causes across scans. Open one for recurrence history, ownership, and group-level suppression.
+              Persistent root causes across scans. Use this backlog after scan triage for recurrence history, ownership, and follow-up.
             </p>
           </div>
 
@@ -118,7 +118,7 @@ export default async function IssuesInboxPage() {
             <Search className="w-4 h-4" />
           </div>
           <div className="text-sm text-slate-500">
-            (Optional) Add search later; keep inbox simple first.
+            Review the failing scan first. Come here when you need the recurring record for ownership or history.
           </div>
         </div>
 

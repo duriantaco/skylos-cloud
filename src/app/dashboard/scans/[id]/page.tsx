@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, CheckCircle, XCircle, FileText, ChevronRight, ChevronDown,
   Search, ExternalLink, AlertTriangle, Lock, Unlock, Ban, Shield, Terminal, X, ChevronUp,
-  Share2, Link2, Check, Fingerprint, Building2, Layers,
+  Share2, Link2, Check, Fingerprint, Layers,
   Download,
 } from "lucide-react";
 import FlowVisualizerButton from "@/components/FlowVisualizerButton";
@@ -73,7 +73,7 @@ type Scan = {
       unsuppressed_new_by_severity?: Record<string, number>;
     };
   };
-  projects?: { name: string; repo_url: string };
+  projects?: { id: string; name: string; repo_url: string };
   provenance_summary?: {
     total_files: number;
     agent_count: number;
@@ -541,7 +541,7 @@ export default function ScanDetailsPage() {
 
     const { data: scanData } = await supabase
       .from("scans")
-      .select("*, share_token, is_public, projects(name, repo_url)")
+      .select("*, share_token, is_public, projects(id, name, repo_url)")
       .eq("id", id)
       .single();
 
@@ -850,11 +850,14 @@ export default function ScanDetailsPage() {
       {/* HEADER - Compact */}
       <header className="h-14 shrink-0 border-b border-slate-200 bg-white px-4 flex items-center justify-between z-20">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="p-2 -ml-2 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded-lg transition-colors">
+          <Link
+            href={scan.projects?.id ? `/dashboard/projects/${scan.projects.id}` : "/dashboard/projects"}
+            className="p-2 -ml-2 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+          >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div className="flex items-center gap-2 text-sm text-slate-500">
-            <span>Scans</span>
+            <span>Project overview</span>
             <ChevronRight className="w-3 h-3 text-slate-300" />
             <span className="font-semibold text-slate-900">{scan.projects?.name}</span>
             <span className="text-xs text-slate-400 font-mono ml-2">{scan.commit_hash?.slice(0, 7)}</span>
@@ -876,14 +879,6 @@ export default function ScanDetailsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Link
-            href={`/dashboard/scans/${scan.id}/city`}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 text-xs font-bold rounded-lg border border-slate-200 hover:bg-slate-50 transition-all"
-          >
-            <Building2 className="w-3 h-3" />
-            City View
-          </Link>
-
           <div className="relative">
             <button
               onClick={() => {
@@ -1289,11 +1284,11 @@ export default function ScanDetailsPage() {
 
 	              <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 p-4">
 	                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-	                  <div>
-	                    <div className="text-xs font-bold uppercase tracking-wide text-sky-700">Scan Occurrence</div>
-	                    <p className="mt-1 text-sm text-sky-900">
+	                    <div>
+	                      <div className="text-xs font-bold uppercase tracking-wide text-sky-700">Scan Occurrence</div>
+	                      <p className="mt-1 text-sm text-sky-900">
 	                      This page is the workbench for one upload. Use it to clear blockers in this scan.
-	                      Recurrence history, assignment, and group-level suppression live in the persistent issue record.
+	                      Recurrence history, ownership, comments, and verification context live in the persistent issue record.
 	                    </p>
 	                  </div>
 	                  {selectedFinding.group_id ? (

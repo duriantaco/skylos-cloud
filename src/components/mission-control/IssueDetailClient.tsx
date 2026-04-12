@@ -6,17 +6,12 @@ import Link from 'next/link';
 import {
   ArrowLeft, ExternalLink, CheckCircle, XCircle,
   GitCommit, FileCode, Shield, Eye, History,
-  ChevronRight, Copy, Check, Sparkles, Ban, GitPullRequest,
-  Layers, Code2, ArrowUpRight, Trash2, Bug,
+  ChevronRight, Layers, ArrowUpRight, Trash2, Bug,
   Key, Zap
 } from 'lucide-react';
 import IssueComments from '@/components/IssueComments';
 import AssignIssue from '@/components/AssignIssue';
-import FlowVisualizerButton from '@/components/FlowVisualizerButton';
 import ProFeatureLock from '@/components/ProFeatureLock';
-import CreditActionButton from '@/components/CreditActionButton';
-import { FEATURE_KEYS } from '@/lib/credits';
-import NoticeModal from '@/components/NoticeModal';
 
 
 type IssueGroup = {
@@ -52,14 +47,6 @@ type Finding = {
 type Project = {
   name: string;
   repo_url: string | null;
-  github_installation_id: number | null;
-};
-
-type NoticeState = {
-  title: string;
-  message: React.ReactNode;
-  tone: 'success' | 'error';
-  reloadOnClose?: boolean;
 };
 
 const CATEGORY_CONTEXT: Record<string, {
@@ -298,10 +285,6 @@ function formatRuleName(ruleId: string): string {
   return ruleId.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
-
 function timeAgo(dateString: string | null) {
   if (!dateString) return 'Unknown';
   const date = new Date(dateString);
@@ -319,12 +302,6 @@ function formatDate(dateString: string | null) {
   return new Date(dateString).toLocaleDateString('en-US', { 
     month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
-}
-
-function getGitHubUrl(repoUrl: string | null, filePath: string, line: number) {
-  if (!repoUrl) return null;
-  const clean = repoUrl.replace(/\.git$/, '').replace(/\/$/, '');
-  return `${clean}/blob/main/${filePath}#L${line}`;
 }
 
 function SeverityBadge({ severity, size = 'md' }: { severity: string; size?: 'sm' | 'md' | 'lg' }) {
@@ -394,78 +371,11 @@ function StatCard({ icon, label, value, subtext }: { icon: React.ReactNode; labe
   );
 }
 
-function CodeBlock({ code, highlightLine, filePath }: { 
-  code: string; 
-  highlightLine?: number;
-  filePath?: string;
-}) {
-  const [copied, setCopied] = useState(false);
-  const lines = code.split('\n');
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-700">
-      {filePath && (
-        <div className="flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700">
-          <div className="flex items-center gap-2 text-sm text-slate-400 font-mono">
-            <FileCode className="w-4 h-4" />
-            {filePath}
-          </div>
-          <button onClick={handleCopy} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition">
-            {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
-        </div>
-      )}
-      <div className="overflow-x-auto">
-        <pre className="text-sm">
-          {lines.map((line, i) => {
-            const lineNum = i + 1;
-            const isHighlighted = highlightLine === lineNum;
-            return (
-              <div key={i} className={`flex ${isHighlighted ? 'bg-rose-500/20 border-l-2 border-rose-500' : 'border-l-2 border-transparent'}`}>
-                <span className={`select-none px-4 py-0.5 text-right w-12 ${isHighlighted ? 'text-rose-400' : 'text-slate-600'}`}>
-                  {lineNum}
-                </span>
-                <code className={`flex-1 px-4 py-0.5 ${isHighlighted ? 'text-rose-100' : 'text-slate-300'}`}>
-                  {line || ' '}
-                </code>
-              </div>
-            );
-          })}
-        </pre>
-      </div>
-    </div>
-  );
-}
-
 export default function IssueDetailClient({ group, plan = 'free' }: { group: IssueGroup; plan?: string }) {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [project, setProject] = useState<Project | null>(null);
-  const [fileContent, setFileContent] = useState<string | null>(null);
-  const [loadingFile, setLoadingFile] = useState(false);
-  const [isActioning, setIsActioning] = useState(false);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [, setIsCreatingPR] = useState(false);
-  const [prResult, setPrResult] = useState<{ success: boolean; url?: string; error?: string } | null>(null);
-  const [triageResult, setTriageResult] = useState<{
-    priority: string;
-    impact: string;
-    remediation: string[];
-    effort_hours: number | null;
-    reasoning: string;
-  } | null>(null);
-  const [triageError, setTriageError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<NoticeState | null>(null);
-  const [suppressOpen, setSuppressOpen] = useState(false);
-  const [suppressReason, setSuppressReason] = useState('');
-  const [suppressExpiryDays, setSuppressExpiryDays] = useState('');
 
   const ruleInfo = getRuleInfo(group.rule_id, group.category);
   const categoryContext = getCategoryContext(group.category);
@@ -476,7 +386,7 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
       const supabase = createClient();
       const { data } = await supabase
         .from('projects')
-        .select('name, repo_url, github_installation_id, org_id')
+        .select('name, repo_url, org_id')
         .eq('id', group.project_id)
         .single();
       if (data) {
@@ -510,172 +420,13 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
     }
     loadFindings();
   }, [group.id]);
-
-  useEffect(() => {
-    async function loadFile() {
-      if (!group.last_seen_scan_id) 
-        return;
-      setLoadingFile(true);
-      try {
-        const res = await fetch(`/api/scans/${group.last_seen_scan_id}/file?path=${encodeURIComponent(group.canonical_file)}`);
-        if (res.ok) {
-          const data = await res.json();
-          setFileContent(data.content);
-        }
-      } finally {
-        setLoadingFile(false);
-      }
-    }
-    loadFile();
-  }, [group.last_seen_scan_id, group.canonical_file]);
-
-  const githubUrl = getGitHubUrl(project?.repo_url || null, group.canonical_file, group.canonical_line);
-  const canCreatePR = project?.github_installation_id && findings.length > 0;
   const lastSeenScanHref = group.last_seen_scan_id ? `/dashboard/scans/${group.last_seen_scan_id}` : null;
-
-  function closeNotice() {
-    const shouldReload = notice?.reloadOnClose;
-    setNotice(null);
-    if (shouldReload) {
-      window.location.reload();
-    }
-  }
 
   const findingsByFile = findings.reduce((acc, f) => {
     if (!acc[f.file_path]) acc[f.file_path] = [];
     acc[f.file_path].push(f);
     return acc;
   }, {} as Record<string, Finding[]>);
-
-  async function handleCreateFixPR() {
-    if (!findings.length) 
-      return;
-    setIsCreatingPR(true);
-    setPrResult(null);
-    try {
-      const findingId = findings[0].id;
-      const res = await fetch(`/api/findings/${findingId}/fix`, { method: 'POST' });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setPrResult({ success: true, url: data.pr_url });
-      } else {
-        setPrResult({ success: false, error: data.error || 'Failed to create PR' });
-      }
-    } catch (error: unknown) {
-      setPrResult({ success: false, error: getErrorMessage(error, 'Network error') });
-    } finally {
-      setIsCreatingPR(false);
-    }
-  }
-
-  async function handleMarkFalsePositive() {
-    setIsActioning(true);
-    try {
-      const response = await fetch(`/api/issue-groups/${group.id}/suppress`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reason: 'False Positive',
-          expires_at: null
-        })
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to mark as false positive');
-      }
-
-      setNotice({
-        title: 'Issue Marked False Positive',
-        message: 'This recurring issue record has been marked false positive. Dismiss this notice to refresh the page.',
-        tone: 'success',
-        reloadOnClose: true,
-      });
-    } catch (error: unknown) {
-      setNotice({
-        title: 'Issue Action Failed',
-        message: getErrorMessage(error, 'Failed to mark as false positive'),
-        tone: 'error',
-      });
-    } finally {
-      setIsActioning(false);
-    }
-  }
-
-  function handleSuppress() {
-    setSuppressReason('');
-    setSuppressExpiryDays('');
-    setSuppressOpen(true);
-  }
-
-  async function submitSuppress() {
-    let expires_at: string | null = null;
-    const trimmedDays = suppressExpiryDays.trim();
-
-    if (trimmedDays) {
-      const days = Number.parseInt(trimmedDays, 10);
-      if (!Number.isFinite(days) || days <= 0) {
-        setNotice({
-          title: 'Invalid Suppression Expiry',
-          message: 'Expiry days must be a positive number.',
-          tone: 'error',
-        });
-        return;
-      }
-
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + days);
-      expires_at = expiryDate.toISOString();
-    }
-
-    setIsActioning(true);
-    try {
-      const response = await fetch(`/api/issue-groups/${group.id}/suppress`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reason: suppressReason.trim() || null,
-          expires_at
-        })
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to suppress issue');
-      }
-
-      setSuppressOpen(false);
-      setNotice({
-        title: 'Issue Suppressed',
-        message: 'This recurring issue record has been suppressed across future scans. Dismiss this notice to refresh the page.',
-        tone: 'success',
-        reloadOnClose: true,
-      });
-    } catch (error: unknown) {
-      setNotice({
-        title: 'Issue Action Failed',
-        message: getErrorMessage(error, 'Failed to suppress issue'),
-        tone: 'error',
-      });
-    } finally {
-      setIsActioning(false);
-    }
-  }
-
-  async function handleTriage() {
-    setTriageError(null);
-    try {
-      const res = await fetch(`/api/issue-groups/${group.id}/triage`, { method: 'POST' });
-      const data = await res.json();
-      if (res.ok && data.triage) {
-        setTriageResult(data.triage);
-      } else {
-        setTriageError(data.error || 'AI triage failed');
-      }
-    } catch (error: unknown) {
-      setTriageError(getErrorMessage(error, 'Network error'));
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-slate-900 font-sans">
@@ -705,154 +456,36 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
               </p>
             </div>
 
-	            <div className="flex items-center gap-2 shrink-0">
-	              {lastSeenScanHref && (
-	                <Link
-	                  href={lastSeenScanHref}
-	                  className="flex items-center gap-2 px-3 py-2 text-sm text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 rounded-lg transition shadow-sm"
-	                >
-	                  <History className="w-4 h-4" />
-	                  Open last seen scan
-	                </Link>
-	              )}
-	              {findings.length > 0 && (
-	                <FlowVisualizerButton
-                  findingId={findings[0].id}
-                  ruleId={group.rule_id}
-                  category={group.category}
-                  repoUrl={project?.repo_url || undefined}
-                />
+            <div className="flex items-center gap-2 shrink-0">
+              {lastSeenScanHref && (
+                <Link
+                  href={lastSeenScanHref}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 rounded-lg transition shadow-sm"
+                >
+                  <History className="w-4 h-4" />
+                  Open last seen scan
+                </Link>
               )}
-	              {githubUrl && (
-	                <a href={githubUrl} target="_blank" rel="noopener noreferrer"
-	                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition shadow-sm">
-	                  <ExternalLink className="w-4 h-4" />
-	                  View current file on GitHub
-	                </a>
-	              )}
-              <button onClick={handleMarkFalsePositive} disabled={isActioning}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition shadow-sm disabled:opacity-50">
-                <XCircle className="w-4 h-4" />
-                False Positive
-              </button>
-              <button onClick={handleSuppress} disabled={isActioning}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition shadow-sm disabled:opacity-50">
-                <Ban className="w-4 h-4" />
-                Suppress
-              </button>
             </div>
           </div>
         </div>
       </header>
 
-      {suppressOpen && (
-        <div className="fixed inset-0 z-[90]">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => {
-              if (isActioning) return;
-              setSuppressOpen(false);
-            }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-              <div className="flex items-start gap-4 border-b border-slate-200 px-6 py-4">
-                <div className="min-w-0">
-                  <div className="text-sm font-bold text-slate-900">Suppress Issue</div>
-                  <div className="mt-0.5 text-xs text-slate-500">Hide this issue group across future scans.</div>
-                </div>
-                <button
-                  onClick={() => setSuppressOpen(false)}
-                  disabled={isActioning}
-                  className="ml-auto rounded-lg p-2 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  <XCircle className="h-4 w-4 text-slate-500" />
-                </button>
-              </div>
-              <div className="space-y-4 p-6">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700">
-                  {group.rule_id} :: {group.canonical_file}:{group.canonical_line}
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-700">Reason</label>
-                  <textarea
-                    value={suppressReason}
-                    onChange={(event) => setSuppressReason(event.target.value)}
-                    rows={3}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none"
-                    placeholder="Optional context for why this issue is safe to ignore"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-700">Expiry Days</label>
-                  <input
-                    type="number"
-                    min="1"
-                    inputMode="numeric"
-                    value={suppressExpiryDays}
-                    onChange={(event) => setSuppressExpiryDays(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none"
-                    placeholder="Leave blank for permanent suppression"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => setSuppressOpen(false)}
-                    disabled={isActioning}
-                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={submitSuppress}
-                    disabled={isActioning}
-                    className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    {isActioning ? 'Saving...' : 'Suppress'}
-                  </button>
-                </div>
-              </div>
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 px-5 py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wide text-sky-700">Recurring Issue Record</div>
+              <p className="mt-1 text-sm text-sky-900">
+                This page tracks the same root cause across scans. Use it for recurrence history, ownership, comments,
+                and verification context. Use the scan view when you need to suppress, fix, verify, inspect flow,
+                or clear blockers from one specific upload.
+              </p>
             </div>
           </div>
         </div>
-      )}
 
-	      {/* Main content */}
-	      <main className="max-w-7xl mx-auto px-6 py-8">
-	        <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 px-5 py-4">
-	          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-	            <div>
-	              <div className="text-xs font-bold uppercase tracking-wide text-sky-700">Recurring Issue Record</div>
-	              <p className="mt-1 text-sm text-sky-900">
-	                This page tracks the same root cause across scans. Use it for recurrence history, ownership, comments,
-	                and group-level suppression. Use the scan view when you want to work blockers from one specific upload.
-	              </p>
-	            </div>
-	            <div className="flex flex-wrap gap-2">
-	              {lastSeenScanHref ? (
-	                <Link
-	                  href={lastSeenScanHref}
-	                  className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
-	                >
-	                  <History className="w-3.5 h-3.5" />
-	                  Open scan occurrence
-	                </Link>
-	              ) : null}
-	              <Link
-	                href={`/dashboard/projects/${group.project_id}`}
-	                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-	              >
-	                <Layers className="w-3.5 h-3.5" />
-	                Project overview
-	              </Link>
-	            </div>
-	          </div>
-	        </div>
-
-	        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column */}
           <div className="lg:col-span-2 space-y-6">
             <section className={`bg-white border ${categoryContext.borderColor} rounded-xl shadow-sm overflow-hidden`}>
@@ -888,136 +521,6 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
               </div>
             </section>
 
-            <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                  <Code2 className="w-5 h-5 text-gray-700" />
-                  {group.category === 'DEAD_CODE' ? 'Unused Code' : 'Flagged Code'}
-                </h2>
-                <span className="text-sm text-slate-500">Line {group.canonical_line}</span>
-              </div>
-              <div className="p-4">
-                {loadingFile ? (
-                  <div className="text-center py-8 text-slate-500">Loading file...</div>
-                ) : (
-                  <CodeBlock
-                    code={fileContent || group.canonical_snippet || '// No code available'}
-                    highlightLine={group.canonical_line}
-                    filePath={group.canonical_file}
-                  />
-                )}
-              </div>
-            </section>
-
-            {(group.category === 'SECURITY' || group.category === 'SECRET') && findings.length > 0 && (
-              <section className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl shadow-sm overflow-hidden">
-                <div className="px-6 py-5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-100 border border-indigo-200 flex items-center justify-center">
-                      <Zap className="w-5 h-5 text-indigo-600" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-semibold text-slate-900">Data Flow Analysis</h2>
-                      <p className="text-sm text-slate-600">
-                        Trace how untrusted data flows from source to sink in this vulnerability
-                      </p>
-                    </div>
-                  </div>
-                  <FlowVisualizerButton
-                    findingId={findings[0].id}
-                    ruleId={group.rule_id}
-                    category={group.category}
-                    repoUrl={project?.repo_url || undefined}
-                  />
-                </div>
-              </section>
-            )}
-
-            <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-emerald-600" />
-                  How to Fix
-                </h2>
-                
-                {canCreatePR && (
-                  <CreditActionButton
-                    featureKey={FEATURE_KEYS.PR_REVIEW}
-                    label="Create Fix PR"
-                    icon={<GitPullRequest className="w-4 h-4" />}
-                    onAction={handleCreateFixPR}
-                    plan={plan}
-                    proFeatureName="PR Auto-Fix"
-                  />
-                )}
-              </div>
-              <div className="p-6">
-                {prResult && (
-                  <div className={`mb-4 p-4 rounded-lg ${prResult.success ? 'bg-emerald-50 border border-emerald-200' : 'bg-rose-50 border border-rose-200'}`}>
-                    {prResult.success ? (
-                      <div className="flex items-center gap-3">
-                        <CheckCircle className="w-5 h-5 text-emerald-600" />
-                        <div>
-                          <div className="text-sm font-medium text-emerald-700">Pull Request Created!</div>
-                          <a href={prResult.url} target="_blank" rel="noopener noreferrer"
-                            className="text-sm text-emerald-600 hover:underline flex items-center gap-1">
-                            View PR on GitHub<ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <XCircle className="w-5 h-5 text-rose-600" />
-                        <div>
-                          <div className="text-sm font-medium text-rose-700">Failed to create PR</div>
-                          <div className="text-sm text-rose-600">{prResult.error}</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <p className="text-slate-700 leading-relaxed">{ruleInfo.remediation}</p>
-
-                {group.suggested_fix && (
-                  <div className="mt-6 space-y-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-emerald-600">
-                      <Sparkles className="w-4 h-4" />
-                      AI-Suggested Fix Available
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-xs font-medium text-slate-500 mb-2">BEFORE</div>
-                        <pre className="bg-rose-50 border border-rose-200 rounded-lg p-4 text-sm text-rose-800 overflow-x-auto">
-                          {group.suggested_fix.before}
-                        </pre>
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium text-slate-500 mb-2">AFTER</div>
-                        <pre className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm text-emerald-800 overflow-x-auto">
-                          {group.suggested_fix.after}
-                        </pre>
-                      </div>
-                    </div>
-                    <p className="text-sm text-slate-600">{group.suggested_fix.explanation}</p>
-                  </div>
-                )}
-
-                {!canCreatePR && project && !project.github_installation_id && (
-                  <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <div className="text-sm text-slate-600">
-                      <strong className="text-slate-900">Want automatic fix PRs?</strong>
-                      {' '}Install the Skylos GitHub App to enable one-click fixes.
-                    </div>
-                    <Link href="/dashboard/settings/github"
-                      className="inline-flex items-center gap-1 mt-2 text-sm text-gray-700 hover:text-indigo-700 font-medium">
-                      Install GitHub App<ArrowUpRight className="w-3 h-3" />
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </section>
-
             {/* All occurrences */}
             <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -1039,18 +542,11 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
                     </div>
                     <div className="space-y-2 pl-6">
                       {fileFindings.map(f => (
-                        <div key={f.id} className="flex items-center gap-3 text-sm group">
+                        <div key={f.id} className="flex items-center gap-3 text-sm">
                           <span className="text-slate-400 font-mono w-12">L{f.line_number}</span>
                           <span className="text-slate-600 truncate flex-1">{f.message}</span>
                           {f.is_new && (
                             <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">NEW</span>
-                          )}
-                          {project?.repo_url && (
-                            <a href={getGitHubUrl(project.repo_url, f.file_path, f.line_number) || '#'}
-                              target="_blank" rel="noopener noreferrer"
-                              className="text-slate-300 hover:text-slate-500 opacity-0 group-hover:opacity-100 transition">
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
                           )}
                         </div>
                       ))}
@@ -1127,62 +623,6 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
               </div>
             </section>
 
-            {/* AI Triage */}
-            <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  AI Triage
-                </h3>
-              </div>
-              <div className="p-4">
-                {triageResult ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                        triageResult.priority === 'P1' ? 'bg-red-100 text-red-700' :
-                        triageResult.priority === 'P2' ? 'bg-orange-100 text-orange-700' :
-                        triageResult.priority === 'P3' ? 'bg-amber-100 text-amber-700' :
-                        'bg-slate-100 text-slate-600'
-                      }`}>
-                        {triageResult.priority}
-                      </span>
-                      {triageResult.effort_hours != null && (
-                        <span className="text-xs text-slate-500">~{triageResult.effort_hours}h effort</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-slate-700">{triageResult.impact}</p>
-                    {triageResult.remediation.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase mb-1">Remediation</p>
-                        <ol className="text-sm text-slate-600 space-y-1 list-decimal list-inside">
-                          {triageResult.remediation.map((step, i) => (
-                            <li key={i}>{step}</li>
-                          ))}
-                        </ol>
-                      </div>
-                    )}
-                    <p className="text-xs text-slate-400 italic">{triageResult.reasoning}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-xs text-slate-500">Get AI-powered priority assessment, impact analysis, and remediation steps.</p>
-                    {triageError && (
-                      <p className="text-xs text-red-600">{triageError}</p>
-                    )}
-                    <CreditActionButton
-                      featureKey={FEATURE_KEYS.AI_TRIAGE}
-                      label="Triage with AI"
-                      icon={<Sparkles className="w-4 h-4" />}
-                      onAction={handleTriage}
-                      plan={plan}
-                      proFeatureName="AI Issue Triage"
-                    />
-                  </div>
-                )}
-              </div>
-            </section>
-
             <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
                 <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
@@ -1199,12 +639,14 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
-                {project?.github_installation_id && (
-                  <div className="mt-2 flex items-center gap-1 text-xs text-emerald-600">
-                    <CheckCircle className="w-3 h-3" />
-                    GitHub App Connected
-                  </div>
-                )}
+                <div className="mt-2">
+                  <Link
+                    href={`/dashboard/projects/${group.project_id}`}
+                    className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                  >
+                    Open project overview
+                  </Link>
+                </div>
               </div>
             </section>
 
@@ -1242,14 +684,6 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
           </div>
         </div>
       </main>
-
-      <NoticeModal
-        isOpen={notice !== null}
-        onClose={closeNotice}
-        title={notice?.title || 'Issue Action'}
-        message={notice?.message || ''}
-        tone={notice?.tone || 'info'}
-      />
     </div>
   );
 }
