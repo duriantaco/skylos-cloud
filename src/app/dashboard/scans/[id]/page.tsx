@@ -903,7 +903,10 @@ export default function ScanDetailsPage() {
 
       setSuppressOpen(false);
       await fetchData();
-      setToast({ type: 'success', message: "Suppressed. Future scans will ignore this signature." });
+      setToast({
+        type: 'success',
+        message: "Suppressed. Future scans will ignore this signature. If you use the CLI, run skylos sync pull before your next local scan.",
+      });
     } catch (error: unknown) {
       setToast({ type: 'error', message: `Suppress failed: ${getErrorMessage(error, "Unknown error")}` });
     } finally {
