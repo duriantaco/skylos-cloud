@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   CheckCircle2, XCircle, Clock, GitBranch, GitCommit,
-  ArrowRight, History, AlertTriangle, Shield, ArrowDownUp
+  ArrowRight, History, AlertTriangle, Shield
 } from "lucide-react";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
@@ -219,15 +219,8 @@ export default async function ScansPage() {
               </p>
             </div>
 
-            {/* Actions + Quick stats */}
+            {/* Quick stats */}
             <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard/scans/compare"
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition"
-            >
-              <ArrowDownUp className="w-4 h-4" />
-              Compare Scans
-            </Link>
             <div className="flex items-center gap-4 text-sm bg-white border border-slate-200 rounded-xl px-4 py-3">
               <div className="text-center px-3">
                 <div className="text-xl font-bold text-slate-900">{totalScans}</div>
@@ -254,6 +247,9 @@ export default async function ScansPage() {
               <div className="text-sm">
                 <p className="text-indigo-900">
                   <strong>Scans are events, not entities.</strong> Each scan captures the state of your code at a specific moment.
+                </p>
+                <p className="text-indigo-700/70 mt-1">
+                  Start from the project overview when you need compare.
                 </p>
                 <p className="text-indigo-700/70 mt-1">
                   Looking for persistent issues across scans? Go to{" "}

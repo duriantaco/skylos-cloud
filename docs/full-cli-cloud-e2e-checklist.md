@@ -242,21 +242,38 @@ cd /private/tmp/skylos-e2e-fixture
 ## Phase 5: Cloud Verification After First Upload
 
 - [x] Open:
+  - `https://skylos.dev/dashboard`
+  Expected:
+  - dashboard `Start here` copy points you to the project overview / latest failed scan flow
+  - `Open Issues` is present as a secondary backlog, not the first recommended stop
+
+- [x] Open:
+  - `https://skylos.dev/dashboard/projects`
+  Expected:
+  - the new project is listed
+  - project overview is the primary entry point for investigation
+
+- [x] Open:
   - `https://skylos.dev/dashboard/scans`
   Expected:
   - the new scan appears in the scans list
   - it is associated with the correct project
+  - the page does not promote compare as the first step
 
 - [x] Open:
   - `https://skylos.dev/dashboard/issues`
   Expected:
   - at least one open issue group exists for the uploaded findings
   - the page is not empty for the fixture upload
+  - the page describes itself as a recurring backlog used after scan triage
 
 - [x] Open the first issue group
   Expected:
   - issue detail page loads
   - canonical file, severity, and rule/group context are visible
+  - issue detail is framed as a recurring record, not a scan workbench
+  - there is a single strong CTA to open the last seen scan
+  - there are no scan-triage tools like flow, code, suppress, or fix PR actions
 
 ## Phase 6: Share, Export, And Compare
 
@@ -304,7 +321,11 @@ cd /private/tmp/skylos-e2e-fixture
 
 - [ ] Leave this unchecked until you have at least two uploaded scans for the same project.
 
-- [ ] When you have two scans, open:
+- [ ] When you have two scans, launch compare from the project overview.
+  Expected:
+  - compare is reached as a drill-down, not as the first step on the scans index
+
+- [ ] Once compare opens, confirm the compare page URL is:
   - `https://skylos.dev/dashboard/scans/compare`
 
 - [ ] In `Scan A`, choose the older scan
@@ -318,6 +339,10 @@ cd /private/tmp/skylos-e2e-fixture
   - the page does not error when loading the two selected scans
 
 ## Phase 7: Suppress A Blocking Finding
+
+- [ ] Stay on the failing scan detail page for this entire phase.
+  Expected:
+  - do not switch to issue detail before finishing `New only` / `All` checks
 
 - [ ] In the failing scan, open `SKY-D212`
 
@@ -404,7 +429,7 @@ cd /private/tmp/skylos-e2e-fixture
   - `SKY-D212` is blocking again
 
 - [ ] Credit-gated: compare the Phase 8 PASS scan against this post-revoke FAIL scan
-  - open `/dashboard/scans/compare`
+  - launch compare from the project overview
   - choose the PASS scan as `Scan A`
   - choose the FAIL scan as `Scan B`
   Expected:

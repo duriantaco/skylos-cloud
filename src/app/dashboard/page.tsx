@@ -15,7 +15,6 @@ import {
   Eye,
   FileSearch,
   Zap,
-  BarChart3,
 } from "lucide-react";
 import MiniSparkline from "@/components/MiniSparkline";
 
@@ -33,7 +32,7 @@ type ScanRow = {
     legacy_issues?: number | null;
     suppressed_new_issues?: number | null;
   } | null;
-  projects?: { name: string | null; repo_url: string | null } | null;
+  projects?: { id: string | null; name: string | null; repo_url: string | null } | null;
 };
 
 type IssueGroupRow = {
@@ -169,7 +168,7 @@ export default async function DashboardPage() {
     supabase
       .from("scans")
       .select(
-        "id, created_at, commit_hash, quality_gate_passed, stats, projects!inner(name, repo_url, org_id)"
+        "id, created_at, commit_hash, quality_gate_passed, stats, projects!inner(id, name, repo_url, org_id)"
       )
       .eq("projects.org_id", orgId)
       .order("created_at", { ascending: false })
@@ -210,8 +209,10 @@ export default async function DashboardPage() {
   const criticalHighGroups = (criticalHighGroupsRaw as unknown as IssueGroupRow[] | null) || [];
 
   const latestScan = recentScans[0] || null;
+  const latestFailedScan = recentScans.find((scan) => scan.quality_gate_passed === false) || null;
   const openCount = Number(openGroupsCount || 0);
   const urgentCount = Number(criticalHighCount || 0);
+  const focusProject = latestFailedScan?.projects || latestScan?.projects || null;
 
   const lastScanAt = latestScan?.created_at ? new Date(latestScan.created_at) : null;
   const daysSinceLastScan = lastScanAt
@@ -257,16 +258,16 @@ export default async function DashboardPage() {
 
             <div className="flex gap-3">
               <Link
-                href="/dashboard/issues"
+                href={focusProject?.id ? `/dashboard/projects/${focusProject.id}` : "/dashboard/projects"}
                 className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-500 transition shadow-sm"
               >
-                <Layers className="w-4 h-4" /> Open Issues
+                <Box className="w-4 h-4" /> Open Project Overview
               </Link>
               <Link
-                href="/dashboard/scans"
+                href="/dashboard/issues"
                 className="flex items-center gap-2 bg-white text-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition border border-slate-200 shadow-sm"
               >
-                <History className="w-4 h-4" /> Scan History
+                <Layers className="w-4 h-4" /> Open Issues
               </Link>
             </div>
           </header>
@@ -361,8 +362,40 @@ export default async function DashboardPage() {
             </div>
           </div>
 
+          <section className="rounded-2xl border border-sky-200 bg-sky-50 px-6 py-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <div className="text-xs font-bold uppercase tracking-wide text-sky-700">Start Here</div>
+                <h2 className="mt-1 text-xl font-bold text-slate-900">
+                  Start from the project overview, then drill into the failing scan.
+                </h2>
+                <p className="mt-2 text-sm text-sky-900">
+                  Projects are the entry point. Use scan detail to clear blockers in one upload. Use Open Issues only after scan triage when you need the recurring record for ownership or history.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href={focusProject?.id ? `/dashboard/projects/${focusProject.id}` : "/dashboard/projects"}
+                  className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-sky-700 border border-sky-200 hover:bg-sky-100 transition"
+                >
+                  <Box className="w-4 h-4" />
+                  {focusProject?.id ? "Open project overview" : "Go to projects"}
+                </Link>
+                {latestFailedScan ? (
+                  <Link
+                    href={`/dashboard/scans/${latestFailedScan.id}`}
+                    className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition"
+                  >
+                    <ShieldAlert className="w-4 h-4" />
+                    Review latest failed scan
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-            <section className="space-y-6">
+            <section className="space-y-6 order-2 xl:order-2">
               {/* Section Header */}
               <div className="flex items-start justify-between">
                 <div>
@@ -370,11 +403,10 @@ export default async function DashboardPage() {
                     <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-100 text-gray-700">
                       <Layers className="w-5 h-5" />
                     </div>
-                    <h2 className="text-xl font-bold text-slate-900">Open Issues</h2>
+                    <h2 className="text-xl font-bold text-slate-900">Open Issues Backlog</h2>
                   </div>
                   <p className="mt-2 text-sm text-slate-500 max-w-md">
-                    <span className="text-slate-700 font-medium">Issues are persistent problems</span> that exist across multiple scans. 
-                    Each issue is deduplicated — fix it once, it&apos;s gone everywhere.
+                    <span className="text-slate-700 font-medium">Open Issues is the recurring backlog.</span> Use it after scan triage when you need recurrence history, ownership, or a project-wide follow-up record.
                   </p>
                 </div>
                 <Link
@@ -395,7 +427,7 @@ export default async function DashboardPage() {
                     {criticalHighGroups.slice(0, 3).map((g) => (
                       <Link
                         key={g.id}
-                        href={`/dashboard/issues/${g.id}`}
+                        href={g.project_id ? `/dashboard/projects/${g.project_id}` : "/dashboard/projects"}
                         className="block bg-white border border-rose-200 rounded-lg p-3 hover:border-rose-300 hover:shadow-sm transition group"
                       >
                         <div className="flex items-start gap-3">
@@ -446,7 +478,7 @@ export default async function DashboardPage() {
                     {openSorted.slice(0, 6).map((g) => (
                       <Link
                         key={g.id}
-                        href={`/dashboard/issues/${g.id}`}
+                        href={g.project_id ? `/dashboard/projects/${g.project_id}` : "/dashboard/projects"}
                         className="block p-4 hover:bg-slate-50 transition group"
                       >
                         <div className="flex items-start gap-3">
@@ -517,7 +549,7 @@ export default async function DashboardPage() {
             {/* ========================================== */}
             {/* RIGHT: SCAN TIMELINE (SCANS = EVENTS)     */}
             {/* ========================================== */}
-            <section className="space-y-6">
+            <section className="space-y-6 order-1 xl:order-1">
               {/* Section Header */}
               <div className="flex items-start justify-between">
                 <div>
@@ -525,11 +557,10 @@ export default async function DashboardPage() {
                     <div className="p-2.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-600">
                       <History className="w-5 h-5" />
                     </div>
-                    <h2 className="text-xl font-bold text-slate-900">Scan Timeline</h2>
+                    <h2 className="text-xl font-bold text-slate-900">Scan Activity</h2>
                   </div>
                   <p className="mt-2 text-sm text-slate-500 max-w-md">
-                    <span className="text-slate-700 font-medium">Scans are point-in-time snapshots.</span> Each scan 
-                    records exactly what Skylos found on a specific commit — your immutable audit trail.
+                    <span className="text-slate-700 font-medium">Scans are where active triage happens.</span> Start from the latest failed upload when you need to clear blockers or understand what changed in one run.
                   </p>
                 </div>
                 <Link
@@ -672,26 +703,13 @@ export default async function DashboardPage() {
                 </div>
               </div>
 
-              {/* Trends Quick Link */}
-              <Link
-                href="/dashboard/trends"
-                className="block bg-white border border-slate-200 rounded-xl p-5 hover:border-slate-300 hover:shadow-md transition group shadow-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-100 text-blue-600">
-                    <BarChart3 className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition">
-                      View Trends
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      Track how your code quality changes over time
-                    </div>
-                  </div>
-                  <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition" />
-                </div>
-              </Link>
+              <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600">
+                Historical analytics is a drill-down, not a first step.{" "}
+                <Link href="/dashboard/trends" className="font-medium text-slate-900 hover:text-gray-700">
+                  Open Historical Analytics
+                </Link>
+                {" "}after you know which project or scan you want to analyze.
+              </div>
 
               {/* Add Project CTA */}
               <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-6 relative overflow-hidden">
