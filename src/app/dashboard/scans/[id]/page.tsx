@@ -1581,6 +1581,9 @@ export default function ScanDetailsPage() {
 	                      This page is the workbench for one upload. Use it to clear blockers in this scan.
 	                      Recurrence history, ownership, comments, and verification context live in the persistent issue record.
 	                    </p>
+                      <p className="mt-2 text-xs text-sky-800">
+                        Need broader delta or history? Go back to project overview and use compare there.
+                      </p>
 	                  </div>
 	                  {selectedFinding.group_id ? (
 	                    <Link
