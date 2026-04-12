@@ -355,7 +355,7 @@ cd /private/tmp/skylos-e2e-fixture
 - [ ] Submit suppression
   Expected:
   - success toast appears
-  - top bar suppressed count increases
+  - scan summary `Suppressed present` increases
   - in `New only` mode the suppressed finding disappears
 
 - [ ] Switch from `New only` to `All`
@@ -387,8 +387,14 @@ cd /private/tmp/skylos-e2e-fixture
 - [ ] Open the new scan URL
   Expected:
   - `Quality Gate: PASS`
-  - `1 suppressed`
+  - `Suppressed present` includes the previously suppressed `SKY-D212`
   - the previously suppressed `SKY-D212` no longer blocks the gate
+
+- [ ] Optional sanity check: do not use a second identical rerun as the primary Phase 8 evidence
+  Expected:
+  - if you rerun the exact same code again before revoke, the previous PASS scan can become the new baseline
+  - matching findings may move from `new` into `not new`
+  - `Suppressed present` should still reflect suppressed findings present in the scan, but `new` counts may drop to zero
 
 ## Phase 9: Revoke Suppression And Confirm Regression
 
@@ -425,8 +431,8 @@ cd /private/tmp/skylos-e2e-fixture
 - [ ] Open the new scan URL
   Expected:
   - `Quality Gate: FAIL`
-  - `0 suppressed`
-  - `SKY-D212` is blocking again
+  - `Suppressed present` no longer includes `SKY-D212`
+  - `Gate blockers` includes `SKY-D212` again
 
 - [ ] Credit-gated: compare the Phase 8 PASS scan against this post-revoke FAIL scan
   - launch compare from the project overview
