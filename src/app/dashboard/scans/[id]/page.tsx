@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, CheckCircle, XCircle, FileText, ChevronRight, ChevronDown,
-  Search, ExternalLink, AlertTriangle, Lock, Unlock, Ban, Shield, Terminal, X, ChevronUp,
+  Search, ExternalLink, AlertTriangle, Lock, Unlock, Ban, Shield, Terminal, X, ChevronUp, History,
   Share2, Link2, Check, Fingerprint, Layers,
   Download,
 } from "lucide-react";
@@ -65,12 +65,20 @@ type Scan = {
     gate?: {
       enabled?: boolean;
       mode?: "zero-new" | "category" | "severity" | "both";
+      comparison_scope?: "pr-diff" | "baseline" | "first-scan-baseline";
       thresholds?: {
         by_category?: Record<string, number>;
         by_severity?: Record<string, number>;
       };
       unsuppressed_new_by_category?: Record<string, number>;
       unsuppressed_new_by_severity?: Record<string, number>;
+      baseline?: {
+        scan_id?: string | null;
+        branch?: string | null;
+        commit_hash?: string | null;
+        created_at?: string | null;
+        source?: "same-branch-pass" | "default-branch-pass" | "none" | null;
+      };
     };
   };
   projects?: { id: string; name: string; repo_url: string };
@@ -97,6 +105,7 @@ type Finding = {
   rule_id: string;
   snippet?: string | null;
   is_new: boolean;
+  new_reason?: "pr-changed-line" | "pr-file-fallback" | "legacy" | "non-pr" | "first-scan-baseline" | "not-in-baseline" | null;
   is_suppressed: boolean;
 
   finding_id?: string | null;
@@ -233,6 +242,21 @@ function TabButton({ active, onClick, label, count }: TabButtonProps) {
 }
 
 type GateStatus = "PASS" | "FAIL" | "OVERRIDDEN";
+type GateSummary = {
+  gateBlockers: Finding[];
+  newNonBlocking: Finding[];
+  suppressedPresent: Finding[];
+  notNew: Finding[];
+  aiGateBlockers: Finding[];
+  blockerSeverityCounts: Record<string, number>;
+  byCategory: Array<{
+    cat: string;
+    gateBlockers: number;
+    newNonBlocking: number;
+    suppressedPresent: number;
+    notNew: number;
+  }>;
+};
 
 function rankSeverity(sev: string) {
   const s = String(sev || "").toUpperCase();
@@ -255,50 +279,186 @@ function safeNum(x: unknown, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function formatGateMode(mode: string) {
+  if (mode === "severity") return "severity thresholds";
+  if (mode === "category") return "category thresholds";
+  if (mode === "both") return "saved thresholds";
+  return "zero-new policy";
+}
+
+function formatScanTimestamp(dateString?: string | null) {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function getNotNewFindingPresentation(finding: Finding) {
+  if (finding.new_reason === "first-scan-baseline") {
+    return {
+      badgeLabel: "BASELINE",
+      badgeClassName: "bg-sky-100 text-sky-700",
+      title: "Baseline Finding",
+      description:
+        "This scan had no earlier passing baseline, so this finding is recorded as part of the baseline for future comparisons.",
+    };
+  }
+
+  return {
+    badgeLabel: "NOT NEW",
+    badgeClassName: "bg-slate-100 text-slate-600",
+    title: "Not New In This Scan",
+    description:
+      "This finding is outside the current new-finding scope, so it remains visible but does not count against the gate.",
+  };
+}
+
+function buildGateSummary(scan: Scan, findings: Finding[]): GateSummary {
+  const gateMeta = scan.stats?.gate;
+  const enabled = gateMeta?.enabled !== false;
+  const mode = String(gateMeta?.mode || "zero-new");
+  const thresholdsByCategory = gateMeta?.thresholds?.by_category || {};
+  const thresholdsBySeverity = gateMeta?.thresholds?.by_severity || {};
+  const aiFiles = new Set(scan.ai_code_stats?.ai_files || []);
+
+  const unsuppressed = findings.filter((f) => !f.is_suppressed);
+  const newUnsuppressed = unsuppressed.filter((f) => f.is_new);
+  const blockerIds = new Set<string>();
+
+  if (!scan.is_overridden) {
+    if (enabled) {
+      const criticalSecurity = unsuppressed.filter(
+        (f) =>
+          String(f.severity || "").toUpperCase() === "CRITICAL" &&
+          String(f.category || "").toUpperCase() === "SECURITY"
+      );
+
+      for (const finding of criticalSecurity) {
+        blockerIds.add(finding.id);
+      }
+
+      if (criticalSecurity.length === 0) {
+        if (mode === "zero-new") {
+          for (const finding of newUnsuppressed) {
+            blockerIds.add(finding.id);
+          }
+        } else {
+          if (mode === "severity" || mode === "both") {
+            const bySeverity = newUnsuppressed.reduce<Record<string, number>>((acc, finding) => {
+              const key = String(finding.severity || "MEDIUM").toUpperCase();
+              acc[key] = (acc[key] || 0) + 1;
+              return acc;
+            }, {});
+
+            for (const [severity, count] of Object.entries(bySeverity)) {
+              if (count <= safeNum(thresholdsBySeverity[severity], 0)) continue;
+              for (const finding of newUnsuppressed) {
+                if (String(finding.severity || "MEDIUM").toUpperCase() === severity) {
+                  blockerIds.add(finding.id);
+                }
+              }
+            }
+          }
+
+          if (mode === "category" || mode === "both") {
+            const byCategory = newUnsuppressed.reduce<Record<string, number>>((acc, finding) => {
+              const key = String(finding.category || "UNCATEGORIZED").toUpperCase();
+              acc[key] = (acc[key] || 0) + 1;
+              return acc;
+            }, {});
+
+            for (const [category, count] of Object.entries(byCategory)) {
+              if (count <= safeNum(thresholdsByCategory[category], 0)) continue;
+              for (const finding of newUnsuppressed) {
+                if (String(finding.category || "UNCATEGORIZED").toUpperCase() === category) {
+                  blockerIds.add(finding.id);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (scan.ai_code_detected && scan.ai_code_stats?.gate_passed === false) {
+      for (const finding of newUnsuppressed) {
+        if (aiFiles.has(finding.file_path)) {
+          blockerIds.add(finding.id);
+        }
+      }
+    }
+  }
+
+  const gateBlockers = findings.filter((f) => blockerIds.has(f.id));
+  const newNonBlocking = findings.filter(
+    (f) => f.is_new && !f.is_suppressed && !blockerIds.has(f.id)
+  );
+  const suppressedPresent = findings.filter((f) => f.is_suppressed);
+  const notNew = findings.filter(
+    (f) => !f.is_new && !f.is_suppressed && !blockerIds.has(f.id)
+  );
+  const aiGateBlockers = gateBlockers.filter((f) => f.is_new && aiFiles.has(f.file_path));
+
+  const blockerSeverityCounts = gateBlockers.reduce<Record<string, number>>((acc, finding) => {
+    const key = String(finding.severity || "LOW").toUpperCase();
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const categories = ["SECURITY", "SECRET", "QUALITY", "DEAD_CODE", "DEPENDENCY"] as const;
+  const byCategory = categories
+    .map((cat) => ({
+      cat,
+      gateBlockers: gateBlockers.filter((f) => f.category === cat).length,
+      newNonBlocking: newNonBlocking.filter((f) => f.category === cat).length,
+      suppressedPresent: suppressedPresent.filter((f) => f.category === cat).length,
+      notNew: notNew.filter((f) => f.category === cat).length,
+    }))
+    .filter((row) => row.gateBlockers + row.newNonBlocking + row.suppressedPresent + row.notNew > 0);
+
+  return {
+    gateBlockers,
+    newNonBlocking,
+    suppressedPresent,
+    notNew,
+    aiGateBlockers,
+    blockerSeverityCounts,
+    byCategory,
+  };
+}
+
 function GatePanel({
   scan,
-  findings,
+  gateSummary,
   onJumpToFinding,
   isExpanded,
   onToggle,
 }: {
   scan: Scan;
-  findings: Finding[];
+  gateSummary: GateSummary;
   onJumpToFinding: (f: Finding) => void;
   isExpanded: boolean;
   onToggle: () => void;
 }) {
   const status = getGateStatus(scan);
   const gateMeta = scan.stats?.gate;
-  const enabled = gateMeta?.enabled !== false;
   const mode = String(gateMeta?.mode || "zero-new");
-
-  const newUnsuppressed = findings.filter((f) => f.is_new && !f.is_suppressed);
-  const newSuppressed = findings.filter((f) => f.is_new && f.is_suppressed);
-  const legacy = findings.filter((f) => !f.is_new);
-
-  const sevCounts = newUnsuppressed.reduce<Record<string, number>>((acc, f) => {
-    const k = String(f.severity || "LOW").toUpperCase();
-    acc[k] = (acc[k] || 0) + 1;
-    return acc;
-  }, {});
-
-  const topBlockers = [...newUnsuppressed]
+  const baseline = gateMeta?.baseline;
+  const comparisonScope =
+    gateMeta?.comparison_scope || (baseline?.scan_id ? "baseline" : "first-scan-baseline");
+  const topBlockers = [...gateSummary.gateBlockers]
     .sort((a, b) => rankSeverity(a.severity) - rankSeverity(b.severity))
     .slice(0, 3);
-
-  const thresholdsByCat = gateMeta?.thresholds?.by_category || {};
-  const cats = ["SECURITY", "SECRET", "QUALITY", "DEAD_CODE"] as const;
-
-  const breakdown = cats.map((cat) => {
-    const inCat = findings.filter((f) => f.category === cat);
-    const newUns = inCat.filter((f) => f.is_new && !f.is_suppressed).length;
-    const newSup = inCat.filter((f) => f.is_new && f.is_suppressed).length;
-    const leg = inCat.filter((f) => !f.is_new).length;
-    const limit = gateMeta ? safeNum(thresholdsByCat[cat], 0) : null;
-    const blocks = !enabled ? false : !gateMeta ? newUns > 0 : (mode === "category" || mode === "both") ? newUns > safeNum(limit, 0) : newUns > 0;
-    return { cat, newUns, newSup, leg, limit, blocks };
-  }).filter(r => (r.newUns + r.newSup + r.leg) > 0);
+  const criticalGateBlockers = gateSummary.gateBlockers.filter(
+    (finding) =>
+      String(finding.severity || "").toUpperCase() === "CRITICAL" &&
+      String(finding.category || "").toUpperCase() === "SECURITY"
+  ).length;
 
   const statusColors = {
     PASS: "border-emerald-200 bg-emerald-50",
@@ -326,15 +486,18 @@ function GatePanel({
             Quality Gate: {status}
           </div>
           
-          <div className="flex items-center gap-3 text-xs text-slate-600">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
             <span className="px-2 py-1 rounded bg-white/80 border border-slate-200">
-              <span className="font-semibold text-red-600">{newUnsuppressed.length}</span> blocking
+              <span className="font-semibold text-red-600">{gateSummary.gateBlockers.length}</span> gate blockers
             </span>
             <span className="px-2 py-1 rounded bg-white/80 border border-slate-200">
-              <span className="font-semibold">{newSuppressed.length}</span> suppressed
+              <span className="font-semibold text-amber-700">{gateSummary.newNonBlocking.length}</span> new non-blocking
             </span>
             <span className="px-2 py-1 rounded bg-white/80 border border-slate-200">
-              <span className="font-semibold text-slate-500">{legacy.length}</span> legacy
+              <span className="font-semibold">{gateSummary.suppressedPresent.length}</span> suppressed present
+            </span>
+            <span className="px-2 py-1 rounded bg-white/80 border border-slate-200">
+              <span className="font-semibold text-slate-500">{gateSummary.notNew.length}</span> not new
             </span>
           </div>
         </div>
@@ -347,82 +510,173 @@ function GatePanel({
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="px-6 pb-4 grid lg:grid-cols-3 gap-4 border-t border-slate-200/50 pt-4">
-          {/* Blocking reason */}
+        <div className="px-6 pb-4 border-t border-slate-200/50 pt-4 space-y-4">
           <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Why</div>
-            {status === "PASS" && (
-              <div className="text-sm text-slate-700">No new unsuppressed findings.</div>
-            )}
-            {status === "OVERRIDDEN" && (
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Compared against</div>
+            {comparisonScope === "pr-diff" ? (
+              <div className="space-y-1.5">
+                <div className="text-sm text-slate-700">
+                  This scan uses PR diff scope to decide what counts as new, based on changed lines and files in the current review.
+                </div>
+                {baseline?.scan_id ? (
+                  <>
+                    <div className="text-xs text-slate-500">
+                      The latest passing baseline on <span className="font-semibold text-slate-700">{baseline.branch || scan.branch}</span> is kept for context, but it does not decide the new/not new classification on this PR-scoped scan.
+                    </div>
+                    <Link
+                      href={`/dashboard/scans/${baseline.scan_id}`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:text-sky-800"
+                    >
+                      Open baseline scan
+                    </Link>
+                  </>
+                ) : null}
+              </div>
+            ) : baseline?.scan_id ? (
+              <div className="space-y-1.5">
+                <div className="text-sm text-slate-700">
+                  Using the latest passing baseline on
+                  {" "}
+                  <span className="font-semibold text-slate-900">{baseline.branch || scan.branch}</span>
+                  {baseline.commit_hash ? (
+                    <>
+                      {" "}
+                      at
+                      {" "}
+                      <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">
+                        {baseline.commit_hash.slice(0, 7)}
+                      </code>
+                    </>
+                  ) : null}
+                  {formatScanTimestamp(baseline.created_at) ? (
+                    <>
+                      {" "}
+                      from
+                      {" "}
+                      <span className="text-slate-500">{formatScanTimestamp(baseline.created_at)}</span>
+                    </>
+                  ) : null}
+                  .
+                </div>
+                <div className="text-xs text-slate-500">
+                  Matching findings from that scan often move into the not new bucket on repeat reruns, even when the code has not changed.
+                </div>
+                <Link
+                  href={`/dashboard/scans/${baseline.scan_id}`}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:text-sky-800"
+                >
+                  Open baseline scan
+                </Link>
+              </div>
+            ) : (
               <div className="text-sm text-slate-700">
-                Gate overridden.
-                {scan.override_reason && (
-                  <span className="block mt-1 text-xs text-slate-500">Reason: {scan.override_reason}</span>
-                )}
+                This scan had no earlier passing baseline, so its findings establish the baseline for future comparisons.
               </div>
             )}
-            {status === "FAIL" && (
-              <div className="space-y-2">
-                <div className="text-sm text-slate-700 font-medium">
-                  {newUnsuppressed.length} new issue{newUnsuppressed.length !== 1 ? 's' : ''} blocking
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-4">
+            {/* Blocking reason */}
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Why</div>
+              {status === "PASS" && (
+                <div className="space-y-2 text-sm text-slate-700">
+                  {gateSummary.gateBlockers.length === 0 && gateSummary.newNonBlocking.length === 0 && gateSummary.notNew.length === 0 ? (
+                    <div>No gate blockers or non-new findings in this scan.</div>
+                  ) : null}
+                  {gateSummary.newNonBlocking.length > 0 ? (
+                    <div>
+                      {gateSummary.newNonBlocking.length} new finding{gateSummary.newNonBlocking.length !== 1 ? "s" : ""} present, but they stay within the saved {formatGateMode(mode)}.
+                    </div>
+                  ) : null}
+                  {gateSummary.suppressedPresent.length > 0 ? (
+                    <div>
+                      {gateSummary.suppressedPresent.length} suppressed finding{gateSummary.suppressedPresent.length !== 1 ? "s are" : " is"} still present in this scan but ignored by the gate.
+                    </div>
+                  ) : null}
+                  {gateSummary.notNew.length > 0 ? (
+                    <div>
+                      {gateSummary.notNew.length} finding{gateSummary.notNew.length !== 1 ? "s are" : " is"} not counted as new in this scan.
+                    </div>
+                  ) : null}
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {Object.keys(sevCounts)
+              )}
+              {status === "OVERRIDDEN" && (
+                <div className="text-sm text-slate-700">
+                  Gate overridden.
+                  {scan.override_reason && (
+                    <span className="block mt-1 text-xs text-slate-500">Reason: {scan.override_reason}</span>
+                  )}
+                </div>
+              )}
+              {status === "FAIL" && (
+                <div className="space-y-2">
+                  <div className="text-sm text-slate-700 font-medium">
+                    {criticalGateBlockers > 0
+                      ? `${criticalGateBlockers} critical security issue${criticalGateBlockers !== 1 ? "s" : ""} block the gate regardless of thresholds.`
+                      : gateSummary.aiGateBlockers.length > 0
+                      ? `${gateSummary.aiGateBlockers.length} finding${gateSummary.aiGateBlockers.length !== 1 ? "s" : ""} in AI-authored files block the AI assurance gate.`
+                      : mode === "zero-new"
+                      ? `${gateSummary.gateBlockers.length} new unsuppressed finding${gateSummary.gateBlockers.length !== 1 ? "s" : ""} block the zero-new policy.`
+                      : `${gateSummary.gateBlockers.length} finding${gateSummary.gateBlockers.length !== 1 ? "s" : ""} exceed the saved ${formatGateMode(mode)}.`}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.keys(gateSummary.blockerSeverityCounts)
                     .sort((a, b) => rankSeverity(a) - rankSeverity(b))
                     .map((k) => (
                       <span key={k} className="px-2 py-0.5 rounded bg-slate-100 text-xs font-semibold text-slate-700">
-                        {k}: {sevCounts[k]}
+                        {k}: {gateSummary.blockerSeverityCounts[k]}
                       </span>
                     ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Top blockers */}
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Top blockers</div>
-            {topBlockers.length === 0 ? (
-              <div className="text-sm text-slate-500">None</div>
-            ) : (
-              <div className="space-y-1.5">
-                {topBlockers.map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => onJumpToFinding(f)}
-                    className="w-full text-left flex items-center gap-2 p-2 rounded hover:bg-slate-50 transition text-xs"
-                  >
-                    <SeverityBadge severity={f.severity} />
-                    <span className="font-mono text-slate-600 truncate">{f.rule_id}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Breakdown */}
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">By category</div>
-            {breakdown.length === 0 ? (
-              <div className="text-sm text-slate-500">No findings.</div>
-            ) : (
-              <div className="space-y-1">
-                {breakdown.map((r) => (
-                  <div key={r.cat} className="flex items-center justify-between text-xs py-1">
-                    <span className="font-medium text-slate-700">{r.cat}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono">{r.newUns}</span>
-                      {r.blocks ? (
-                        <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold">BLOCK</span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">OK</span>
-                      )}
-                    </div>
                   </div>
-                ))}
-              </div>
-            )}
+                  {gateSummary.newNonBlocking.length > 0 ? (
+                    <div className="text-xs text-slate-500">
+                      {gateSummary.newNonBlocking.length} additional new finding{gateSummary.newNonBlocking.length !== 1 ? "s are" : " is"} present but not contributing to the gate failure.
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+
+            {/* Top blockers */}
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Gate blockers</div>
+              {topBlockers.length === 0 ? (
+                <div className="text-sm text-slate-500">None in this scan.</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {topBlockers.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => onJumpToFinding(f)}
+                      className="w-full text-left flex items-center gap-2 p-2 rounded hover:bg-slate-50 transition text-xs"
+                    >
+                      <SeverityBadge severity={f.severity} />
+                      <span className="font-mono text-slate-600 truncate">{f.rule_id}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Breakdown */}
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">By category</div>
+              {gateSummary.byCategory.length === 0 ? (
+                <div className="text-sm text-slate-500">No findings.</div>
+              ) : (
+                <div className="space-y-2">
+                  {gateSummary.byCategory.map((row) => (
+                    <div key={row.cat} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                      <div className="text-xs font-semibold text-slate-800">{row.cat}</div>
+                      <div className="mt-1 text-[11px] text-slate-500">
+                        Gate blockers {row.gateBlockers} • New non-blocking {row.newNonBlocking} • Suppressed present {row.suppressedPresent} • Not new {row.notNew}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -726,6 +980,7 @@ export default function ScanDetailsPage() {
     DEPENDENCY: viewFindings.filter(f => f.category === 'DEPENDENCY').length,
     REVIEW: viewFindings.filter(f => f.needs_review).length,
   }), [viewFindings]);
+  const gateSummary = useMemo(() => (scan ? buildGateSummary(scan, findings) : null), [scan, findings]);
   const verificationChain = selectedFinding?.verification_evidence?.chain ?? [];
 
   const toggleFile = (filePath: string) => {
@@ -748,6 +1003,15 @@ export default function ScanDetailsPage() {
   }
 
   const gateFailed = !scan.quality_gate_passed;
+  const effectiveGateSummary = gateSummary || buildGateSummary(scan, findings);
+  const selectedFindingIsGateBlocker = !!(
+    selectedFinding &&
+    effectiveGateSummary.gateBlockers.some((finding) => finding.id === selectedFinding.id)
+  );
+  const selectedFindingNotNewPresentation =
+    selectedFinding && !selectedFinding.is_new && !selectedFinding.is_suppressed
+      ? getNotNewFindingPresentation(selectedFinding)
+      : null;
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 font-sans text-slate-900 overflow-hidden">
@@ -973,7 +1237,7 @@ export default function ScanDetailsPage() {
       {/* GATE PANEL - Collapsible */}
       <GatePanel
         scan={scan}
-        findings={findings}
+        gateSummary={effectiveGateSummary}
         onJumpToFinding={(f) => {
           setSelectedFinding(f);
           setExpandedFiles(prev => ({ ...prev, [f.file_path]: true }));
@@ -1205,6 +1469,8 @@ export default function ScanDetailsPage() {
                         <div className="pl-3 pr-2 space-y-1 pb-1">
                           {fileFindings.map(f => {
                             const active = selectedFinding?.id === f.id;
+                            const notNewPresentation =
+                              !f.is_new && !f.is_suppressed ? getNotNewFindingPresentation(f) : null;
                             return (
                               <button
                                 key={f.id}
@@ -1225,6 +1491,11 @@ export default function ScanDetailsPage() {
                                     )}
                                     {f.is_suppressed && (
                                       <span className="px-1.5 py-0.5 bg-slate-200 text-slate-500 text-[9px] font-bold rounded">IGNORED</span>
+                                    )}
+                                    {notNewPresentation && (
+                                      <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${notNewPresentation.badgeClassName}`}>
+                                        {notNewPresentation.badgeLabel}
+                                      </span>
                                     )}
                                     {!!f.analysis_source && <SourceBadge source={f.analysis_source} />}
                                     {!!f.analysis_confidence && <ConfidenceBadge confidence={f.analysis_confidence} />}
@@ -1262,12 +1533,22 @@ export default function ScanDetailsPage() {
           ) : (
 	            <div className="max-w-4xl mx-auto p-6 lg:p-8">
 	              {/* Alert banners */}
-              {selectedFinding.is_new && !selectedFinding.is_suppressed && (
+              {selectedFinding.is_new && !selectedFinding.is_suppressed && selectedFindingIsGateBlocker && (
                 <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-3 flex gap-3">
                   <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
                   <div>
-                    <div className="text-sm font-semibold text-red-900">New Violation</div>
-                    <p className="text-xs text-red-700 mt-0.5">This blocks the quality gate.</p>
+                    <div className="text-sm font-semibold text-red-900">Gate Blocker</div>
+                    <p className="text-xs text-red-700 mt-0.5">This finding is currently failing the quality gate.</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedFinding.is_new && !selectedFinding.is_suppressed && !selectedFindingIsGateBlocker && (
+                <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 flex gap-3">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-sm font-semibold text-amber-900">New In This Scan</div>
+                    <p className="text-xs text-amber-700 mt-0.5">This finding is new, but it stays below the current gate thresholds.</p>
                   </div>
                 </div>
               )}
@@ -1277,10 +1558,20 @@ export default function ScanDetailsPage() {
                   <Ban className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                   <div>
                     <div className="text-sm font-semibold text-slate-700">Suppressed</div>
-                    <p className="text-xs text-slate-500 mt-0.5">Won&apos;t block future gates.</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Still present in this scan, but ignored by the active suppression.</p>
                   </div>
 	                </div>
 	              )}
+
+              {!selectedFinding.is_new && !selectedFinding.is_suppressed && !selectedFindingIsGateBlocker && selectedFindingNotNewPresentation && (
+                <div className="mb-6 rounded-lg border border-slate-200 bg-white p-3 flex gap-3">
+                  <History className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-sm font-semibold text-slate-700">{selectedFindingNotNewPresentation.title}</div>
+                    <p className="text-xs text-slate-500 mt-0.5">{selectedFindingNotNewPresentation.description}</p>
+                  </div>
+                </div>
+              )}
 
 	              <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 p-4">
 	                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

@@ -338,6 +338,13 @@ type NotificationPayload = {
   suppressedCount: number;
 };
 
+type BaselineScanRow = {
+  id: string;
+  branch: string | null;
+  commit_hash: string | null;
+  created_at: string | null;
+};
+
 
 export async function POST(req: Request) {
   const supabase = getSupabaseAdmin();
@@ -614,11 +621,12 @@ export async function POST(req: Request) {
     }
 
    
-    let baselineScan: { id: string } | null = null;
+    let baselineScan: BaselineScanRow | null = null;
+    let baselineSource: "same-branch-pass" | "default-branch-pass" | "none" = "none";
 
     const { data: sameBranchScan } = await supabase
       .from('scans')
-      .select('id')
+      .select('id, branch, commit_hash, created_at')
       .eq('project_id', project.id)
       .eq('branch', effectiveBranch)
       .or('quality_gate_passed.eq.true,is_overridden.eq.true')
@@ -627,12 +635,13 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (sameBranchScan?.id) {
-      baselineScan = sameBranchScan;
+      baselineScan = sameBranchScan as BaselineScanRow;
+      baselineSource = "same-branch-pass";
     }
     else if (effectiveBranch !== defaultBranch) {
       const { data: fallbackScan } = await supabase
         .from('scans')
-        .select('id')
+        .select('id, branch, commit_hash, created_at')
         .eq('project_id', project.id)
         .eq('branch', defaultBranch)
         .or('quality_gate_passed.eq.true,is_overridden.eq.true')
@@ -641,11 +650,18 @@ export async function POST(req: Request) {
         .maybeSingle();
 
       if (fallbackScan?.id) {
-        baselineScan = fallbackScan;
+        baselineScan = fallbackScan as BaselineScanRow;
+        baselineSource = "default-branch-pass";
       }
     }
 
     const hasBaseline = !!baselineScan?.id;
+    const comparisonScope: "pr-diff" | "baseline" | "first-scan-baseline" =
+      diffScope && caps.prDiffEnabled
+        ? "pr-diff"
+        : hasBaseline
+        ? "baseline"
+        : "first-scan-baseline";
     const isWhitelisted = !!overriddenScanResult.data
 
     if (process.env.SKYLOS_DEBUG) {
@@ -807,9 +823,20 @@ export async function POST(req: Request) {
       String(f.severity || "").toUpperCase() === "CRITICAL" &&
       String(f.category || "").toUpperCase() === "SECURITY"
     ).length;
+    const aiAssuranceEnabled = !!(ai_code?.detected && (project as any).ai_assurance_enabled);
+    const aiFiles = new Set(ai_code?.ai_files || []);
+    const aiFileFindings = aiAssuranceEnabled
+      ? finalFindings.filter(
+          (f: any) => f.is_new && !f.is_suppressed && aiFiles.has(f.file_path)
+        )
+      : [];
 
 
     let passedGate = false;
+    let failedByCritical = false;
+    let failedByZeroNew = false;
+    let failedByThresholds = false;
+    let failedByAiAssurance = false;
 
     if (isWhitelisted && caps.overridesEnabled) {
       passedGate = true;
@@ -817,8 +844,10 @@ export async function POST(req: Request) {
       passedGate = true;
     } else if (criticalSecurityIssues > 0) {
       passedGate = false;
+      failedByCritical = true;
     } else if (mode === "zero-new") {
       passedGate = unsuppressedNewCount === 0;
+      failedByZeroNew = unsuppressedNewCount > 0;
     } else {
       let ok = true;
 
@@ -839,15 +868,13 @@ export async function POST(req: Request) {
       }
 
       passedGate = ok;
+      failedByThresholds = !ok;
     }
 
-    if (ai_code?.detected && (project as any).ai_assurance_enabled) {
-      const aiFiles = new Set(ai_code.ai_files || []);
-      const aiFileFindings = finalFindings.filter(
-        (f: any) => f.is_new && !f.is_suppressed && aiFiles.has(f.file_path)
-      );
+    if (aiAssuranceEnabled) {
       if (aiFileFindings.length > 0) {
         passedGate = false;
+        failedByAiAssurance = true;
       }
       if (ai_code) {
         ai_code.gate_passed = aiFileFindings.length === 0;
@@ -873,9 +900,25 @@ export async function POST(req: Request) {
           gate: {
             enabled: gateEnabled,
             mode,
+            comparison_scope: comparisonScope,
             thresholds: { by_category: byCategoryThresholds, by_severity: bySeverityThresholds },
             unsuppressed_new_by_category: unsuppressedNewByCategory,
             unsuppressed_new_by_severity: unsuppressedNewBySeverity,
+            baseline: baselineScan
+              ? {
+                  scan_id: baselineScan.id,
+                  branch: baselineScan.branch,
+                  commit_hash: baselineScan.commit_hash,
+                  created_at: baselineScan.created_at,
+                  source: baselineSource,
+                }
+              : {
+                  scan_id: null,
+                  branch: effectiveBranch,
+                  commit_hash: null,
+                  created_at: null,
+                  source: baselineSource,
+                },
           }
         },
         quality_gate_passed: passedGate,
@@ -1316,7 +1359,9 @@ export async function POST(req: Request) {
             const reasons: string[] = [];
             if (!passedGate) {
               if (criticalSecurityIssues > 0) reasons.push(`${criticalSecurityIssues} critical security issue(s)`);
-              if (unsuppressedNewCount > 0) reasons.push(`${unsuppressedNewCount} new unsuppressed issue(s) introduced`);
+              if (failedByAiAssurance) reasons.push(`${aiFileFindings.length} new unsuppressed AI-authored file issue(s)`);
+              if (failedByZeroNew) reasons.push(`${unsuppressedNewCount} new unsuppressed issue(s) introduced`);
+              if (failedByThresholds) reasons.push(`saved ${mode} thresholds exceeded`);
             }
 
             const summaryMd = [
@@ -1513,6 +1558,17 @@ export async function POST(req: Request) {
     }
 
 
+    const qualityGateFailureReasons: string[] = [];
+    if (failedByCritical) qualityGateFailureReasons.push(`${criticalSecurityIssues} critical security issue${criticalSecurityIssues !== 1 ? "s" : ""}`);
+    if (failedByAiAssurance) qualityGateFailureReasons.push(`${aiFileFindings.length} new unsuppressed finding${aiFileFindings.length !== 1 ? "s" : ""} in AI-authored files`);
+    if (failedByZeroNew) qualityGateFailureReasons.push(`${unsuppressedNewCount} new unsuppressed finding${unsuppressedNewCount !== 1 ? "s" : ""}`);
+    if (failedByThresholds) qualityGateFailureReasons.push(`saved ${mode} thresholds exceeded`);
+    const qualityGateMessage = passedGate
+      ? 'Quality Gate Passed.'
+      : qualityGateFailureReasons.length > 0
+      ? `Quality Gate Failed! ${qualityGateFailureReasons.join("; ")}.`
+      : 'Quality Gate Failed.';
+
     const response: any = {
       success: passedGate,
       scanId: scan.id,
@@ -1521,9 +1577,7 @@ export async function POST(req: Request) {
         passed: passedGate,
         new_violations: unsuppressedNewCount,
         suppressed_new_violations: suppressedNewCount,
-        message: passedGate
-          ? 'Quality Gate Passed.'
-          : `Quality Gate Failed! ${unsuppressedNewCount} new violations introduced.`,
+        message: qualityGateMessage,
       },
       explain: {
             baseline: {
@@ -1532,7 +1586,7 @@ export async function POST(req: Request) {
               selection_rule:
                 "latest successful or overridden scan on the current branch, otherwise the repository default branch",
             },
-            detection_mode: caps.prDiffEnabled ? "pr-diff" : "baseline-fallback",
+            detection_mode: comparisonScope,
             suppressions_enabled: caps.suppressionsEnabled,
             strict_mode: !!project.strict_mode,
             force_disabled_when_strict: !!project.strict_mode,
