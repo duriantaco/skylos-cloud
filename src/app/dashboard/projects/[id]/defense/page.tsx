@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   ArrowLeft, Shield, CheckCircle, XCircle, AlertTriangle,
   TrendingUp, Layers, Eye,
@@ -105,9 +105,14 @@ function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function CustomTooltip({ active, payload }: any) {
-  if (!active || !payload?.[0]) return null;
-  const d = payload[0].payload;
+type CustomTooltipProps = {
+  active?: boolean;
+  payload?: Array<{ payload: HistoryPoint }>;
+};
+
+function CustomTooltip({ active, payload }: CustomTooltipProps) {
+  const d = payload?.[0]?.payload;
+  if (!active || !d) return null;
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-3 py-2 text-xs">
       <div className="font-bold text-slate-900">{formatDate(d.created_at)}</div>
@@ -139,8 +144,8 @@ export default function DefensePage() {
         setHistory(data.history || []);
         setFindings(data.findings || []);
         setOwaspCoverage(data.owaspCoverage || null);
-      } catch (e: any) {
-        setError(e.message);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to load defense data");
       } finally {
         setLoading(false);
       }
@@ -214,6 +219,15 @@ export default function DefensePage() {
                   </div>
                   <div className="text-xs text-slate-500 mt-1">
                     {latest.passed}/{latest.total} checks passing &middot; {latest.weighted_score}/{latest.weighted_max} weighted
+                  </div>
+                  <div className="mt-3">
+                    <Link
+                      href={`/dashboard/scans/${latest.scan_id}/defense`}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      Open latest receipt
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -298,7 +312,7 @@ export default function DefensePage() {
                       uncovered: 'text-red-700',
                       not_applicable: 'text-slate-400',
                     };
-                    const icons: Record<string, any> = {
+                    const icons: Record<string, ReactNode> = {
                       covered: <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />,
                       partial: <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />,
                       uncovered: <XCircle className="w-3.5 h-3.5 text-red-500" />,

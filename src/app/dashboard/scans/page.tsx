@@ -99,10 +99,11 @@ function ScanCard({ scan }: { scan: Scan }) {
   const legacyIssues = stats.legacy_issues ?? 0;
   const total = stats.total ?? newIssues + legacyIssues;
   const criticalHigh = (stats.by_severity?.CRITICAL ?? 0) + (stats.by_severity?.HIGH ?? 0);
+  const scanHref = scan.tool === "skylos-defend" ? `/dashboard/scans/${scan.id}/defense` : `/dashboard/scans/${scan.id}`;
 
   return (
     <Link
-      href={`/dashboard/scans/${scan.id}`}
+      href={scanHref}
       className="block bg-white border border-slate-200 rounded-xl p-5 hover:border-slate-300 hover:shadow-md transition group"
     >
       <div className="flex items-start justify-between gap-4">
