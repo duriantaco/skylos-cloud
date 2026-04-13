@@ -177,16 +177,6 @@ type DefenseIntegration = {
   risk_rating: string;
 };
 
-type DefenseHistoryPoint = {
-  scan_id: string;
-  score_pct: number;
-  risk_rating: string;
-  ops_score_pct: number;
-  ops_rating: string;
-  integrations_found: number;
-  created_at: string;
-};
-
 type TabButtonProps = {
   active: boolean;
   onClick: () => void;
@@ -353,12 +343,10 @@ function DefenseScanView({
   scan,
   defenseFindings,
   defenseIntegrations,
-  defenseHistory,
 }: {
   scan: Scan;
   defenseFindings: DefenseFinding[];
   defenseIntegrations: DefenseIntegration[];
-  defenseHistory: DefenseHistoryPoint[];
 }) {
   const defenseScore = scan.defense_score;
   if (!defenseScore) {
@@ -398,47 +386,47 @@ function DefenseScanView({
   const opsChecks = defenseFindings.filter((finding) => finding.category.toLowerCase() === "ops");
 
   return (
-    <div className="bg-slate-50">
+    <main className="bg-slate-50 pointer-events-auto">
       <div className="max-w-6xl mx-auto p-6 lg:p-8 space-y-6">
         <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="text-xs font-bold uppercase tracking-wide text-sky-700">AI Defense Scan</div>
-              <h1 className="mt-1 text-2xl font-black text-slate-900">Security posture for this LLM upload</h1>
+            <div className="max-w-3xl">
+              <div className="text-xs font-bold uppercase tracking-wide text-sky-700">Defense Run Receipt</div>
+              <h1 className="mt-1 text-2xl font-black text-slate-900">This upload&apos;s AI defense result</h1>
               <p className="mt-2 max-w-3xl text-sm text-sky-900">
-                This page is a defense report, not a file-triage workbench. It shows how secure the detected LLM integrations
-                were in this specific upload.
+                Use this page to inspect exactly what was detected in this one defense run. For posture over time, latest score,
+                and historical trend, use Project Defense instead.
               </p>
               <p className="mt-2 text-xs text-sky-700">
                 Uploaded {formatCompactDate(scan.created_at)} from commit <span className="font-mono">{scan.commit_hash?.slice(0, 7) || "local"}</span>.
               </p>
-              <p className="mt-2 text-xs text-sky-800">
-                Revisit this upload as the report for this exact run, or jump to project-level defense history for the longer trend.
-              </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={`/dashboard/projects/${scan.project_id}/defense`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
-              >
-                <Shield className="w-3.5 h-3.5" />
-                Project Defense History
-              </Link>
-              <Link
-                href={`/dashboard/projects/${scan.project_id}`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                Project Overview
-              </Link>
-              <Link
-                href="/dashboard/scans"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                Scan History
-              </Link>
+            <div className="rounded-xl border border-sky-200 bg-white/80 p-4 lg:w-80">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Next</div>
+              <div className="mt-2 space-y-2">
+                <Link
+                  href={`/dashboard/projects/${scan.project_id}/defense`}
+                  className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  Open Project Defense
+                </Link>
+                <Link
+                  href={`/dashboard/projects/${scan.project_id}`}
+                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  Project Overview
+                </Link>
+                <Link
+                  href="/dashboard/scans"
+                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Scan History
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -472,47 +460,29 @@ function DefenseScanView({
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Integrations</div>
-            <div className="mt-2 text-3xl font-black text-slate-900">{defenseScore.integrations_found ?? defenseIntegrations.length}</div>
-            <div className="mt-1 text-xs text-slate-500">LLM call sites detected</div>
-            <div className="mt-1 text-[10px] text-slate-400">
-              {defenseScore.files_scanned ?? 0} files scanned
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Run Context</div>
+            <div className="mt-3 space-y-2 text-xs text-slate-600">
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-400">Branch</div>
+                <div className="mt-1 font-mono text-slate-800">{scan.branch || "unknown"}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-400">Commit</div>
+                <div className="mt-1 font-mono text-slate-800">{scan.commit_hash?.slice(0, 7) || "local"}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-400">Integrations</div>
+                <div className="mt-1 text-slate-800">
+                  {defenseScore.integrations_found ?? defenseIntegrations.length} call site{(defenseScore.integrations_found ?? defenseIntegrations.length) === 1 ? "" : "s"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-400">Files Scanned</div>
+                <div className="mt-1 text-slate-800">{defenseScore.files_scanned ?? 0}</div>
+              </div>
             </div>
           </div>
         </div>
-
-        {defenseHistory.length > 1 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">Recent Defense Runs</h2>
-                <p className="mt-1 text-xs text-slate-500">Use this upload as the receipt and the project defense page as the long-term trend view.</p>
-              </div>
-            </div>
-            <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-              {defenseHistory.slice(0, 4).map((point) => (
-                <Link
-                  key={point.scan_id}
-                  href={`/dashboard/scans/${point.scan_id}`}
-                  className={`rounded-xl border p-3 transition ${
-                    point.scan_id === scan.id
-                      ? "border-sky-300 bg-sky-50"
-                      : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-slate-900">{point.score_pct}%</span>
-                    <span className="text-[10px] font-bold text-slate-500">{point.risk_rating}</span>
-                  </div>
-                  <div className="mt-1 text-[11px] text-slate-500">
-                    Ops {point.ops_score_pct}% · {point.integrations_found} integration{point.integrations_found === 1 ? "" : "s"}
-                  </div>
-                  <div className="mt-2 text-[10px] text-slate-400">{formatCompactDate(point.created_at)}</div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6">
           <div className="flex items-center gap-2">
@@ -686,7 +656,7 @@ function DefenseScanView({
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -1141,7 +1111,6 @@ export default function ScanDetailsPage() {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [defenseFindings, setDefenseFindings] = useState<DefenseFinding[]>([]);
   const [defenseIntegrations, setDefenseIntegrations] = useState<DefenseIntegration[]>([]);
-  const [defenseHistory, setDefenseHistory] = useState<DefenseHistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [userPlan, setUserPlan] = useState<string>('free');
 
@@ -1281,7 +1250,6 @@ export default function ScanDetailsPage() {
       const [
         { data: defenseFindingsData },
         { data: defenseIntegrationsData },
-        { data: defenseHistoryData },
       ] = await Promise.all([
         supabase
           .from("defense_findings")
@@ -1293,21 +1261,13 @@ export default function ScanDetailsPage() {
           .select("*")
           .eq("scan_id", id)
           .order("score_pct", { ascending: true }),
-        supabase
-          .from("defense_scores")
-          .select("scan_id, score_pct, risk_rating, ops_score_pct, ops_rating, integrations_found, created_at")
-          .eq("project_id", scanData.project_id)
-          .order("created_at", { ascending: false })
-          .limit(6),
       ]);
 
       setDefenseFindings((defenseFindingsData || []) as DefenseFinding[]);
       setDefenseIntegrations((defenseIntegrationsData || []) as DefenseIntegration[]);
-      setDefenseHistory((defenseHistoryData || []) as DefenseHistoryPoint[]);
     } else {
       setDefenseFindings([]);
       setDefenseIntegrations([]);
-      setDefenseHistory([]);
     }
 
     // Fetch plan for gating
@@ -1505,20 +1465,8 @@ export default function ScanDetailsPage() {
 
   if (isDefenseOnlyScan) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-slate-50 font-sans text-slate-900">
-        {toast && (
-          <div className="fixed top-4 right-4 z-[100]">
-            <div className={`rounded-xl border shadow-lg px-4 py-3 flex items-start gap-3 max-w-[420px]
-              ${toast.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
-              <div className="text-sm font-medium leading-snug">{toast.message}</div>
-              <button onClick={() => setToast(null)} className="ml-auto p-1 rounded hover:bg-black/5">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="border-b border-slate-200 bg-white">
+      <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pointer-events-auto">
+        <div className="border-b border-slate-200 bg-white relative z-10">
           <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
               <Link href="/dashboard/scans" className="font-medium text-slate-600 hover:text-slate-900">
@@ -1578,7 +1526,6 @@ export default function ScanDetailsPage() {
           scan={scan}
           defenseFindings={defenseFindings}
           defenseIntegrations={defenseIntegrations}
-          defenseHistory={defenseHistory}
         />
       </div>
     );
