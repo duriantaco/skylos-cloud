@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Github, Check, Loader2, AlertCircle, ExternalLink } from 'lucide-react'
+import ConfirmModal from '@/components/ConfirmModal'
 
 type ConflictProject = {
   id: string
@@ -25,6 +26,7 @@ export default function RepoUrlEditor({
   const [error, setError] = useState<string | null>(null)
   const [conflictProject, setConflictProject] = useState<ConflictProject | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const [showUnlinkModal, setShowUnlinkModal] = useState(false)
 
   useEffect(() => {
     setUrl(currentUrl || '')
@@ -79,15 +81,7 @@ export default function RepoUrlEditor({
 
   const handleUnlink = async () => {
     if (!currentUrl) return
-
-    const confirmed = window.confirm(
-      githubInstallationId
-        ? 'Remove the repository link from this project? This keeps the GitHub App installation in GitHub, but Skylos will stop using this repo binding until you link a repo again.'
-        : 'Remove the repository link from this project?'
-    )
-
-    if (!confirmed) return
-
+    setShowUnlinkModal(false)
     setUrl('')
     await saveRepoUrl(null)
   }
@@ -151,7 +145,7 @@ export default function RepoUrlEditor({
         </button>
         {currentUrl ? (
           <button
-            onClick={handleUnlink}
+            onClick={() => setShowUnlinkModal(true)}
             disabled={saving}
             className="px-4 py-2 border border-red-200 bg-white text-red-700 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -191,6 +185,28 @@ export default function RepoUrlEditor({
           This project still has a GitHub App installation attached. Unlinking the repository URL here does not uninstall the GitHub App from GitHub.
         </p>
       ) : null}
+
+      <ConfirmModal
+        isOpen={showUnlinkModal}
+        onClose={() => setShowUnlinkModal(false)}
+        onConfirm={handleUnlink}
+        title="Unlink GitHub repository?"
+        message={
+          githubInstallationId ? (
+            <>
+              Remove the repository link from this project? Skylos will stop using this repo binding until you link a repository again.
+              <br />
+              <br />
+              The GitHub App installation will remain installed in GitHub until you remove it there.
+            </>
+          ) : (
+            "Remove the repository link from this project?"
+          )
+        }
+        confirmText="Unlink"
+        confirmStyle="warning"
+        isLoading={saving}
+      />
     </div>
   )
 }
