@@ -39,10 +39,14 @@ export async function POST(request: NextRequest) {
   try {
     getCheckoutBillingConfig(packId as PackId);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Billing checkout is not configured.";
+    console.error("Billing checkout config check failed", {
+      orgId: auth.orgId,
+      packId,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       {
-        error: message,
+        error: "Checkout is not available for this pack right now.",
         code: "BILLING_NOT_CONFIGURED",
         pack_id: packId,
       },
@@ -76,10 +80,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: checkoutUrl });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to create checkout session.";
+    console.error("Billing checkout session creation failed", {
+      orgId: org.id,
+      packId,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json(
       {
-        error: message,
+        error: "Checkout could not be started right now. Please try again later.",
         code: "CHECKOUT_FAILED",
         pack_id: packId,
       },
