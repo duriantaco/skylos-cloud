@@ -281,7 +281,11 @@ export default async function SettingsPage({
 
         <ProjectSwitcher projects={projects} selectedProjectId={project.id} />
 
-        <RepoUrlEditor projectId={project.id} currentUrl={project.repo_url} />
+        <RepoUrlEditor
+          projectId={project.id}
+          currentUrl={project.repo_url}
+          githubInstallationId={project.github_installation_id}
+        />
 
         <GitHubAppInstall 
           currentPlan={userPlan}
