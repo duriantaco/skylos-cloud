@@ -5,6 +5,7 @@ import { ArrowLeft, ExternalLink, FileText, Fingerprint, GitBranch, GitCommit, S
 import ProjectSectionTabs from "@/components/ProjectSectionTabs";
 import ProFeatureLock from "@/components/ProFeatureLock";
 import ProvenanceDetail from "@/components/ProvenanceDetail";
+import ScrollToTopOnMount from "@/components/ScrollToTopOnMount";
 import { canUseProvenanceAudit, canViewProvenanceDetail, getEffectivePlan } from "@/lib/entitlements";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
@@ -27,6 +28,7 @@ type ScanRow = {
 
 type ProvenanceFile = {
   id: string;
+  scan_id: string;
   file_path: string;
   agent_authored: boolean;
   agent_name: string | null;
@@ -54,6 +56,15 @@ function timeAgo(dateString: string) {
 
 function shortCommit(commit?: string | null) {
   return commit ? commit.slice(0, 7) : "unknown";
+}
+
+function derivedAgentFileCount(
+  scan: Pick<ScanRow, "id" | "provenance_agent_count" | "provenance_summary">,
+  filesByScan: Map<string, ProvenanceFile[]>
+) {
+  const summaryCount = Number(scan.provenance_agent_count ?? scan.provenance_summary?.agent_count ?? 0);
+  const fileCount = filesByScan.get(scan.id)?.length || 0;
+  return Math.max(summaryCount, fileCount);
 }
 
 export default async function ProjectProvenancePage({
@@ -103,31 +114,46 @@ export default async function ProjectProvenancePage({
     .from("scans")
     .select("id, created_at, branch, commit_hash, provenance_agent_count, provenance_confidence, provenance_summary")
     .eq("project_id", id)
-    .gt("provenance_agent_count", 0)
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(50);
 
-  const scans = (scansRaw || []) as ScanRow[];
-  const latestScan = scans[0] || null;
+  const recentScans = (scansRaw || []) as ScanRow[];
+  const scanIds = recentScans.map((scan) => scan.id);
 
-  const { data: latestFilesData } =
-    latestScan
+  const { data: provenanceFilesData } =
+    scanIds.length > 0
       ? await supabase
           .from("provenance_files")
           .select("*")
-          .eq("scan_id", latestScan.id)
+          .in("scan_id", scanIds)
           .eq("agent_authored", true)
           .order("file_path")
       : { data: [] as ProvenanceFile[] | null };
 
-  const latestFiles = (latestFilesData || []) as ProvenanceFile[];
+  const provenanceFiles = (provenanceFilesData || []) as ProvenanceFile[];
+  const filesByScan = new Map<string, ProvenanceFile[]>();
+  for (const file of provenanceFiles) {
+    const existing = filesByScan.get(file.scan_id) || [];
+    existing.push(file);
+    filesByScan.set(file.scan_id, existing);
+  }
+
+  const scans = recentScans.filter((scan) => derivedAgentFileCount(scan, filesByScan) > 0);
+  const latestScan = scans[0] || null;
+  const latestFiles = latestScan ? filesByScan.get(latestScan.id) || [] : [];
 
   const distinctAgents = Array.from(
-    new Set(scans.flatMap((scan) => scan.provenance_summary?.agents_seen || []))
+    new Set(
+      scans.flatMap((scan) => [
+        ...(scan.provenance_summary?.agents_seen || []),
+        ...(filesByScan.get(scan.id) || []).map((file) => file.agent_name).filter(Boolean) as string[],
+      ])
+    )
   );
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
+      <ScrollToTopOnMount />
       <div className="mx-auto max-w-7xl px-6 py-10">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
@@ -175,6 +201,7 @@ export default async function ProjectProvenancePage({
               {latestScan ? (
                 <Link
                   href={`/dashboard/scans/${latestScan.id}/provenance`}
+                  scroll
                   className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 hover:bg-violet-100"
                 >
                   Latest provenance receipt
@@ -182,6 +209,7 @@ export default async function ProjectProvenancePage({
               ) : null}
               <Link
                 href={`/dashboard/projects/${id}/defense`}
+                scroll
                 className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100"
               >
                 <Shield className="h-4 w-4" />
@@ -189,6 +217,7 @@ export default async function ProjectProvenancePage({
               </Link>
               <Link
                 href="/dashboard/scans"
+                scroll
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 <FileText className="h-4 w-4" />
@@ -201,7 +230,7 @@ export default async function ProjectProvenancePage({
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Latest attributed files</div>
-                <div className="mt-2 text-2xl font-bold text-slate-900">{latestScan.provenance_agent_count || 0}</div>
+                <div className="mt-2 text-2xl font-bold text-slate-900">{derivedAgentFileCount(latestScan, filesByScan)}</div>
                 <div className="mt-2 text-sm text-slate-500">From the latest provenance-backed upload.</div>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -311,7 +340,7 @@ export default async function ProjectProvenancePage({
                         <div>
                           <div className="text-sm font-semibold text-slate-900">{timeAgo(scan.created_at)}</div>
                           <div className="mt-1 text-xs text-slate-500">
-                            {scan.provenance_agent_count || 0} AI file{scan.provenance_agent_count === 1 ? "" : "s"} · {scan.provenance_confidence || "low"} confidence
+                            {derivedAgentFileCount(scan, filesByScan)} AI file{derivedAgentFileCount(scan, filesByScan) === 1 ? "" : "s"} · {scan.provenance_confidence || "low"} confidence
                           </div>
                         </div>
                         <Link

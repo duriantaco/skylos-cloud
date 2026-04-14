@@ -3,6 +3,7 @@ import { Fingerprint, FileText, GitCommit, GitBranch, Shield, ChevronRight } fro
 import { createClient } from "@/utils/supabase/server";
 import ProFeatureLock from "@/components/ProFeatureLock";
 import ProvenanceDetail from "@/components/ProvenanceDetail";
+import ScrollToTopOnMount from "@/components/ScrollToTopOnMount";
 import { canUseProvenanceAudit, canViewProvenanceDetail, getEffectivePlan } from "@/lib/entitlements";
 
 type ProvenanceFile = {
@@ -122,6 +123,7 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
+      <ScrollToTopOnMount />
       <div className="mx-auto max-w-6xl p-6 lg:p-8">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
@@ -142,6 +144,7 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
             <div className="flex flex-wrap gap-2">
               <Link
                 href={`/dashboard/scans/${scan.id}`}
+                scroll
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 <FileText className="h-4 w-4" />
@@ -149,18 +152,21 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
               </Link>
               <Link
                 href={`/dashboard/projects/${scan.project_id}`}
+                scroll
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Project Overview
               </Link>
               <Link
                 href={`/dashboard/projects/${scan.project_id}/provenance`}
+                scroll
                 className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 hover:bg-violet-100"
               >
                 Project Provenance
               </Link>
               <Link
                 href="/dashboard/scans"
+                scroll
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Scan History
