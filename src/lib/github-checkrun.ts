@@ -60,39 +60,17 @@ async function ghJson<T>(url: string, token: string, init?: RequestInit): Promis
   return res.json() as Promise<T>;
 }
 
-async function findAssociatedPrNumber(repoPath: string, sha: string, token: string): Promise<number | null> {
-  const url = `https://api.github.com/repos/${repoPath}/commits/${sha}/pulls`;
-  const prs = await ghJson<any[]>(url, token, {
-    headers: { Accept: "application/vnd.github+json, application/vnd.github.groot-preview+json" },
-  });
-  return prs?.[0]?.number ?? null;
-}
-
-async function listPrFiles(repoPath: string, prNumber: number, token: string): Promise<Set<string>> {
-  const files = new Set<string>();
-  let page = 1;
-
-  while (page <= 10) {
-    const url = `https://api.github.com/repos/${repoPath}/pulls/${prNumber}/files?per_page=100&page=${page}`;
-    const batch = await ghJson<any[]>(url, token);
-    if (!batch?.length) 
-      break;
-    for (const f of batch) {
-      if (f?.filename) files.add(String(f.filename));
-    }
-    if (batch.length < 100) 
-      break;
-    page += 1;
-  }
-
-  return files;
-}
+type GitHubPull = {
+  base?: { ref?: string | null; sha?: string | null } | null;
+  head?: { sha?: string | null } | null;
+};
 
 export async function postSkylosCheckRun(args: {
   repoUrl: string | null;
   sha: string;
   scanId: string;
   appBaseUrl: string;
+  detailsUrl?: string;
   passedGate: boolean;
   findings: FindingLike[];
   diffScope?: CheckRunDiffScope | null;
@@ -123,7 +101,7 @@ export async function postSkylosCheckRun(args: {
       changedFilesCount = scope.changedFiles.size;
       missingPatchCount = scope.filesMissingPatch.size;
 
-      const pr = await ghJson<any>(
+      const pr = await ghJson<GitHubPull>(
         `https://api.github.com/repos/${scope.repoPath}/pulls/${scope.prNumber}`,
         token
       );
@@ -132,14 +110,14 @@ export async function postSkylosCheckRun(args: {
       baseSha = pr?.base?.sha ?? null;
       headSha = pr?.head?.sha ?? null;
     }
-  } catch (e) {
+  } catch {
   }
 
   const candidate = args.findings.filter(f => f.is_new && !f.is_suppressed);
 
   const filtered = candidate;
 
-  const detailsUrl = `${args.appBaseUrl.replace(/\/$/, "")}/dashboard/scans/${args.scanId}`;
+  const detailsUrl = args.detailsUrl || `${args.appBaseUrl.replace(/\/$/, "")}/dashboard/scans/${args.scanId}`;
 
   const MAX_ANN = 50;
   const annotations = filtered.slice(0, MAX_ANN).map(f => {

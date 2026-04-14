@@ -941,6 +941,8 @@ export async function POST(req: Request) {
     if (scanError) 
       throw new Error(scanError.message)
 
+    const scanUrl = `${process.env.APP_BASE_URL || getSiteUrl()}/dashboard/scans/${scan.id}${tool === "skylos-defend" ? "/defense" : ""}`;
+
     const dbRows = finalFindings.map((f: any, idx: number) => ({
       scan_id: scan.id,
       rule_id: f.rule_id || 'UNKNOWN',
@@ -1286,7 +1288,7 @@ export async function POST(req: Request) {
               output: {
                 title: passedGate ? "Quality Gate Passed" : "Quality Gate Failed",
                 summary: `Found ${unsuppressedNewCount} new issue(s).`,
-                text: `[View full report](${process.env.APP_BASE_URL}/dashboard/scans/${scan.id})`,
+                text: `[View full report](${scanUrl})`,
               },
             });
           } else {
@@ -1300,7 +1302,7 @@ export async function POST(req: Request) {
               output: {
                 title: passedGate ? "Quality Gate Passed" : "Quality Gate Failed",
                 summary: `Found ${unsuppressedNewCount} new issue(s).`,
-                text: `[View full report](${process.env.APP_BASE_URL}/dashboard/scans/${scan.id})`,
+                text: `[View full report](${scanUrl})`,
               },
             });
           }
@@ -1316,6 +1318,7 @@ export async function POST(req: Request) {
           sha: commit_hash || "local",
           scanId: scan.id,
           appBaseUrl: process.env.APP_BASE_URL || "http://localhost:3000",
+          detailsUrl: scanUrl,
           passedGate,
           findings: finalFindings,
           diffScope: diffScope ? {
@@ -1354,8 +1357,6 @@ export async function POST(req: Request) {
             (await getPrNumberForCommit({ octokit, owner, repo, sha }));
 
           if (prNumber) {
-            const scanUrl = `${process.env.APP_BASE_URL || getSiteUrl()}/dashboard/scans/${scan.id}`;
-
             const reasons: string[] = [];
             if (!passedGate) {
               if (criticalSecurityIssues > 0) reasons.push(`${criticalSecurityIssues} critical security issue(s)`);
@@ -1443,7 +1444,7 @@ export async function POST(req: Request) {
 
             const truncatedNote =
               inlineFindings.length > MAX_INLINE_COMMENTS
-                ? `\n\n> Showing ${MAX_INLINE_COMMENTS} of ${inlineFindings.length} new findings. [View all →](${process.env.APP_BASE_URL || getSiteUrl()}/dashboard/scans/${scan.id})`
+                ? `\n\n> Showing ${MAX_INLINE_COMMENTS} of ${inlineFindings.length} new findings. [View all →](${scanUrl})`
                 : "";
 
             await octokit.pulls.createReview({
@@ -1525,6 +1526,7 @@ export async function POST(req: Request) {
             repoUrl: project.repo_url,
             scanId: scan.id,
             siteUrl: getSiteUrl(),
+            scanUrl,
           },
           { ...notificationPayload, isRecovery }
         ).catch((err) => {
@@ -1549,6 +1551,7 @@ export async function POST(req: Request) {
             repoUrl: project.repo_url,
             scanId: scan.id,
             siteUrl: getSiteUrl(),
+            scanUrl,
           },
           { ...notificationPayload, isRecovery }
         ).catch((err) => {
@@ -1573,6 +1576,7 @@ export async function POST(req: Request) {
       success: passedGate,
       scanId: scan.id,
       scan_id: scan.id,
+      scan_url: scanUrl,
       quality_gate: {
         passed: passedGate,
         new_violations: unsuppressedNewCount,
