@@ -6,6 +6,7 @@ export type DiscordNotifyConfig = {
   repoUrl?: string | null;
   scanId: string;
   siteUrl: string;
+  scanUrl?: string;
 };
 
 export type GateResult = {
@@ -31,11 +32,11 @@ function truncate(str: string, len: number): string {
 }
 
 function buildDiscordEmbed(config: DiscordNotifyConfig, result: GateResult) {
-  const { projectName, branch, commitHash, repoUrl, scanId, siteUrl } = config;
+  const { projectName, branch, commitHash, repoUrl, scanId, siteUrl, scanUrl: providedScanUrl } = config;
   const { passed, isRecovery, newIssues, criticalCount, highCount, mediumCount, lowCount, suppressedCount } = result;
 
   const shortSha = commitHash?.slice(0, 7) || 'local';
-  const scanUrl = `${siteUrl}/dashboard/scans/${scanId}`;
+  const scanUrl = providedScanUrl || `${siteUrl}/dashboard/scans/${scanId}`;
   const commitUrl = repoUrl && commitHash !== 'local'
     ? `${repoUrl.replace(/\.git$/, '')}/commit/${commitHash}`
     : null;
@@ -128,9 +129,9 @@ export async function sendDiscordNotification(
     }
 
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Discord notification failed:', err);
-    return { success: false, error: err.message || 'Network error' };
+    return { success: false, error: err instanceof Error ? err.message : 'Network error' };
   }
 }
 
@@ -175,7 +176,7 @@ export async function testDiscordWebhook(
     }
 
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Failed to connect to Discord' };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to connect to Discord' };
   }
 }
