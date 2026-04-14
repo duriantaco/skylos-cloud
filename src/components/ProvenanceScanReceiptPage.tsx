@@ -6,6 +6,21 @@ import ProvenanceDetail from "@/components/ProvenanceDetail";
 import ScrollToTopOnMount from "@/components/ScrollToTopOnMount";
 import { canUseProvenanceAudit, canViewProvenanceDetail, getEffectivePlan } from "@/lib/entitlements";
 
+type AiCodeIndicator = {
+  type: string;
+  commit: string;
+  detail: string;
+};
+
+type AiCodeStats = {
+  detected?: boolean;
+  indicators?: AiCodeIndicator[];
+  ai_files?: string[];
+  confidence?: "high" | "medium" | "low";
+  gate_passed?: boolean;
+  ai_findings_count?: number;
+};
+
 type ProvenanceFile = {
   id: string;
   file_path: string;
@@ -34,6 +49,23 @@ function formatTimestamp(dateString: string) {
   });
 }
 
+function shortCommit(commit?: string | null) {
+  return commit ? commit.slice(0, 7) : "unknown";
+}
+
+function labelForIndicator(type: string) {
+  switch (type) {
+    case "author-email":
+      return "Git author email matched an AI agent";
+    case "co-author":
+      return "Git co-author trailer matched an AI agent";
+    case "commit-message":
+      return "Commit message mentioned AI generation";
+    default:
+      return type.replace(/-/g, " ");
+  }
+}
+
 function SeverityBadge({ severity }: { severity: string }) {
   const s = String(severity || "").toUpperCase();
   const styles = {
@@ -56,7 +88,7 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
 
   const { data: scan } = await supabase
     .from("scans")
-    .select("id, project_id, branch, commit_hash, created_at, provenance_summary, provenance_agent_count, provenance_confidence, quality_gate_passed, projects(id, name, repo_url, org_id)")
+    .select("id, project_id, branch, commit_hash, created_at, provenance_summary, provenance_agent_count, provenance_confidence, quality_gate_passed, ai_code_detected, ai_code_stats, projects(id, name, repo_url, org_id)")
     .eq("id", scanId)
     .single();
 
@@ -106,20 +138,35 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
 
   const provenanceFiles = (provenanceFilesData || []) as ProvenanceFile[];
   const provenancePaths = provenanceFiles.map((file) => file.file_path);
+  const aiCodeStats = (scan.ai_code_stats || null) as AiCodeStats | null;
+  const fallbackAiFiles = aiCodeStats?.ai_files || [];
+  const effectivePaths = provenancePaths.length > 0 ? provenancePaths : fallbackAiFiles;
 
   const { data: findingsData } =
-    provenancePaths.length > 0
+    effectivePaths.length > 0
       ? await supabase
           .from("findings")
           .select("id, rule_id, message, severity, file_path, line_number")
           .eq("scan_id", scanId)
-          .in("file_path", provenancePaths)
+          .in("file_path", effectivePaths)
           .order("severity")
       : { data: [] as Finding[] | null };
 
   const findings = (findingsData || []) as Finding[];
-
-  const agents = scan.provenance_summary?.agents_seen || [];
+  const agents = Array.from(
+    new Set([
+      ...(scan.provenance_summary?.agents_seen || []),
+      ...provenanceFiles.map((file) => file.agent_name).filter(Boolean) as string[],
+    ])
+  );
+  const attributedFileCount = Math.max(
+    Number(scan.provenance_agent_count || scan.provenance_summary?.agent_count || 0),
+    provenanceFiles.length,
+    fallbackAiFiles.length
+  );
+  const confidence = scan.provenance_confidence || aiCodeStats?.confidence || (attributedFileCount > 0 ? "recorded" : "unknown");
+  const relatedFindingCount = Math.max(findings.length, aiCodeStats?.ai_findings_count || 0);
+  const firstFindingLabel = findings[0]?.message || null;
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -177,17 +224,17 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">AI-attributed files</div>
-              <div className="mt-2 text-2xl font-bold text-slate-900">{scan.provenance_agent_count || 0}</div>
-              <div className="mt-2 text-sm text-slate-500">{agents.length ? agents.join(", ") : "No agents detected"}</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{attributedFileCount}</div>
+              <div className="mt-2 text-sm text-slate-500">{agents.length ? agents.join(", ") : "AI attribution detected for this upload"}</div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Confidence</div>
-              <div className="mt-2 text-2xl font-bold text-slate-900">{scan.provenance_confidence || "low"}</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{confidence}</div>
               <div className="mt-2 text-sm text-slate-500">Based on git authorship signals like author email, co-author trailers, and commit text.</div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Related findings</div>
-              <div className="mt-2 text-2xl font-bold text-slate-900">{findings.length}</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{relatedFindingCount}</div>
               <div className="mt-2 text-sm text-slate-500">Findings that land in the AI-attributed files from this same upload.</div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -198,9 +245,9 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
                   <GitBranch className="h-3.5 w-3.5" />
                   {scan.branch || "unknown branch"}
                 </div>
-                <div className="flex items-center gap-1.5 font-mono">
+                <div className="flex min-w-0 items-center gap-1.5 font-mono">
                   <GitCommit className="h-3.5 w-3.5" />
-                  {scan.commit_hash || "unknown commit"}
+                  <span title={scan.commit_hash || "unknown commit"}>{shortCommit(scan.commit_hash)}</span>
                 </div>
               </div>
             </div>
@@ -211,8 +258,13 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
               <div>
                 <div className="text-sm font-semibold text-violet-900">What this page means</div>
                 <p className="mt-1 text-sm text-violet-800">
-                  Provenance is attribution context, not the vulnerability itself. If the code scan found <span className="font-semibold">Use of eval()</span>,
-                  that is still the security rule. This receipt explains why Skylos believes the changed lines came from AI and what evidence supported that attribution.
+                  Provenance is attribution context, not the vulnerability itself.
+                  {firstFindingLabel ? (
+                    <>
+                      {" "}If the code scan found <span className="font-semibold">{firstFindingLabel}</span>, that remains the code-scan finding.
+                    </>
+                  ) : null}
+                  {" "}This receipt explains why Skylos believes the changed lines came from AI and what evidence supported that attribution.
                 </p>
               </div>
               <div className="text-sm text-violet-700">
@@ -249,9 +301,52 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
             </div>
 
             {provenanceFiles.length === 0 ? (
-              <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-                No AI-authored files were recorded for this scan.
-              </div>
+              aiCodeStats?.detected || aiCodeStats?.indicators?.length ? (
+                <div className="mt-6 space-y-4">
+                  <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                    <div className="text-sm font-semibold text-violet-900">Scan-level attribution metadata is available</div>
+                    <p className="mt-2 text-sm text-violet-800">
+                      This scan has AI attribution signals on the scan record, but it does not have the newer per-file provenance rows attached.
+                      Skylos can still show the files and git signals captured for this upload.
+                    </p>
+                  </div>
+
+                  {fallbackAiFiles.length > 0 ? (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Attributed files from scan metadata</div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {fallbackAiFiles.map((filePath) => (
+                          <span
+                            key={filePath}
+                            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700"
+                          >
+                            {filePath}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {aiCodeStats?.indicators?.length ? (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Attribution signals</div>
+                      <div className="mt-3 space-y-3">
+                        {aiCodeStats.indicators.map((indicator, index) => (
+                          <div key={`${indicator.type}-${indicator.commit}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="text-sm font-semibold text-slate-900">{labelForIndicator(indicator.type)}</div>
+                            <div className="mt-1 text-xs text-slate-500">{indicator.detail}</div>
+                            <div className="mt-2 font-mono text-[11px] text-slate-400">{indicator.commit}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+                  No AI-authored files were recorded for this scan.
+                </div>
+              )
             ) : canViewDetail ? (
               <ProvenanceDetail scanId={scan.id} files={provenanceFiles} />
             ) : (
