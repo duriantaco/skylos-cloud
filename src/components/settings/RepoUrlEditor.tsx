@@ -4,6 +4,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Github, Check, Loader2, AlertCircle, ExternalLink } from 'lucide-react'
 
+type ConflictProject = {
+  id: string
+  name: string
+}
+
 export default function RepoUrlEditor({ 
   projectId, 
   currentUrl 
@@ -16,6 +21,7 @@ export default function RepoUrlEditor({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [conflictProject, setConflictProject] = useState<ConflictProject | null>(null)
 
   useEffect(() => {
     setUrl(currentUrl || '')
@@ -25,6 +31,7 @@ export default function RepoUrlEditor({
     setSaving(true)
     setSaved(false)
     setError(null)
+    setConflictProject(null)
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
@@ -34,6 +41,9 @@ export default function RepoUrlEditor({
 
       if (!res.ok) {
         const body = await res.json().catch(() => null)
+        if (body?.conflict_project && typeof body.conflict_project.id === 'string' && typeof body.conflict_project.name === 'string') {
+          setConflictProject(body.conflict_project)
+        }
         const message =
           typeof body?.error === 'string'
             ? body.error
@@ -92,6 +102,7 @@ export default function RepoUrlEditor({
           onChange={(e) => {
             setUrl(e.target.value)
             if (error) setError(null)
+            if (conflictProject) setConflictProject(null)
           }}
           placeholder="https://github.com/owner/repo"
           className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
@@ -119,7 +130,17 @@ export default function RepoUrlEditor({
       {error ? (
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{error}</span>
+          <div>
+            <div>{error}</div>
+            {conflictProject ? (
+              <a
+                href={`/dashboard/projects/${conflictProject.id}`}
+                className="mt-2 inline-flex items-center gap-1.5 font-medium text-red-900 underline underline-offset-2 hover:text-red-700"
+              >
+                Open linked project: {conflictProject.name}
+              </a>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
