@@ -13,11 +13,37 @@ type ProvenanceFile = {
   indicators: { type: string; commit: string; detail: string }[];
 };
 
-export default function ProvenanceDetail({ scanId }: { scanId: string }) {
-  const [files, setFiles] = useState<ProvenanceFile[]>([]);
-  const [loading, setLoading] = useState(true);
+const formatRanges = (ranges: [number, number][]) =>
+  ranges.map(([start, end]) => (start === end ? `L${start}` : `L${start}-${end}`)).join(", ");
+
+const describeIndicator = (type: string) => {
+  switch (type) {
+    case "author-email":
+      return "Git author email matched an AI agent";
+    case "co-author":
+      return "Git co-author trailer matched an AI agent";
+    case "commit-message":
+      return "Commit message mentioned AI generation";
+    default:
+      return type;
+  }
+};
+
+export default function ProvenanceDetail({
+  scanId,
+  files: initialFiles,
+}: {
+  scanId: string;
+  files?: ProvenanceFile[];
+}) {
+  const [fetchedFiles, setFetchedFiles] = useState<ProvenanceFile[]>([]);
+  const [loading, setLoading] = useState(initialFiles == null);
+  const files = initialFiles ?? fetchedFiles;
+  const isLoading = initialFiles ? false : loading;
 
   useEffect(() => {
+    if (initialFiles) return;
+
     const fetchFiles = async () => {
       const supabase = createClient();
       const { data } = await supabase
@@ -27,34 +53,57 @@ export default function ProvenanceDetail({ scanId }: { scanId: string }) {
         .eq("agent_authored", true)
         .order("file_path");
 
-      if (data) setFiles(data as ProvenanceFile[]);
+      if (data) setFetchedFiles(data as ProvenanceFile[]);
       setLoading(false);
     };
     fetchFiles();
-  }, [scanId]);
+  }, [initialFiles, scanId]);
 
-  if (loading) {
+  if (isLoading) {
     return <div className="mt-2 text-xs text-violet-500">Loading provenance details...</div>;
   }
 
   if (files.length === 0) return null;
 
   return (
-    <div className="mt-2 space-y-1">
+    <div className="mt-3 space-y-2">
       {files.map((f) => (
-        <div key={f.id} className="flex items-center gap-2 px-2 py-1 rounded bg-white border border-violet-100 text-[11px]">
-          <Fingerprint className="w-3 h-3 text-violet-400 shrink-0" />
-          <span className="font-mono text-violet-800 truncate flex-1">{f.file_path}</span>
-          {f.agent_name && (
-            <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-600 font-bold text-[9px] shrink-0">
-              {f.agent_name}
-            </span>
-          )}
-          {f.agent_lines && f.agent_lines.length > 0 && (
-            <span className="text-violet-400 shrink-0">
-              L{f.agent_lines.map(([s, e]) => s === e ? s : `${s}-${e}`).join(', ')}
-            </span>
-          )}
+        <div key={f.id} className="rounded-lg border border-violet-100 bg-white p-3">
+          <div className="flex items-start gap-2">
+            <Fingerprint className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-400" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[11px] text-violet-900">{f.file_path}</span>
+                {f.agent_name && (
+                  <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold text-violet-700">
+                    {f.agent_name}
+                  </span>
+                )}
+                {f.agent_lines && f.agent_lines.length > 0 && (
+                  <span className="text-[10px] text-violet-500">{formatRanges(f.agent_lines)}</span>
+                )}
+              </div>
+
+              <p className="mt-1 text-[11px] text-violet-700">
+                Skylos attributed these changed lines to {f.agent_name || "an AI agent"} from git metadata.
+                This is attribution evidence, not the security finding itself.
+              </p>
+
+              {f.indicators && f.indicators.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {f.indicators.map((indicator, index) => (
+                    <div key={`${f.id}-${indicator.commit}-${index}`} className="rounded border border-violet-100 bg-violet-50 px-2 py-1.5">
+                      <div className="flex flex-wrap items-center gap-2 text-[10px]">
+                        <span className="font-semibold text-violet-800">{describeIndicator(indicator.type)}</span>
+                        <span className="font-mono text-violet-500">{indicator.commit}</span>
+                      </div>
+                      <div className="mt-0.5 break-all text-[10px] text-violet-600">{indicator.detail}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       ))}
     </div>

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getEffectivePlan } from "@/lib/entitlements";
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, Target, FolderOpen, History, Layers, Zap, Bot, type LucideIcon } from "lucide-react";
+import { BookOpen, Target, FolderOpen, History, Layers, Zap, type LucideIcon } from "lucide-react";
 import DashboardUserMenu from "@/components/DashboardUserMenu";
 import OrganizationSwitcher from "@/components/OrganizationSwitcher";
 import {
@@ -81,11 +81,11 @@ export default async function DashboardLayout({
             </Link>
 
             <div className="hidden md:flex items-center gap-1">
-              <NavLink href="/dashboard" icon={Target}>Home</NavLink>
+              <NavLink href="/dashboard" icon={Target}>Overview</NavLink>
               <NavLink href="/dashboard/projects" icon={FolderOpen}>Projects</NavLink>
               <NavLink href="/dashboard/scans" icon={History}>Scans</NavLink>
-              <NavLink href="/dashboard/issues" icon={Layers}>Recurring Issues</NavLink>
-              <NavLink href="/dashboard/agent-activity" icon={Bot}>Agent</NavLink>
+              <NavLink href="/dashboard/issues" icon={Layers}>Issues</NavLink>
+              <NavLink href="/dashboard/trends" icon={History}>History</NavLink>
             </div>
           </div>
 
