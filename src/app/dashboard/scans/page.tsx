@@ -14,6 +14,7 @@ type Scan = {
   quality_gate_passed: boolean | null;
   analysis_mode?: "static" | "hybrid" | "agent" | null;
   tool?: string | null;
+  provenance_agent_count?: number | null;
   stats: {
     total?: number;
     new_issues?: number;
@@ -93,6 +94,15 @@ function SourceBadge({ tool }: { tool?: string | null }) {
   );
 }
 
+function ProvenanceBadge({ count }: { count?: number | null }) {
+  if (!count || count <= 0) return null;
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-md border bg-violet-50 text-violet-700 border-violet-200">
+      AI Provenance
+    </span>
+  );
+}
+
 function ScanCard({ scan }: { scan: Scan }) {
   const stats = scan.stats || {};
   const newIssues = stats.new_issues ?? 0;
@@ -121,6 +131,7 @@ function ScanCard({ scan }: { scan: Scan }) {
               </span>
             )}
             <SourceBadge tool={scan.tool} />
+            <ProvenanceBadge count={scan.provenance_agent_count} />
           </div>
 
           {/* Branch + Commit */}
@@ -147,6 +158,11 @@ function ScanCard({ scan }: { scan: Scan }) {
                 {newIssues} new
               </span>
             )}
+            {scan.provenance_agent_count ? (
+              <span className="text-violet-600 font-medium">
+                {scan.provenance_agent_count} AI file{scan.provenance_agent_count === 1 ? "" : "s"}
+              </span>
+            ) : null}
             <span className="text-slate-400">
               {legacyIssues} legacy
             </span>
@@ -196,6 +212,7 @@ export default async function ScansPage() {
     .from("scans")
     .select(`
       id, created_at, commit_hash, branch, quality_gate_passed, stats, analysis_mode, tool,
+      provenance_agent_count,
       projects!inner(id, name, repo_url, org_id)
     `)
     .eq("projects.org_id", orgId)

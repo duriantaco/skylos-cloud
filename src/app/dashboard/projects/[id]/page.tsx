@@ -6,16 +6,17 @@ import {
   CheckCircle,
   ChevronRight,
   ExternalLink,
+  Fingerprint,
   GitCompareArrows,
   Minus,
   Settings,
-  Shield,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
 
 import { FileHotspotChart, TopViolationsChart } from "@/components/AdvanceCharts";
 import MiniSparkline from "@/components/MiniSparkline";
+import ProjectSectionTabs from "@/components/ProjectSectionTabs";
 import ScanActions from "@/components/ScanActions";
 import { getEffectivePlan } from "@/lib/entitlements";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
@@ -37,6 +38,8 @@ type ScanRow = {
   commit_hash?: string | null;
   quality_gate_passed?: boolean | null;
   is_overridden?: boolean | null;
+  provenance_agent_count?: number | null;
+  provenance_confidence?: string | null;
   stats?: ScanStats | null;
 };
 
@@ -300,7 +303,7 @@ export default async function ProjectPage({
 
   const { data: scansRaw } = await supabase
     .from("scans")
-    .select("id, created_at, branch, commit_hash, quality_gate_passed, is_overridden, stats")
+    .select("id, created_at, branch, commit_hash, quality_gate_passed, is_overridden, provenance_agent_count, provenance_confidence, stats")
     .eq("project_id", id)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -346,6 +349,7 @@ export default async function ProjectPage({
 
   const latestGate = gateState(latestScan);
   const previousGate = gateState(previousComparableScan);
+  const latestAiFiles = countValue(latestScan?.provenance_agent_count);
 
   let streakCount = 0;
   if (latestScan) {
@@ -441,23 +445,6 @@ export default async function ProjectPage({
 
           <div className="flex items-center gap-2">
             <Link
-              href={`/dashboard/projects/${id}/defense`}
-              className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 transition hover:bg-sky-100 hover:text-sky-800"
-              title="AI Defense analysis"
-            >
-              <Shield className="h-4 w-4" />
-              AI Defense
-            </Link>
-
-            <Link
-              href={`/dashboard/projects/${id}/suppressions`}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              title="Suppression audit + revoke"
-            >
-              Suppressions
-            </Link>
-
-            <Link
               href={`/dashboard/settings?project=${id}`}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
               title="Project settings"
@@ -466,6 +453,9 @@ export default async function ProjectPage({
               Settings
             </Link>
           </div>
+        </div>
+        <div className="mt-4 px-6 pb-4">
+          <ProjectSectionTabs projectId={id} active="overview" />
         </div>
       </nav>
 
@@ -506,6 +496,16 @@ export default async function ProjectPage({
                   >
                     Review blockers
                     <ChevronRight className="h-4 w-4" />
+                  </Link>
+                ) : null}
+
+                {latestAiFiles > 0 ? (
+                  <Link
+                    href={`/dashboard/projects/${id}/provenance`}
+                    className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
+                  >
+                    <Fingerprint className="h-4 w-4" />
+                    AI Provenance
                   </Link>
                 ) : null}
 
@@ -551,6 +551,15 @@ export default async function ProjectPage({
                 label="Active Suppressions"
                 value={activeSuppressions}
                 meta={`${latestSuppressed} suppressed findings in the latest scan still count as historical context.`}
+              />
+              <HealthCard
+                label="AI Provenance"
+                value={latestAiFiles}
+                meta={
+                  latestAiFiles > 0
+                    ? `${latestScan?.provenance_confidence || "low"} confidence attribution in the latest scan.`
+                    : "No AI-attributed files were detected in the latest scan."
+                }
               />
               <HealthCard
                 label="Current Streak"
@@ -844,6 +853,14 @@ export default async function ProjectPage({
                             >
                               View
                             </Link>
+                            {countValue(scan.provenance_agent_count) > 0 ? (
+                              <Link
+                                href={`/dashboard/scans/${scan.id}/provenance`}
+                                className="font-medium text-violet-700 hover:text-violet-900"
+                              >
+                                Provenance
+                              </Link>
+                            ) : null}
                             {compareToLatest ? (
                               <Link
                                 href={compareToLatest}

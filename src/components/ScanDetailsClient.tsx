@@ -12,8 +12,6 @@ import {
 } from "lucide-react";
 import FlowVisualizerButton from "@/components/FlowVisualizerButton";
 import FixPrButton from "@/components/FixPrButton";
-import ProFeatureLock from "@/components/ProFeatureLock";
-import ProvenanceDetail from "@/components/ProvenanceDetail";
 
 type Scan = {
   id: string;
@@ -1280,71 +1278,61 @@ export default function ScanDetailsPage() {
             onToggle={() => setGatePanelExpanded(!gatePanelExpanded)}
           />
 
-          {/* AI Code Assurance Panel */}
-          {scan.ai_code_detected && scan.ai_code_stats && (
-        <div className="mx-4 mb-2 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-purple-600" />
-              <span className="text-sm font-bold text-purple-900">AI Code Assurance</span>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                scan.ai_code_stats.gate_passed === true
-                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                  : scan.ai_code_stats.gate_passed === false
-                  ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                  : 'bg-purple-100 text-purple-700 border border-purple-200'
-              }`}>
-                {scan.ai_code_stats.gate_passed === true ? 'AI ASSURED' :
-                 scan.ai_code_stats.gate_passed === false ? 'AI ISSUES FOUND' :
-                 'AI CODE DETECTED'}
-              </span>
-            </div>
-            <span className="text-xs text-purple-600">
-              {scan.ai_code_stats.confidence} confidence &middot; {scan.ai_code_stats.ai_files?.length || 0} files &middot; {scan.ai_code_stats.indicators?.length || 0} indicators
-            </span>
-          </div>
+          {(scan.provenance_agent_count != null && scan.provenance_agent_count > 0 && scan.provenance_summary) ||
+          (scan.ai_code_detected && scan.ai_code_stats) ? (
+            <div className="mx-4 mb-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Fingerprint className="w-4 h-4 text-violet-600" />
+                    <span className="text-sm font-bold text-violet-900">AI provenance captured</span>
+                    {scan.provenance_agent_count != null && scan.provenance_agent_count > 0 ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">
+                        {scan.provenance_agent_count} AI FILES
+                      </span>
+                    ) : null}
+                    {scan.ai_code_stats ? (
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        scan.ai_code_stats.gate_passed === true
+                          ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                          : scan.ai_code_stats.gate_passed === false
+                          ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                          : 'bg-purple-100 text-purple-700 border border-purple-200'
+                      }`}>
+                        {scan.ai_code_stats.gate_passed === true ? 'AI ASSURED' :
+                         scan.ai_code_stats.gate_passed === false ? 'AI ISSUES FOUND' :
+                         'AI CODE DETECTED'}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-2 text-sm text-violet-900">
+                    This scan has attribution evidence from git metadata like author email, co-author trailers, or commit messages.
+                    Keep triage here for security, quality, and dead code. Open the provenance receipt when you need to inspect why Skylos marked code as AI-authored.
+                  </p>
+                  <div className="mt-2 text-xs text-violet-700">
+                    {scan.provenance_confidence || scan.ai_code_stats?.confidence || "low"} confidence
+                    {scan.provenance_summary?.agents_seen?.length ? ` · ${scan.provenance_summary.agents_seen.join(', ')}` : ""}
+                    {scan.ai_code_stats?.ai_findings_count != null ? ` · ${scan.ai_code_stats.ai_findings_count} finding${scan.ai_code_stats.ai_findings_count === 1 ? "" : "s"} in attributed files` : ""}
+                  </div>
+                </div>
 
-          {scan.ai_code_stats.indicators && scan.ai_code_stats.indicators.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {scan.ai_code_stats.indicators.slice(0, 8).map((ind, i) => (
-                <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-purple-200 text-[10px] text-purple-700">
-                  <span className="font-bold">{ind.type}</span>
-                  <span className="font-mono text-purple-500">{ind.commit}</span>
-                </span>
-              ))}
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`/dashboard/scans/${scan.id}/provenance`}
+                    className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-medium text-violet-700 transition hover:bg-violet-100"
+                  >
+                    Open provenance receipt
+                  </Link>
+                  <Link
+                    href={`/dashboard/projects/${scan.project_id}/provenance`}
+                    className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-100 px-3 py-2 text-sm font-medium text-violet-700 transition hover:bg-violet-200"
+                  >
+                    Project provenance
+                  </Link>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-      )}
-
-	      {/* AI Provenance Panel */}
-	      {scan.provenance_agent_count != null && scan.provenance_agent_count > 0 && scan.provenance_summary && (
-        <div className="mx-4 mb-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Fingerprint className="w-4 h-4 text-violet-600" />
-              <span className="text-sm font-bold text-violet-900">AI Provenance</span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">
-                {scan.provenance_agent_count} AI FILES
-              </span>
-            </div>
-            <span className="text-xs text-violet-600">
-              {scan.provenance_confidence} confidence &middot; {scan.provenance_summary.agents_seen?.join(', ')}
-            </span>
-          </div>
-
-          {userPlan === 'free' ? (
-            <div className="mt-3">
-              <ProFeatureLock
-                feature="Per-file AI provenance breakdown"
-                description="See which files were AI-authored, by which agent, with exact line ranges"
-              />
-            </div>
-          ) : (
-            <ProvenanceDetail scanId={scan.id} />
-          )}
-        </div>
-      )}
+          ) : null}
 
           {/* AI Defense Panel */}
           {scan.defense_score && (

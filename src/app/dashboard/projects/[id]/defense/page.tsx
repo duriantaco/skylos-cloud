@@ -11,6 +11,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import ProjectSectionTabs from "@/components/ProjectSectionTabs";
 
 type DefenseScore = {
   id: string;
@@ -176,15 +177,20 @@ export default function DefensePage() {
     <main className="min-h-screen bg-gray-50 text-slate-900 font-sans">
       {/* Top Nav */}
       <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-3">
-          <Link
-            href={`/dashboard/projects/${id}`}
-            className="text-slate-500 hover:text-slate-900 transition"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <Shield className="w-4 h-4 text-sky-600" />
-          <span className="font-bold text-sm text-slate-900">AI Defense</span>
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/dashboard/projects/${id}`}
+              className="text-slate-500 hover:text-slate-900 transition"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Link>
+            <Shield className="w-4 h-4 text-sky-600" />
+            <span className="font-bold text-sm text-slate-900">AI Defense</span>
+          </div>
+          <div className="mt-4">
+            <ProjectSectionTabs projectId={id} active="defense" />
+          </div>
         </div>
       </nav>
 

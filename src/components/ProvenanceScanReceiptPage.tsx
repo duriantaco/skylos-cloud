@@ -1,0 +1,309 @@
+import Link from "next/link";
+import { Fingerprint, FileText, GitCommit, GitBranch, Shield, ChevronRight } from "lucide-react";
+import { createClient } from "@/utils/supabase/server";
+import ProFeatureLock from "@/components/ProFeatureLock";
+import ProvenanceDetail from "@/components/ProvenanceDetail";
+import { canUseProvenanceAudit, canViewProvenanceDetail, getEffectivePlan } from "@/lib/entitlements";
+
+type ProvenanceFile = {
+  id: string;
+  file_path: string;
+  agent_authored: boolean;
+  agent_name: string | null;
+  agent_lines: [number, number][];
+  indicators: { type: string; commit: string; detail: string }[];
+};
+
+type Finding = {
+  id: string;
+  rule_id: string | null;
+  message: string;
+  severity: string;
+  file_path: string;
+  line_number: number;
+};
+
+function formatTimestamp(dateString: string) {
+  return new Date(dateString).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function SeverityBadge({ severity }: { severity: string }) {
+  const s = String(severity || "").toUpperCase();
+  const styles = {
+    CRITICAL: "bg-red-50 text-red-700 ring-red-600/20",
+    HIGH: "bg-orange-50 text-orange-700 ring-orange-600/20",
+    MEDIUM: "bg-yellow-50 text-yellow-700 ring-yellow-600/20",
+    LOW: "bg-blue-50 text-blue-700 ring-blue-700/10",
+    UNKNOWN: "bg-gray-50 text-gray-700 ring-gray-500/10",
+  };
+  const activeStyle = styles[s as keyof typeof styles] || styles.UNKNOWN;
+  return (
+    <span className={`inline-flex items-center rounded-md px-2 py-1 text-[10px] font-medium ring-1 ring-inset ${activeStyle}`}>
+      {s}
+    </span>
+  );
+}
+
+export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: string }) {
+  const supabase = await createClient();
+
+  const { data: scan } = await supabase
+    .from("scans")
+    .select("id, project_id, branch, commit_hash, created_at, provenance_summary, provenance_agent_count, provenance_confidence, quality_gate_passed, projects(id, name, repo_url, org_id)")
+    .eq("id", scanId)
+    .single();
+
+  if (!scan) {
+    return (
+      <main className="min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-4xl p-6 lg:p-8">
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+            <h1 className="text-lg font-bold text-slate-900">Scan not found</h1>
+            <div className="mt-6">
+              <Link
+                href="/dashboard/scans"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Scan History
+              </Link>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const project = Array.isArray(scan.projects) ? scan.projects[0] : scan.projects;
+  const { data: organization } = project?.org_id
+    ? await supabase
+        .from("organizations")
+        .select("plan, pro_expires_at")
+        .eq("id", project.org_id)
+        .single()
+    : { data: null as { plan?: string | null; pro_expires_at?: string | null } | null };
+
+  const plan = getEffectivePlan({
+    plan: organization?.plan || "free",
+    pro_expires_at: organization?.pro_expires_at || null,
+  });
+  const canViewDetail = canViewProvenanceDetail(plan);
+  const canAudit = canUseProvenanceAudit(plan);
+
+  const { data: provenanceFilesData } = await supabase
+    .from("provenance_files")
+    .select("*")
+    .eq("scan_id", scanId)
+    .eq("agent_authored", true)
+    .order("file_path");
+
+  const provenanceFiles = (provenanceFilesData || []) as ProvenanceFile[];
+  const provenancePaths = provenanceFiles.map((file) => file.file_path);
+
+  const { data: findingsData } =
+    provenancePaths.length > 0
+      ? await supabase
+          .from("findings")
+          .select("id, rule_id, message, severity, file_path, line_number")
+          .eq("scan_id", scanId)
+          .in("file_path", provenancePaths)
+          .order("severity")
+      : { data: [] as Finding[] | null };
+
+  const findings = (findingsData || []) as Finding[];
+
+  const agents = scan.provenance_summary?.agents_seen || [];
+
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="mx-auto max-w-6xl p-6 lg:p-8">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-700">
+                <Fingerprint className="h-3.5 w-3.5" />
+                AI Provenance Receipt
+              </div>
+              <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
+                One upload’s attribution evidence, separate from the normal findings workbench.
+              </h1>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Use this page to answer where the AI-attributed code came from, which lines were attributed, and what git evidence Skylos used.
+                Use the normal scan page to triage security, dead code, and quality findings.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/dashboard/scans/${scan.id}`}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <FileText className="h-4 w-4" />
+                Code scan workbench
+              </Link>
+              <Link
+                href={`/dashboard/projects/${scan.project_id}`}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Project Overview
+              </Link>
+              <Link
+                href={`/dashboard/projects/${scan.project_id}/provenance`}
+                className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 hover:bg-violet-100"
+              >
+                Project Provenance
+              </Link>
+              <Link
+                href="/dashboard/scans"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Scan History
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">AI-attributed files</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{scan.provenance_agent_count || 0}</div>
+              <div className="mt-2 text-sm text-slate-500">{agents.length ? agents.join(", ") : "No agents detected"}</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Confidence</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{scan.provenance_confidence || "low"}</div>
+              <div className="mt-2 text-sm text-slate-500">Based on git authorship signals like author email, co-author trailers, and commit text.</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Related findings</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{findings.length}</div>
+              <div className="mt-2 text-sm text-slate-500">Findings that land in the AI-attributed files from this same upload.</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Uploaded</div>
+              <div className="mt-2 text-sm font-semibold text-slate-900">{formatTimestamp(scan.created_at)}</div>
+              <div className="mt-2 space-y-1 text-xs text-slate-500">
+                <div className="flex items-center gap-1.5">
+                  <GitBranch className="h-3.5 w-3.5" />
+                  {scan.branch || "unknown branch"}
+                </div>
+                <div className="flex items-center gap-1.5 font-mono">
+                  <GitCommit className="h-3.5 w-3.5" />
+                  {scan.commit_hash || "unknown commit"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-violet-200 bg-violet-50 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-violet-900">What this page means</div>
+                <p className="mt-1 text-sm text-violet-800">
+                  Provenance is attribution context, not the vulnerability itself. If the code scan found <span className="font-semibold">Use of eval()</span>,
+                  that is still the security rule. This receipt explains why Skylos believes the changed lines came from AI and what evidence supported that attribution.
+                </p>
+              </div>
+              <div className="text-sm text-violet-700">
+                Quality gate:{" "}
+                <span className="font-semibold">{scan.quality_gate_passed ? "PASS" : "FAIL"}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,1fr)]">
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Evidence</div>
+                <h2 className="mt-2 text-xl font-semibold text-slate-900">Why Skylos marked these files as AI-authored</h2>
+              </div>
+              {canAudit ? (
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`/api/provenance/audit?project_id=${scan.project_id}&format=json`}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Audit JSON
+                  </a>
+                  <a
+                    href={`/api/provenance/audit?project_id=${scan.project_id}&format=csv`}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Audit CSV
+                  </a>
+                </div>
+              ) : null}
+            </div>
+
+            {provenanceFiles.length === 0 ? (
+              <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+                No AI-authored files were recorded for this scan.
+              </div>
+            ) : canViewDetail ? (
+              <ProvenanceDetail scanId={scan.id} files={provenanceFiles} />
+            ) : (
+              <div className="mt-6">
+                <ProFeatureLock
+                  feature="Per-file AI provenance evidence"
+                  description="See the exact file, line ranges, and git signals Skylos used to attribute code to an AI agent."
+                />
+              </div>
+            )}
+          </section>
+
+          <aside className="space-y-6">
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Related findings</div>
+              <h2 className="mt-2 text-lg font-semibold text-slate-900">Security and quality signals in attributed files</h2>
+              {findings.length === 0 ? (
+                <p className="mt-4 text-sm text-slate-500">No findings landed in the attributed files for this scan.</p>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {findings.slice(0, 8).map((finding) => (
+                    <div key={finding.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-center gap-2">
+                        <SeverityBadge severity={finding.severity} />
+                        <span className="font-mono text-[11px] text-slate-500">{finding.rule_id || "unknown"}</span>
+                      </div>
+                      <div className="mt-2 text-sm font-medium text-slate-900">{finding.message}</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {finding.file_path} · line {finding.line_number}
+                      </div>
+                    </div>
+                  ))}
+                  <Link
+                    href={`/dashboard/scans/${scan.id}`}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900"
+                  >
+                    Open full code scan workbench
+                    <ChevronRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-slate-500" />
+                <div className="text-sm font-semibold text-slate-900">Risk cross-analysis</div>
+              </div>
+              <p className="mt-2 text-sm text-slate-600">
+                If you are on Pro with enough credits, provenance risk intersection can cross-reference AI-attributed files with findings and defense failures.
+              </p>
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+                Endpoint: <span className="font-mono">/api/provenance/risk-intersection</span>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </main>
+  );
+}
