@@ -7,6 +7,19 @@ import ComplianceReportButton from "@/components/ComplianceReportButton";
 import { getEffectivePlan } from "@/lib/entitlements";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
+type ComplianceFramework = {
+  id: string;
+  code: string;
+  name: string;
+  version: string | null;
+};
+
+type EnabledFramework = {
+  id: string;
+  next_audit_date: string | null;
+  compliance_frameworks: ComplianceFramework | null;
+};
+
 export default async function CompliancePage() {
   const { user, orgId, supabase } = await ensureWorkspace();
   if (!user) {
@@ -109,7 +122,7 @@ export default async function CompliancePage() {
                   href="/dashboard/billing"
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition"
                 >
-                  Buy Credits to Unlock Pro
+                  Buy Credits to Unlock Workspace
                   <Zap className="w-4 h-4" />
                 </Link>
               </div>
@@ -131,8 +144,9 @@ export default async function CompliancePage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {enabledFrameworks.map((ef) => {
-                    const fw = ef.compliance_frameworks as any;
+                  {(enabledFrameworks as EnabledFramework[]).map((ef) => {
+                    const fw = ef.compliance_frameworks;
+                    if (!fw) return null;
                     return (
                       <div
                         key={ef.id}
@@ -171,7 +185,7 @@ export default async function CompliancePage() {
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {allFrameworks?.map((fw) => {
                   const isEnabled = enabledFrameworks?.some(
-                    (ef) => (ef.compliance_frameworks as any)?.id === fw.id
+                    (ef) => (ef.compliance_frameworks as ComplianceFramework | null)?.id === fw.id
                   );
                   
                   return (

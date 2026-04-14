@@ -10,18 +10,16 @@ const PACKS = {
   starter: {
     id: "starter",
     name: "Starter",
-    credits: 500,
+    credits: 50,
     priceCents: 900,
-    perCreditCost: "$0.018",
-    proDays: 30,
+    perCreditCost: "$0.180",
   },
   team: {
     id: "team",
     name: "Team",
-    credits: 10_000,
+    credits: 1_000,
     priceCents: 12_900,
-    perCreditCost: "$0.013",
-    proDays: 180,
+    perCreditCost: "$0.129",
   },
 } as const;
 
@@ -32,20 +30,18 @@ function run(): void {
     {
       id: "starter",
       name: "Starter",
-      credits: 500,
+      credits: 50,
       price: "$9",
       priceCents: 900,
-      perCreditCost: "$0.018",
-      proDays: 30,
+      perCreditCost: "$0.180",
     },
     {
       id: "team",
       name: "Team",
-      credits: 10000,
+      credits: 1000,
       price: "$129",
       priceCents: 12900,
-      perCreditCost: "$0.013",
-      proDays: 180,
+      perCreditCost: "$0.129",
     },
   ]);
 

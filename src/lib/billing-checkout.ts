@@ -4,7 +4,6 @@ export type CheckoutPackShape = {
   credits: number;
   priceCents: number;
   perCreditCost: string;
-  proDays: number;
 };
 
 export type PublicCheckoutPack = {
@@ -14,7 +13,6 @@ export type PublicCheckoutPack = {
   price: string;
   priceCents: number;
   perCreditCost: string;
-  proDays: number;
 };
 
 export function listPublicCheckoutPacks<T extends CheckoutPackShape>(
@@ -27,7 +25,6 @@ export function listPublicCheckoutPacks<T extends CheckoutPackShape>(
     price: `$${(pack.priceCents / 100).toFixed(0)}`,
     priceCents: pack.priceCents,
     perCreditCost: pack.perCreditCost,
-    proDays: pack.proDays,
   }));
 }
 

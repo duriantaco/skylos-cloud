@@ -130,7 +130,7 @@ export default function ScanActions({ scanId, scanCommit, onDeleted, showLabels 
     if (!canExport) {
       setNotice({
         title: 'Export Locked',
-        message: 'Findings export is a Pro feature. Buy any credit pack at skylos.dev/dashboard/billing to unlock.',
+        message: 'Findings export is a Workspace feature. Buy any credit pack at skylos.dev/dashboard/billing to unlock it permanently.',
         tone: 'warning',
       })
       setShowMenu(false)

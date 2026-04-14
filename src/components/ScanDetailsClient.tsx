@@ -806,7 +806,7 @@ export default function ScanDetailsPage() {
     if (!canExport) {
       setToast({
         type: "error",
-        message: "Findings export is a Pro feature. Buy any credit pack at skylos.dev/dashboard/billing to unlock.",
+        message: "Findings export is a Workspace feature. Buy any credit pack at skylos.dev/dashboard/billing to unlock it permanently.",
       });
       setExportPopoverOpen(false);
       return;
@@ -1461,7 +1461,7 @@ export default function ScanDetailsPage() {
                       ? 'bg-violet-100 text-violet-700 border-violet-300'
                       : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-violet-50'
                   } ${userPlan === 'free' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  title={userPlan === 'free' ? 'Pro feature: filter by AI-authored files' : 'Show only AI-authored files'}
+                  title={userPlan === 'free' ? 'Workspace feature: filter by AI-authored files' : 'Show only AI-authored files'}
                 >
                   {userPlan === 'free' && <Lock className="w-2.5 h-2.5 inline mr-0.5" />}
                   <Fingerprint className="w-2.5 h-2.5 inline mr-0.5" />

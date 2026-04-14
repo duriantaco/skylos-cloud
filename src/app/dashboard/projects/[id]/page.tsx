@@ -642,7 +642,7 @@ export default async function ProjectPage({
                 </Link>
               ) : (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
-                  Deep compare is still Pro-gated. Keep this page for the fast summary.
+                  Deep compare is still Workspace-gated. Keep this page for the fast summary.
                 </div>
               )
             ) : null}

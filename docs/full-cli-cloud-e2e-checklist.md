@@ -296,7 +296,7 @@ cd /private/tmp/skylos-e2e-fixture
 
 ### Export
 
-- [ ] Plan-gated: export requires Pro.
+- [ ] Plan-gated: export requires Workspace access.
 
 - [ ] Open the first scan page
 
@@ -317,7 +317,7 @@ cd /private/tmp/skylos-e2e-fixture
 
 ### Compare
 
-- [ ] Plan-gated and credit-gated: compare requires Pro and costs 2 credits.
+- [ ] Plan-gated and credit-gated: compare requires Workspace access and costs 2 credits.
 
 - [ ] Leave this unchecked until you have at least two uploaded scans for the same project.
 
@@ -498,11 +498,11 @@ cd /private/tmp/skylos-e2e-fixture
   - scan detail or related cloud views do not error
   - provenance-backed features can query the scan without 500s
 
-- [ ] Plan-gated and credit-gated: risk intersection requires Pro and costs 5 credits.
+- [ ] Plan-gated and credit-gated: risk intersection requires Workspace access and costs 5 credits.
 
 - [ ] If testing risk intersection, open the browser console or use the UI path that triggers provenance risk analysis for the defense/core scan
   Expected:
-  - request succeeds for a Pro plan with sufficient credits
+  - request succeeds for a workspace-enabled plan with sufficient credits
   - high-risk or medium-risk file intersections are returned when applicable
 
 - [ ] Enterprise-gated: provenance audit export requires Enterprise.
@@ -602,18 +602,40 @@ cd /private/tmp/skylos-e2e-fixture
   - `https://skylos.dev/dashboard/billing`
   Expected:
   - current balance is shown
-  - current plan is shown
+  - current workspace access state is shown
   - available credit packs are shown
+  - each pack has a specific CTA and does not look disabled unless checkout is actually unavailable
 
 - [ ] Confirm the page explains:
   - one-time purchases
+  - no seat-based pricing
   - credits never expire
-  - Pro feature summary
+  - permanent workspace access unlocks after purchase
+  - workspace feature summary
+
+- [ ] If checkout is unavailable, confirm the diagnostics panel explains whether the blocker is:
+  - billing config
+  - Lemon Squeezy connectivity / variant setup
+  - billing database readiness
+
+- [ ] Open:
+  - `https://skylos.dev/api/billing/status`
+  Expected:
+  - `configured` reflects env setup
+  - `remote.storeAccessible` reflects Lemon Squeezy connectivity
+  - `database.ready` reflects billing table / cost-row readiness
+  - each pack variant shows whether it is actually reachable
 
 - [ ] Start checkout for any visible pack
   Expected:
   - checkout opens correctly
   - selected pack is passed into the billing flow
+  - if checkout fails, the page shows a specific error instead of a generic dead-end
+
+- [ ] If testing a real completed purchase, verify after fulfillment:
+  - credits increase by the purchased pack amount
+  - billing does not show time-bound workspace-duration copy
+  - workspace access is active without a pack-duration countdown
 
 Do not complete a real purchase unless you intentionally want a real charge.
 

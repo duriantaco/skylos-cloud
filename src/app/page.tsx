@@ -1193,7 +1193,7 @@ export default async function Home() {
               Credits for cloud workflows
             </h2>
             <p className="mt-4 text-lg text-slate-600">
-              Local CLI scans stay free. Buy credits when you want uploads, history, PR automation, or AI-assisted actions. No subscriptions.
+              Local CLI scans stay free. Buy credits when you want uploads, history, PR automation, or AI-assisted actions. Any completed purchase unlocks permanent workspace access. No seat-based pricing.
             </p>
           </div>
 
@@ -1206,10 +1206,10 @@ export default async function Home() {
                 </span>
               </div>
               <h3 className="text-xl font-semibold text-slate-900">Cloud workflow</h3>
-              <p className="mt-2 text-slate-600 text-sm">Buy credits when you need shared history and automation</p>
+              <p className="mt-2 text-slate-600 text-sm">Buy credits when you need shared history, automation, and workspace access</p>
               <div className="mt-6">
                 <span className="text-5xl font-bold text-slate-900">$9</span>
-                <span className="text-slate-500 text-sm ml-1">/ 500 credits</span>
+                <span className="text-slate-500 text-sm ml-1">/ 50 credits</span>
               </div>
               <ul className="mt-8 space-y-3 text-sm text-slate-600 flex-1">
                 <li className="flex items-center gap-2">
@@ -1232,6 +1232,9 @@ export default async function Home() {
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Credits never expire
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Workspace access stays unlocked after purchase
                 </li>
               </ul>
               <Link

@@ -96,15 +96,51 @@ export const PLAN_CAPABILITIES: Record<Plan, PlanCapabilities> = {
   },
 };
 
-/**
- * Resolves the effective plan based on pro_expires_at.
- * Pro is time-bound — if expired, reverts to free.
- * Enterprise is always enterprise.
- */
 export function getEffectivePlan(org: { plan: string; pro_expires_at?: string | null }): Plan {
   if (org.plan === "enterprise") return "enterprise";
-  if (org.plan === "pro" && org.pro_expires_at && new Date(org.pro_expires_at) > new Date()) return "pro";
+  if (org.plan !== "pro") return "free";
+  if (!org.pro_expires_at) return "pro";
+  if (new Date(org.pro_expires_at) > new Date()) return "pro";
   return "free";
+}
+
+export function hasPermanentWorkspaceAccess(org: {
+  plan: string;
+  pro_expires_at?: string | null;
+}): boolean {
+  return org.plan === "pro" && !org.pro_expires_at;
+}
+
+export function hasActiveWorkspaceTrial(org: {
+  plan: string;
+  pro_expires_at?: string | null;
+}): boolean {
+  return (
+    org.plan === "pro" &&
+    Boolean(org.pro_expires_at) &&
+    new Date(org.pro_expires_at as string) > new Date()
+  );
+}
+
+export function hasExpiredWorkspaceTrial(org: {
+  plan: string;
+  pro_expires_at?: string | null;
+}): boolean {
+  return (
+    org.plan === "pro" &&
+    Boolean(org.pro_expires_at) &&
+    new Date(org.pro_expires_at as string) <= new Date()
+  );
+}
+
+export function getPlanDisplayName(plan: Plan): string {
+  if (plan === "pro") return "Workspace";
+  if (plan === "enterprise") return "Enterprise";
+  return "Free";
+}
+
+export function getRequiredPlanDisplayName(plan: "pro" | "enterprise"): string {
+  return plan === "pro" ? "Workspace" : "Enterprise";
 }
 
 export function getCapabilities(plan: string): PlanCapabilities {

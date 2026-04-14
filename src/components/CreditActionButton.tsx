@@ -65,7 +65,7 @@ export default function CreditActionButton({
     return (
       <ProFeatureLock
         feature={proFeatureName || label}
-        description={proFeatureDescription || `Unlock ${label} with Pro`}
+        description={proFeatureDescription || `Unlock ${label} with Workspace access`}
       />
     );
   }

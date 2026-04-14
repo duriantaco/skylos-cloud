@@ -56,7 +56,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // Free users must provide an expiry date
   if (!caps.suppressionGovernanceEnabled && !expires_at) {
     return NextResponse.json({
-      error: "Free plan requires an expiry date on suppressions. Upgrade to Pro for permanent suppressions.",
+      error: "Free plan requires an expiry date on suppressions. Unlock Workspace access for permanent suppressions.",
       code: "PLAN_REQUIRED",
       buy_url: "/dashboard/billing",
     }, { status: 403 });
@@ -71,7 +71,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if ((existingCount ?? 0) >= caps.maxSuppressionsPerProject) {
     return NextResponse.json({
-      error: `Suppression limit reached (${caps.maxSuppressionsPerProject} on ${effectivePlan} plan). Upgrade to Pro for unlimited suppressions.`,
+      error: `Suppression limit reached (${caps.maxSuppressionsPerProject} on ${effectivePlan} plan). Unlock Workspace access for unlimited suppressions.`,
       code: "PLAN_REQUIRED",
       buy_url: "/dashboard/billing",
     }, { status: 403 });

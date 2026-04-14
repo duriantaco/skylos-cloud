@@ -73,7 +73,7 @@ export async function createRule(formData: FormData) {
   const ruleType = String(formData.get("rule_type") || "yaml");
   
   if (ruleType === "python" && !canUsePython) {
-    return { success: false, error: "Python rules require Pro plan or higher" };
+    return { success: false, error: "Python rules require Workspace access or higher" };
   }
 
   let yamlConfig = null;
@@ -125,7 +125,7 @@ export async function updateRule(ruleId: string, formData: FormData) {
   const ruleType = String(formData.get("rule_type") || "yaml");
   
   if (ruleType === "python" && !canUsePython) {
-    return { success: false, error: "Python rules require Pro plan or higher" };
+    return { success: false, error: "Python rules require Workspace access or higher" };
   }
 
   let yamlConfig = null;

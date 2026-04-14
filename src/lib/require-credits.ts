@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { SupabaseClient } from "@supabase/supabase-js";
-import type { Plan } from "./entitlements";
+import {
+  getRequiredPlanDisplayName,
+  type Plan,
+} from "./entitlements";
 
 const BUY_URL = "https://skylos.dev/dashboard/billing";
 
@@ -9,7 +12,7 @@ export async function requireCredits(
   orgId: string,
   plan: Plan,
   featureKey: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
   if (plan === "enterprise") {
     return { ok: true };
@@ -92,7 +95,7 @@ export function requirePlan(
     ok: false,
     response: NextResponse.json(
       {
-        error: `${featureName} requires ${minPlan === "pro" ? "Pro" : "Enterprise"} plan. Buy any credit pack to unlock Pro.`,
+        error: `${featureName} requires ${getRequiredPlanDisplayName(minPlan)} access. Buy any credit pack to unlock Workspace access.`,
         code: "PLAN_REQUIRED",
         required_plan: minPlan,
         buy_url: BUY_URL,

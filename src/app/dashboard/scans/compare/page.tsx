@@ -18,7 +18,7 @@ type ScanOption = {
   branch: string | null;
   quality_gate_passed: boolean | null;
   stats: { new_issues?: number; legacy_issues?: number; total?: number } | null;
-  projects: { id: string; name: string } | null;
+  projects: { id: string; name: string } | { id: string; name: string }[] | null;
 };
 
 type DiffFinding = {
@@ -47,6 +47,11 @@ type DiffResult = {
     delta: number;
   };
 };
+
+function getScanProject(scan: ScanOption): { id: string; name: string } | null {
+  if (!scan.projects) return null;
+  return Array.isArray(scan.projects) ? scan.projects[0] ?? null : scan.projects;
+}
 
 function timeAgo(dateString: string) {
   const date = new Date(dateString);
@@ -149,7 +154,7 @@ function ScanSelector({
         {selected ? (
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
-              {selected.projects?.name}
+              {getScanProject(selected)?.name}
               <span className="text-xs text-slate-400">{timeAgo(selected.created_at)}</span>
             </div>
             <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
@@ -187,7 +192,7 @@ function ScanSelector({
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-900">{scan.projects?.name}</span>
+                  <span className="text-sm font-medium text-slate-900">{getScanProject(scan)?.name}</span>
                   <span className="text-xs text-slate-400">{timeAgo(scan.created_at)}</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
@@ -285,7 +290,7 @@ export default function ScanComparePage() {
           // Group by project, pick the one with most scans
           const byProject: Record<string, typeof data> = {};
           for (const s of data) {
-            const pid = (s.projects as any)?.id;
+            const pid = getScanProject(s)?.id;
             if (pid) {
               if (!byProject[pid]) byProject[pid] = [];
               byProject[pid].push(s);
@@ -379,7 +384,7 @@ export default function ScanComparePage() {
               </div>
               <h1 className="text-2xl font-bold text-slate-900">Scan Diff</h1>
               <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                Pro
+                Workspace
               </span>
             </div>
             <p className="text-slate-500 text-sm">

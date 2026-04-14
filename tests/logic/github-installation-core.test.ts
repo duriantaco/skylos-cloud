@@ -42,7 +42,7 @@ test("mergeGitHubAutoConfigureSetting preserves other policy config", () => {
   );
 });
 
-test("canAutoConfigureGitHubInstall requires a paid effective plan", () => {
+test("canAutoConfigureGitHubInstall requires paid workspace access", () => {
   assert.equal(
     canAutoConfigureGitHubInstall(
       { github_auto_configure_on_install: true },
@@ -50,6 +50,15 @@ test("canAutoConfigureGitHubInstall requires a paid effective plan", () => {
       { plan: "free", pro_expires_at: null }
     ),
     false
+  );
+
+  assert.equal(
+    canAutoConfigureGitHubInstall(
+      { github_auto_configure_on_install: true },
+      true,
+      { plan: "pro", pro_expires_at: null }
+    ),
+    true
   );
 
   assert.equal(

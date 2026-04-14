@@ -40,12 +40,12 @@ export default async function ActivityPage() {
           </div>
           <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-12 text-center">
             <Lock className="w-10 h-10 text-indigo-400 mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-indigo-900 mb-2">Team Activity — Pro Feature</h2>
+            <h2 className="text-lg font-bold text-indigo-900 mb-2">Team Activity — Workspace Feature</h2>
             <p className="text-sm text-indigo-700 mb-6 max-w-md mx-auto">
-              Track your team's comments, assignments, suppressions, and resolutions with a full activity feed.
+              Track your team&apos;s comments, assignments, suppressions, and resolutions with a full activity feed.
             </p>
             <a href="/dashboard/billing" className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition">
-              Buy any credit pack to unlock Pro
+              Buy any credit pack to unlock Workspace
             </a>
           </div>
         </div>

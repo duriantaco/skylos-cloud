@@ -206,7 +206,7 @@ export default function TrendsPage() {
       if (res.ok) {
         const json = await res.json();
         setPlan(json.plan || "free");
-        // If Pro or enterprise, default to 30d range
+        // If Workspace or enterprise, default to 30d range
         if (json.plan === "pro" || json.plan === "enterprise") {
           setRange("30");
         }
@@ -291,7 +291,7 @@ export default function TrendsPage() {
               ))}
             </select>
 
-            {/* Branch Picker — Pro only */}
+            {/* Branch Picker — Workspace only */}
             {data && data.branches.length > 0 && !isFreePlan && (
               <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-2 rounded-lg">
                 <GitBranch className="w-4 h-4 text-slate-500" />
@@ -330,7 +330,7 @@ export default function TrendsPage() {
                         ? "text-slate-300 cursor-not-allowed"
                         : "text-slate-600 hover:bg-slate-50"
                     }`}
-                    title={locked ? "Upgrade to Pro for extended history" : undefined}
+                    title={locked ? "Unlock Workspace for extended history" : undefined}
                   >
                     {r.label}
                     {locked && <Lock className="w-3 h-3 inline ml-0.5 opacity-50" />}
@@ -369,7 +369,7 @@ export default function TrendsPage() {
               <div className="mb-4 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between">
                 <p className="text-sm text-indigo-800">
                   <Lock className="w-3.5 h-3.5 inline mr-1" />
-                  Viewing last 7 days. <span className="font-medium">Upgrade to Pro</span> for full history, branch filters, and multi-project comparison.
+                  Viewing last 7 days. <span className="font-medium">Unlock Workspace</span> for full history, branch filters, and multi-project comparison.
                 </p>
                 <a href="/dashboard/billing" className="text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded-lg transition shrink-0 ml-4">
                   Buy Credits
