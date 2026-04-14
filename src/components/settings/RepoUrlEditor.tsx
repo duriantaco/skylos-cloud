@@ -11,10 +11,12 @@ type ConflictProject = {
 
 export default function RepoUrlEditor({ 
   projectId, 
-  currentUrl 
+  currentUrl,
+  githubInstallationId,
 }: { 
   projectId: string
   currentUrl: string | null 
+  githubInstallationId?: number | null
 }) {
   const router = useRouter()
   const [url, setUrl] = useState(currentUrl || '')
@@ -22,21 +24,23 @@ export default function RepoUrlEditor({
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [conflictProject, setConflictProject] = useState<ConflictProject | null>(null)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
   useEffect(() => {
     setUrl(currentUrl || '')
   }, [currentUrl])
 
-  const handleSave = async () => {
+  const saveRepoUrl = async (nextUrl: string | null) => {
     setSaving(true)
     setSaved(false)
     setError(null)
     setConflictProject(null)
+    setStatusMessage(null)
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo_url: url.trim() || null }),
+        body: JSON.stringify({ repo_url: nextUrl }),
       })
 
       if (!res.ok) {
@@ -53,6 +57,13 @@ export default function RepoUrlEditor({
       }
 
       setSaved(true)
+      setStatusMessage(
+        nextUrl
+          ? 'Repository URL saved. Refresh the project page or open Project Overview to confirm the link is visible there.'
+          : githubInstallationId
+            ? 'Repository link removed. The GitHub App installation still exists until you remove it in GitHub.'
+            : 'Repository link removed.'
+      )
       router.refresh()
       setTimeout(() => setSaved(false), 3000)
     } catch {
@@ -60,6 +71,25 @@ export default function RepoUrlEditor({
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSave = async () => {
+    await saveRepoUrl(url.trim() || null)
+  }
+
+  const handleUnlink = async () => {
+    if (!currentUrl) return
+
+    const confirmed = window.confirm(
+      githubInstallationId
+        ? 'Remove the repository link from this project? This keeps the GitHub App installation in GitHub, but Skylos will stop using this repo binding until you link a repo again.'
+        : 'Remove the repository link from this project?'
+    )
+
+    if (!confirmed) return
+
+    setUrl('')
+    await saveRepoUrl(null)
   }
 
   return (
@@ -119,11 +149,20 @@ export default function RepoUrlEditor({
           ) : null}
           {saved ? 'Saved!' : 'Save'}
         </button>
+        {currentUrl ? (
+          <button
+            onClick={handleUnlink}
+            disabled={saving}
+            className="px-4 py-2 border border-red-200 bg-white text-red-700 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Unlink
+          </button>
+        ) : null}
       </div>
 
-      {saved ? (
+      {statusMessage ? (
         <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Repository URL saved. Refresh the project page or open Project Overview to confirm the link is visible there.
+          {statusMessage}
         </div>
       ) : null}
 
@@ -147,6 +186,11 @@ export default function RepoUrlEditor({
       <p className="mt-3 text-xs text-slate-500">
         Leave this blank if you want to keep the project cloud-only and upload scans without GitHub binding.
       </p>
+      {githubInstallationId ? (
+        <p className="mt-2 text-xs text-amber-700">
+          This project still has a GitHub App installation attached. Unlinking the repository URL here does not uninstall the GitHub App from GitHub.
+        </p>
+      ) : null}
     </div>
   )
 }
