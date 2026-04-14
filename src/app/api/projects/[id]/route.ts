@@ -46,7 +46,7 @@ export async function PATCH(
         if (repoFilter) {
           const { data: existingProjects, error: existingError } = await supabase
             .from("projects")
-            .select("id")
+            .select("id, name, org_id")
             .or(repoFilter)
             .limit(10);
 
@@ -54,16 +54,25 @@ export async function PATCH(
             return serverError(existingError, "Check repo URL uniqueness");
           }
 
-          const conflict = (existingProjects || []).some(
+          const conflictProject = (existingProjects || []).find(
             (existingProject) => existingProject.id !== id
           );
 
-          if (conflict) {
+          if (conflictProject) {
             return NextResponse.json(
-              {
-                error:
-                  "This GitHub repository is already linked to another project. Use a unique repo binding per project.",
-              },
+              conflictProject.org_id === project.org_id
+                ? {
+                    error:
+                      "This GitHub repository is already linked to another project in this workspace.",
+                    conflict_project: {
+                      id: conflictProject.id,
+                      name: conflictProject.name,
+                    },
+                  }
+                : {
+                    error:
+                      "This GitHub repository is already linked to another project. Use a unique repo binding per project.",
+                  },
               { status: 409 }
             );
           }
