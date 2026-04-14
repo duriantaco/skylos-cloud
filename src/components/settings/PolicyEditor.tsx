@@ -331,14 +331,14 @@ export default function PolicyEditor({
             className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500"
           >
             <option value="zero-new">Zero-new (block any new issue)</option>
-            <option value="category" disabled={!canUseAdvancedGates}>By category thresholds {!canUseAdvancedGates ? "(Pro)" : ""}</option>
-            <option value="severity" disabled={!canUseAdvancedGates}>By severity thresholds {!canUseAdvancedGates ? "(Pro)" : ""}</option>
-            <option value="both" disabled={!canUseAdvancedGates}>Category + severity {!canUseAdvancedGates ? "(Pro)" : ""}</option>
+            <option value="category" disabled={!canUseAdvancedGates}>By category thresholds {!canUseAdvancedGates ? "(Workspace)" : ""}</option>
+            <option value="severity" disabled={!canUseAdvancedGates}>By severity thresholds {!canUseAdvancedGates ? "(Workspace)" : ""}</option>
+            <option value="both" disabled={!canUseAdvancedGates}>Category + severity {!canUseAdvancedGates ? "(Workspace)" : ""}</option>
           </select>
           {!canUseAdvancedGates && (
             <p className="mt-1 text-xs text-indigo-600 flex items-center gap-1">
               <Lock className="w-3 h-3" />
-              <a href="/dashboard/billing" className="underline hover:text-indigo-800">Buy any credit pack</a> to unlock advanced gate modes
+              <a href="/dashboard/billing" className="underline hover:text-indigo-800">Buy any credit pack</a> to unlock advanced gate modes permanently
             </p>
           )}
         </div>

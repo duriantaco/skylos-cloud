@@ -13,7 +13,7 @@ test("parseOrderCreatedPayload accepts valid Lemon Squeezy payloads", () => {
       custom_data: {
         org_id: "org-123",
         pack_id: "team",
-        credits: "10000",
+        credits: "1000",
       },
     },
     data: {
@@ -27,7 +27,7 @@ test("parseOrderCreatedPayload accepts valid Lemon Squeezy payloads", () => {
   assert.deepEqual(parsed, {
     orgId: "org-123",
     packId: "team",
-    credits: 10000,
+    credits: 1000,
     orderId: "order-1",
     amountCents: 12900,
   });

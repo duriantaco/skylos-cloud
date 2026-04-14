@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   const effectivePlan = getEffectivePlan({ plan: org.plan, pro_expires_at: org.pro_expires_at });
 
   if (!canViewProvenanceDetail(effectivePlan)) {
-    return NextResponse.json({ error: 'Pro plan required for risk intersection analysis' }, { status: 403 });
+    return NextResponse.json({ error: 'Workspace access required for risk intersection analysis' }, { status: 403 });
   }
 
   // Deduct credits (enterprise = free)

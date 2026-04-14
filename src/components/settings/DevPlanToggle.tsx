@@ -51,7 +51,7 @@ export default function DevPlanToggle({ currentPlan }: { currentPlan: string }) 
           disabled={isPending}
         >
           <option value="free">Free</option>
-          <option value="pro">Pro</option>
+          <option value="pro">Workspace</option>
         </select>
 
         <button

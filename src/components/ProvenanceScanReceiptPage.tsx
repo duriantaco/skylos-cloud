@@ -396,7 +396,7 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
                 <div className="text-sm font-semibold text-slate-900">Risk cross-analysis</div>
               </div>
               <p className="mt-2 text-sm text-slate-600">
-                If you are on Pro with enough credits, provenance risk intersection can cross-reference AI-attributed files with findings and defense failures.
+                If you have Workspace access and enough credits, provenance risk intersection can cross-reference AI-attributed files with findings and defense failures.
               </p>
               <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
                 Endpoint: <span className="font-mono">/api/provenance/risk-intersection</span>

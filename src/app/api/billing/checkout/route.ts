@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { badRequest, serverError } from "@/lib/api-error";
+import { badRequest } from "@/lib/api-error";
+import { getCheckoutBillingConfig } from "@/lib/billing-config";
 import { CREDIT_PACKS, createCheckoutUrl, type PackId } from "@/lib/payments";
 import { requirePermission, isAuthError } from "@/lib/permissions";
 import {
@@ -35,6 +36,20 @@ export async function POST(request: NextRequest) {
     return badRequest(invalidPackIdMessage(CREDIT_PACKS));
   }
 
+  try {
+    getCheckoutBillingConfig(packId as PackId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Billing checkout is not configured.";
+    return NextResponse.json(
+      {
+        error: message,
+        code: "BILLING_NOT_CONFIGURED",
+        pack_id: packId,
+      },
+      { status: 503 }
+    );
+  }
+
   const { data: org } = await supabase
     .from("organizations")
     .select("id, name")
@@ -45,18 +60,30 @@ export async function POST(request: NextRequest) {
     return badRequest("No organization found for this user");
   }
 
+  if (!auth.user.email?.trim()) {
+    return badRequest("Your account does not have a billing email yet. Add an email to your account before checkout.");
+  }
+
   const baseUrl = process.env.APP_BASE_URL || "https://skylos.dev";
 
   try {
     const checkoutUrl = await createCheckoutUrl({
       orgId: org.id,
-      email: auth.user.email || "",
+      email: auth.user.email,
       packId: packId as PackId,
       successUrl: buildBillingSuccessUrl(baseUrl, packId),
     });
 
     return NextResponse.json({ url: checkoutUrl });
   } catch (err) {
-    return serverError(err, "Billing checkout");
+    const message = err instanceof Error ? err.message : "Failed to create checkout session.";
+    return NextResponse.json(
+      {
+        error: message,
+        code: "CHECKOUT_FAILED",
+        pack_id: packId,
+      },
+      { status: 502 }
+    );
   }
 }

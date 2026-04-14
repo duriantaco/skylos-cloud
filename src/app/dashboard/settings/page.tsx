@@ -42,7 +42,7 @@ function NoWorkspaceState() {
           </div>
           <h2 className="text-lg font-semibold text-slate-900 mb-2">Workspace Not Found</h2>
           <p className="text-slate-600 mb-6">
-            We couldn't find or create your workspace. Please try logging out and back in.
+            We couldn&apos;t find or create your workspace. Please try logging out and back in.
           </p>
           <Link 
             href="/dashboard" 
@@ -65,7 +65,7 @@ function NoProjectsState({ userPlan }: { userPlan: string }) {
         </Link>
         
         <h1 className="text-2xl font-bold mb-2 text-slate-900">Settings</h1>
-        <p className="text-slate-500 mb-8">Manage your organization plan and project settings.</p>
+        <p className="text-slate-500 mb-8">Manage your workspace access and project settings.</p>
         
         <div className={`rounded-xl p-6 mb-8 border-2 ${
           ['pro', 'enterprise'].includes(userPlan)
@@ -81,7 +81,7 @@ function NoProjectsState({ userPlan }: { userPlan: string }) {
                     ? 'bg-gray-700 text-white'
                     : 'bg-slate-600 text-white'
                 }`}>
-                  {userPlan === 'enterprise' ? '🏢 Enterprise' : userPlan === 'pro' ? '⚡ Pro' : 'Free'}
+                  {userPlan === 'enterprise' ? '🏢 Enterprise' : userPlan === 'pro' ? '⚡ Workspace' : 'Free'}
                 </span>
               </h3>
               <p className="text-sm text-slate-600">
@@ -138,7 +138,7 @@ function ProjectPicker({ projects, userPlan }: {
         </Link>
         
         <h1 className="text-2xl font-bold mb-2 text-slate-900">Settings</h1>
-        <p className="text-slate-500 mb-8">Manage your organization plan and project settings.</p>
+        <p className="text-slate-500 mb-8">Manage your workspace access and project settings.</p>
 
         <div className={`rounded-xl p-6 mb-8 border-2 ${
           ['pro', 'enterprise'].includes(userPlan)
@@ -154,7 +154,7 @@ function ProjectPicker({ projects, userPlan }: {
                     ? 'bg-gray-700 text-white'
                     : 'bg-slate-600 text-white'
                 }`}>
-                  {userPlan === 'enterprise' ? '🏢 Enterprise' : userPlan === 'pro' ? '⚡ Pro' : 'Free'}
+                  {userPlan === 'enterprise' ? '🏢 Enterprise' : userPlan === 'pro' ? '⚡ Workspace' : 'Free'}
                 </span>
               </h3>
               <p className="text-sm text-slate-600">
@@ -252,7 +252,7 @@ export default async function SettingsPage({
   }
 
   const params = await searchParams;
-  let projectId = params.project;
+  const projectId = params.project;
 
   if (!projectId) {
     return <ProjectPicker projects={projects} userPlan={userPlan} />;
@@ -264,7 +264,7 @@ export default async function SettingsPage({
     return <ProjectPicker projects={projects} userPlan={userPlan} />;
   }
 
-  const pc = (project.policy_config as Record<string, any>) ?? {};
+  const pc = (project.policy_config as Record<string, unknown>) ?? {};
   const excludePaths = Array.isArray(pc.exclude_paths) ? pc.exclude_paths : [];
   const githubAutoConfigureEnabled = pc.github_auto_configure_on_install === true;
 
@@ -310,7 +310,7 @@ export default async function SettingsPage({
                     ? 'bg-gray-700 text-white'
                     : 'bg-slate-600 text-white'
                 }`}>
-                  {userPlan === 'enterprise' ? '🏢 Enterprise' : userPlan === 'pro' ? '⚡ Pro' : 'Free'}
+                  {userPlan === 'enterprise' ? '🏢 Enterprise' : userPlan === 'pro' ? '⚡ Workspace' : 'Free'}
                 </span>
               </h3>
               <p className="text-sm text-slate-600">
@@ -390,9 +390,9 @@ export default async function SettingsPage({
                 <SlackIntegration projectId={project.id} />
                 <div className="absolute inset-0 flex items-center justify-center bg-white/90">
                   <div className="text-center">
-                    <p className="font-semibold mb-2">Pro Feature</p>
+                    <p className="font-semibold mb-2">Workspace Feature</p>
                     <a href="/dashboard/billing" className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">
-                      Buy any credit pack to unlock Pro
+                      Buy any credit pack to unlock Workspace
                     </a>
                   </div>
                 </div>
@@ -422,9 +422,9 @@ export default async function SettingsPage({
                 <DiscordIntegration projectId={project.id} />
                 <div className="absolute inset-0 flex items-center justify-center bg-white/90">
                   <div className="text-center">
-                    <p className="font-semibold mb-2">Pro Feature</p>
+                    <p className="font-semibold mb-2">Workspace Feature</p>
                     <a href="/dashboard/billing" className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm">
-                      Buy any credit pack to unlock Pro
+                      Buy any credit pack to unlock Workspace
                     </a>
                   </div>
                 </div>

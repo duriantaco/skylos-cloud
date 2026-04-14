@@ -12,8 +12,8 @@ Run through every check after any feature change or release.
 - [ ] `entitlements.ts` is the SINGLE SOURCE OF TRUTH for plan capabilities.
 - [ ] Every 402 response includes `buy_url: "/dashboard/billing"`.
 - [ ] Every 403 (PLAN_REQUIRED) response includes `buy_url: "/dashboard/billing"`.
-- [ ] Pro is TIME-BOUND via `pro_expires_at`. Expired Pro = free.
-- [ ] Credits persist forever. Pro access expires. These are SEPARATE systems.
+- [ ] Timed `pro_expires_at` is trial-only. `plan = 'pro'` with `pro_expires_at IS NULL` means permanent workspace access.
+- [ ] Credits persist forever. Purchases unlock permanent workspace access. Trials can still expire.
 - [ ] Enterprise = unlimited everything (skip all credit deductions).
 - [ ] Server-side gating is MANDATORY. Frontend gating is UX only.
 - [ ] No double-charging (if server deducts, client must NOT also deduct).
@@ -34,39 +34,39 @@ Run through every check after any feature change or release.
 ### 2.2 Gate Policy — `/api/policy` (PATCH)
 
 - [ ] Free users forced to `zero-new` gate mode (silent downgrade, not error)
-- [ ] Pro/Enterprise can use `category`, `severity`, `both` modes
+- [ ] Workspace/Enterprise can use `category`, `severity`, `both` modes
 - [ ] Uses `canUseAdvancedGates()` from entitlements
 
 ### 2.3 Quality Gate Override — `/api/scans/[id]/override` (POST)
 
-- [ ] Requires Pro plan (`requirePlan(plan, "pro", "Gate Override")`)
+- [ ] Requires Workspace access (`requirePlan(plan, "pro", "Gate Override")`)
 - [ ] 403 with `buy_url` for free users
 
 ### 2.4 Team Invite — `/api/team/invite` (POST)
 
-- [ ] Requires Pro plan
+- [ ] Requires Workspace access
 - [ ] 403 with `buy_url` for free users
 
 ### 2.5 Team Activity — `/api/team/activity` (GET)
 
-- [ ] Requires Pro plan
+- [ ] Requires Workspace access
 - [ ] 403 with `buy_url` for free users
 
 ### 2.6 Issue Comments — `/api/issue-groups/[id]/comments` (POST)
 
-- [ ] Requires Pro plan (plan gate only, NO credit cost)
-- [ ] 403 for free users, 200 for Pro (no credits deducted)
-- [ ] 403 for EXPIRED Pro (effective plan = free)
+- [ ] Requires Workspace access (plan gate only, NO credit cost)
+- [ ] 403 for free users, 200 for workspace-enabled users (no credits deducted)
+- [ ] 403 for expired trials (effective plan = free)
 
 ### 2.7 Issue Assignment — `/api/issue-groups/[id]/assign` (POST)
 
-- [ ] Requires Pro plan (plan gate only, NO credit cost)
+- [ ] Requires Workspace access (plan gate only, NO credit cost)
 
 ### 2.8 Finding Suppress — `/api/findings/[id]/suppress` (POST)
 
 - [ ] Free users MUST provide `expires_at` (no permanent suppressions)
 - [ ] Free users limited to 25 active suppressions per project
-- [ ] Pro/Enterprise: unlimited, permanent OK
+- [ ] Workspace/Enterprise: unlimited, permanent OK
 - [ ] Count query filters by `is("revoked_at", null)`
 
 ### 2.9 Issue Group Suppress — `/api/issue-groups/[id]/suppress` (POST)
@@ -76,28 +76,28 @@ Run through every check after any feature change or release.
 
 ### 2.10 PR Auto-Fix — `/api/findings/[id]/fix` (POST)
 
-- [ ] Requires Pro plan AND 3 credits (LLM compute)
+- [ ] Requires Workspace access AND 3 credits (LLM compute)
 - [ ] Plan gate checked FIRST, then credit gate
-- [ ] 403 for free (plan), 402 for Pro with insufficient credits
+- [ ] 403 for free (plan), 402 for workspace-enabled users with insufficient credits
 
 ### 2.11 Compliance Report — `/api/compliance/report` (POST)
 
-- [ ] Requires Pro plan (not "team") AND 500 credits
+- [ ] Requires Workspace access (not "team") AND 500 credits
 - [ ] Server-side credit deduction (not client-side)
 - [ ] Plan check uses `["pro", "enterprise"]`, not `["team", "enterprise"]`
 
 ### 2.12 Scan Export — `/api/scans/[id]/export` (GET)
 
-- [ ] Requires Pro plan (plan gate only, NO credit cost)
+- [ ] Requires Workspace access (plan gate only, NO credit cost)
 - [ ] 403 with `buy_url` for free users
 
 ### 2.13 Slack Integration — `/api/projects/[id]/slack` (POST)
 
-- [ ] Requires Pro plan
+- [ ] Requires Workspace access
 
 ### 2.14 Discord Integration — `/api/projects/[id]/discord` (POST)
 
-- [ ] Requires Pro plan
+- [ ] Requires Workspace access
 
 ### 2.15 Credit Deduction — `/api/credits/deduct` (POST)
 
@@ -123,12 +123,12 @@ Run through every check after any feature change or release.
 
 - [ ] NEVER returns 403 — viewing is always allowed
 - [ ] Free users: data limited to 7 days, 1 project
-- [ ] Pro users: full history, all projects, branch filters
+- [ ] Workspace users: full history, all projects, branch filters
 
 ### 2.20 Whoami — `/api/whoami` (GET)
 
 - [ ] Uses `getEffectivePlan()`
-- [ ] SARIF capability matches entitlements.ts (Pro, not enterprise-only)
+- [ ] SARIF capability matches entitlements.ts (Workspace, not enterprise-only)
 
 ### 2.21 CLI Connect — `/api/cli/connect` (POST)
 
@@ -141,16 +141,16 @@ Run through every check after any feature change or release.
 ### 3.1 Dashboard Home — `/dashboard`
 
 - [ ] Stale data nudge when last scan > 7 days + 0 credits
-- [ ] Pro expiry banner when expiring in < 7 days
-- [ ] Pro expired banner with reactivation CTA
+- [ ] Workspace trial banner when ending in < 7 days
+- [ ] Expired trial banner with permanent-unlock CTA
 
 ### 3.2 Trends Page — `/dashboard/trends`
 
 - [ ] Free: default range = 7 days
 - [ ] Free: 30d/90d buttons locked with Lock icon
 - [ ] Free: branch picker hidden
-- [ ] Free: upsell banner "Viewing last 7 days. Upgrade to Pro..."
-- [ ] Pro/Enterprise: all filters available
+- [ ] Free: upsell banner "Viewing last 7 days. Unlock Workspace..."
+- [ ] Workspace/Enterprise: all filters available
 
 ### 3.3 Scan Detail — `/dashboard/scans/[id]`
 
@@ -165,33 +165,33 @@ Run through every check after any feature change or release.
 
 ### 3.5 Issue Detail — `/dashboard/issues/[id]`
 
-- [ ] Comments section: ProFeatureLock for free, functional for Pro
-- [ ] Assignment: ProFeatureLock for free, functional for Pro
+- [ ] Comments section: ProFeatureLock for free, functional for Workspace
+- [ ] Assignment: ProFeatureLock for free, functional for Workspace
 - [ ] Viewing issue data is ALWAYS free (never block viewing)
 
 ### 3.6 Activity Page — `/dashboard/activity`
 
-- [ ] Full Pro lock screen for free (Lock icon + CTA)
+- [ ] Full Workspace lock screen for free (Lock icon + CTA)
 - [ ] Uses `getEffectivePlan()` for plan resolution
 
 ### 3.7 Settings Page — `/dashboard/settings`
 
 - [ ] PolicyEditor: advanced gate modes locked for free with Lock + upgrade link
-- [ ] TeamMembers: invite form replaced with Pro lock card for free
+- [ ] TeamMembers: invite form replaced with Workspace lock card for free
 - [ ] Slack/Discord: overlay with "Buy any credit pack to unlock" CTA
 - [ ] Both PolicyEditor and TeamMembers receive `plan` prop
 
 ### 3.8 Compliance Page — `/dashboard/compliance`
 
 - [ ] Plan check uses `["pro", "enterprise"]`, NOT `["team", "enterprise"]`
-- [ ] CTA text: "Buy Credits to Unlock Pro" (not "Upgrade to Team — $199/mo")
+- [ ] CTA text: "Buy Credits to Unlock Workspace" (not "Upgrade to Team — $199/mo")
 
 ### 3.9 Billing Page — `/dashboard/billing`
 
-- [ ] Shows Pro status (active/expiring/expired)
-- [ ] "What Pro Unlocks" section for free users
+- [ ] Shows workspace status (permanent/trial/expired trial)
+- [ ] "What Workspace Unlocks" section for free users
 - [ ] Credit cost reference table (only compute-heavy actions)
-- [ ] Pro unlock durations per pack: Starter=30d, Builder=90d, Team=180d, Scale=365d
+- [ ] No pack duration messaging remains in billing UI
 
 ---
 
@@ -229,15 +229,15 @@ Run through every check after any feature change or release.
 
 ### 6.1 Credit Purchase (`fulfillCreditPurchase`)
 
-- [ ] Sets `pro_expires_at` (not just `plan: 'pro'`)
-- [ ] Pro duration: Starter=30d, Builder=90d, Team=180d, Scale=365d
-- [ ] STACKS on repeat purchase (extends existing expiry, doesn't reset)
+- [ ] Sets permanent workspace access via `plan = 'pro'` and `pro_expires_at = NULL`
+- [ ] Timed `pro_expires_at` is reserved for trials or legacy data only
+- [ ] Repeat purchases add credits without changing permanent workspace access
 - [ ] Credits added to balance (persist forever)
 
 ### 6.2 Starter Credits
 
 - [ ] New org gets 50 free credits on creation
-- [ ] New org gets 7-day Pro trial (`pro_expires_at = now + 7 days`)
+- [ ] New org gets 7-day Workspace trial (`pro_expires_at = now + 7 days`)
 
 ---
 
@@ -246,7 +246,7 @@ Run through every check after any feature change or release.
 ### 7.1 Organizations Table
 
 - [ ] Has `pro_expires_at` column (timestamptz)
-- [ ] Existing Pro users grandfathered with 90-day expiry
+- [ ] Existing completed purchasers migrated to permanent workspace access
 - [ ] Enterprise users have far-future expiry (2099)
 
 ### 7.2 Feature Credit Costs Table
@@ -262,22 +262,22 @@ Run through every check after any feature change or release.
 |--------|---------|-----------|
 | Scan upload | 1 | Credit |
 | Scan comparison | 2 | Credit |
-| PR auto-fix | 3 | Credit + Pro |
-| AI issue triage | 5 | Credit + Pro |
-| MCP AI remediation | 10 | Credit + Pro |
-| Compliance report | 500 | Credit + Pro |
-| Team comments | 0 | Pro only |
-| Team assignments | 0 | Pro only |
-| Findings export | 0 | Pro only |
-| Slack/Discord setup | 0 | Pro only |
-| Override quality gate | 0 | Pro only |
-| Advanced gate modes | 0 | Pro only |
+| PR auto-fix | 3 | Credit + Workspace |
+| AI issue triage | 5 | Credit + Workspace |
+| MCP AI remediation | 10 | Credit + Workspace |
+| Compliance report | 500 | Credit + Workspace |
+| Team comments | 0 | Workspace only |
+| Team assignments | 0 | Workspace only |
+| Findings export | 0 | Workspace only |
+| Slack/Discord setup | 0 | Workspace only |
+| Override quality gate | 0 | Workspace only |
+| Advanced gate modes | 0 | Workspace only |
 
 ---
 
 ## 9. Plan Capabilities Quick Reference
 
-| Capability | Free | Pro | Enterprise |
+| Capability | Free | Workspace | Enterprise |
 |-----------|------|-----|------------|
 | Projects | 1 | 10 | Unlimited |
 | Scans stored | 10 | 500 | 10,000 |

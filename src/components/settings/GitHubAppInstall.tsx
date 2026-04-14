@@ -29,7 +29,7 @@ export default function GitHubAppInstall({
   const [savingAutoConfigure, setSavingAutoConfigure] = useState(false)
   const [autoConfigureError, setAutoConfigureError] = useState<string | null>(null)
 
-  const isPro = currentPlan === "pro" || currentPlan === "enterprise"
+  const hasWorkspaceAccess = currentPlan === "pro" || currentPlan === "enterprise"
   const isInstalled = !!githubInstallationId
 
   const handleAutoConfigureChange = async (enabled: boolean) => {
@@ -76,17 +76,17 @@ export default function GitHubAppInstall({
     }
   }
   
-  if (!isPro) {
+  if (!hasWorkspaceAccess) {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 mb-8 opacity-75">
         <div className="flex items-center gap-2 mb-2">
           <Github className="w-5 h-5" />
           <h3 className="text-lg font-semibold">GitHub App Integration</h3>
-          <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">PRO</span>
+          <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">WORKSPACE</span>
         </div>
         
         <p className="text-sm text-gray-700 mb-4">
-          Automatically block PRs that fail the quality gate. Purchase credits to enable.
+          Automatically block PRs that fail the quality gate. Buy any credit pack to unlock Workspace access.
         </p>
         
         <ul className="text-sm text-gray-500 mb-4 space-y-1">
@@ -99,13 +99,13 @@ export default function GitHubAppInstall({
           href="/dashboard/billing"
           className="inline-block px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition"
         >
-          Buy Credits
+          Unlock Workspace
         </a>
       </div>
     )
   }
   
-  // Pro + Already installed
+  // Workspace access + already installed
   if (isInstalled) {
     return (
       <div className="rounded-xl border-2 border-green-200 bg-green-50 p-6 mb-8">

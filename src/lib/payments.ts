@@ -30,56 +30,40 @@ export interface CreditPack {
   priceCents: number;
   variantId: string;
   perCreditCost: string;
-  proDays: number;
-}
-
-const PRO_DURATION_MAP: Record<string, number> = {
-  starter: 30,
-  builder: 90,
-  team: 180,
-  scale: 365,
-};
-
-export function getProDurationDays(packId: string): number {
-  return PRO_DURATION_MAP[packId] || 30;
 }
 
 export const CREDIT_PACKS: Record<PackId, CreditPack> = {
   starter: {
     id: "starter",
     name: "Starter",
-    credits: 500,
+    credits: 50,
     priceCents: 900,
     variantId: process.env.LS_VARIANT_STARTER || "",
-    perCreditCost: "$0.018",
-    proDays: 30,
+    perCreditCost: "$0.180",
   },
   builder: {
     id: "builder",
     name: "Builder",
-    credits: 2_500,
+    credits: 250,
     priceCents: 3_900,
     variantId: process.env.LS_VARIANT_BUILDER || "",
-    perCreditCost: "$0.016",
-    proDays: 90,
+    perCreditCost: "$0.156",
   },
   team: {
     id: "team",
     name: "Team",
-    credits: 10_000,
+    credits: 1_000,
     priceCents: 12_900,
     variantId: process.env.LS_VARIANT_TEAM || "",
-    perCreditCost: "$0.013",
-    proDays: 180,
+    perCreditCost: "$0.129",
   },
   scale: {
     id: "scale",
     name: "Scale",
-    credits: 50_000,
+    credits: 5_000,
     priceCents: 49_900,
     variantId: process.env.LS_VARIANT_SCALE || "",
-    perCreditCost: "$0.010",
-    proDays: 365,
+    perCreditCost: "$0.100",
   },
 };
 

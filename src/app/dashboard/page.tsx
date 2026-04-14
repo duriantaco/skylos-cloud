@@ -2,6 +2,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
 import {
+  hasActiveWorkspaceTrial,
+  hasExpiredWorkspaceTrial,
+  hasPermanentWorkspaceAccess,
+} from "@/lib/entitlements";
+import {
   ShieldAlert,
   ArrowUpRight,
   GitPullRequest,
@@ -139,19 +144,31 @@ export default async function DashboardPage() {
     );
   }
 
-  // Fetch org data for Pro expiry banner
+  // Fetch org data for workspace access status
   const { data: orgData } = await supabase
     .from("organizations")
     .select("plan, pro_expires_at, credits")
     .eq("id", orgId)
     .single();
 
-  const proExpiresAt = orgData?.pro_expires_at ? new Date(orgData.pro_expires_at) : null;
   const now = new Date();
-  const proExpired = orgData?.plan === "pro" && (!proExpiresAt || proExpiresAt <= now);
-  const proExpiringSoon = proExpiresAt && proExpiresAt > now && (proExpiresAt.getTime() - now.getTime()) < 7 * 24 * 60 * 60 * 1000;
-  const daysUntilProExpiry = proExpiresAt && proExpiresAt > now ? Math.ceil((proExpiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)) : 0;
-  const daysSinceProExpired = proExpiresAt && proExpiresAt <= now ? Math.floor((now.getTime() - proExpiresAt.getTime()) / (24 * 60 * 60 * 1000)) : 0;
+  const trialExpiresAt = orgData?.pro_expires_at ? new Date(orgData.pro_expires_at) : null;
+  const workspaceAccess = {
+    plan: orgData?.plan || "free",
+    pro_expires_at: orgData?.pro_expires_at || null,
+  };
+  const permanentWorkspaceAccess = hasPermanentWorkspaceAccess(workspaceAccess);
+  const activeWorkspaceTrial = hasActiveWorkspaceTrial(workspaceAccess);
+  const expiredWorkspaceTrial = hasExpiredWorkspaceTrial(workspaceAccess);
+  const trialEndingSoon = activeWorkspaceTrial
+    && Boolean(trialExpiresAt)
+    && (trialExpiresAt!.getTime() - now.getTime()) < 7 * 24 * 60 * 60 * 1000;
+  const daysUntilTrialEnds = trialExpiresAt && trialExpiresAt > now
+    ? Math.ceil((trialExpiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+    : 0;
+  const daysSinceTrialEnded = trialExpiresAt && trialExpiresAt <= now
+    ? Math.floor((now.getTime() - trialExpiresAt.getTime()) / (24 * 60 * 60 * 1000))
+    : 0;
   const orgCredits = orgData?.credits || 0;
 
   const [
@@ -272,15 +289,15 @@ export default async function DashboardPage() {
             </div>
           </header>
 
-          {/* PRO EXPIRY / STALE DATA NUDGES */}
-          {proExpired && (
+          {/* WORKSPACE ACCESS / STALE DATA NUDGES */}
+          {expiredWorkspaceTrial && !permanentWorkspaceAccess && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-amber-900">
-                  Your Pro access expired {daysSinceProExpired > 0 ? `${daysSinceProExpired} days ago` : 'today'}. Team features are paused.
+                  Your workspace trial ended {daysSinceTrialEnded > 0 ? `${daysSinceTrialEnded} days ago` : "today"}. Shared workspace features are paused.
                 </p>
-                <p className="text-xs text-amber-700 mt-0.5">Your credits and data are safe. Buy any pack to reactivate Pro.</p>
+                <p className="text-xs text-amber-700 mt-0.5">Your credits and data are safe. Buy any pack to unlock permanent workspace access.</p>
               </div>
               <Link href="/dashboard/billing" className="shrink-0 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition">
                 Buy Credits
@@ -288,21 +305,21 @@ export default async function DashboardPage() {
             </div>
           )}
 
-          {proExpiringSoon && !proExpired && (
+          {trialEndingSoon && activeWorkspaceTrial && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-amber-900">
-                  Your Pro access expires in {daysUntilProExpiry} day{daysUntilProExpiry !== 1 ? 's' : ''}. Buy any credit pack to extend.
+                  Your workspace trial ends in {daysUntilTrialEnds} day{daysUntilTrialEnds !== 1 ? "s" : ""}. Buy any credit pack to unlock permanent workspace access.
                 </p>
               </div>
               <Link href="/dashboard/billing" className="shrink-0 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition">
-                Extend Pro
+                Unlock Workspace
               </Link>
             </div>
           )}
 
-          {isStale && orgCredits === 0 && !proExpired && (
+          {isStale && orgCredits === 0 && (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center gap-3">
               <Clock className="w-5 h-5 text-slate-400 shrink-0" />
               <div className="flex-1">
@@ -727,7 +744,7 @@ export default async function DashboardPage() {
               <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-6 text-white relative overflow-hidden">
                 <h3 className="font-bold text-lg mb-2 relative z-10">Need more from Skylos?</h3>
                 <p className="text-slate-300 text-sm mb-4 relative z-10">
-                  Get trend dashboards, PR decoration, team collaboration, and more with credits.
+                  Unlock shared history, PR decoration, team collaboration, and more with workspace access plus credits.
                 </p>
                 <a
                   href="mailto:founder@skylos.dev"

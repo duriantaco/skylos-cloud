@@ -52,7 +52,7 @@ export default function CreateWorkspaceModal({
             .update({ name: name.trim() })
             .eq('id', existingMember.org_id)
         } else {
-          // Create org from scratch with 50 starter credits + 7-day Pro trial
+          // Create org from scratch with 50 starter credits + 7-day Workspace trial
           const proExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
           const { data: org, error: orgErr } = await supabase
             .from('organizations')

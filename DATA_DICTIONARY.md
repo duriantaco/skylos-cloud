@@ -517,7 +517,7 @@ A lookup for common join patterns to avoid column name mistakes:
 | Function | Purpose |
 |----------|---------|
 | `handle_new_user()` | Creates profile on auth signup |
-| `init_workspace()` | Creates org + owner role + default project (50 credits, 7-day Pro trial) |
+| `init_workspace()` | Creates org + owner role + default project (50 credits, 7-day Workspace trial) |
 | `deduct_credits(org uuid, amount int, ...)` | Atomic credit deduction |
 | `add_credits(org uuid, amount int, ...)` | Atomic credit addition |
 | `bump_verify_usage_daily(owner uuid)` | Rate-limit counter for Verify API |

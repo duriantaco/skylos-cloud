@@ -81,7 +81,7 @@ Waiting for authentication (press Ctrl+C to cancel)...
 ✓ Connected to Skylos Cloud!
   Project:      my-project
   Organization: My Team
-  Plan:         Pro
+  Plan:         Workspace
 
 Uploading scan results...
 ✓ Upload complete! View at https://skylos.dev/dashboard

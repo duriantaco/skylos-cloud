@@ -285,7 +285,7 @@ export default function TeamMembers({
         })}
       </div>
 
-      {/* Invite form — admin/owner only, Pro plan required */}
+      {/* Invite form — admin/owner only, paid workspace access required */}
       {canManage && pendingInvites.length > 0 && (
         <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
           <div className="border-b border-slate-100 px-4 py-3">
@@ -340,11 +340,11 @@ export default function TeamMembers({
         <div className="p-4 rounded-lg bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200">
           <div className="flex items-center gap-2 text-sm font-semibold text-indigo-900 mb-1">
             <Lock className="w-4 h-4" />
-            Team Collaboration — Pro Feature
+            Team Collaboration — Workspace Feature
           </div>
           <p className="text-xs text-indigo-700 mb-2">Invite team members, assign roles, and collaborate on issues.</p>
           <a href="/dashboard/billing" className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded-lg transition">
-            Buy any credit pack to unlock
+            Buy any credit pack to unlock Workspace
           </a>
         </div>
       )}
