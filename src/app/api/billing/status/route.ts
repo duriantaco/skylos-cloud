@@ -15,6 +15,27 @@ import {
   lemonSqueezySetup,
 } from "@lemonsqueezy/lemonsqueezy.js";
 
+type SectionStatus = {
+  ready: boolean;
+  checked: boolean;
+  message: string;
+};
+
+type PackStatus = {
+  packId: string;
+  ready: boolean;
+  message: string;
+};
+
+type BillingStatusResponse = {
+  configured: boolean;
+  checkoutReady: boolean;
+  config: SectionStatus;
+  provider: SectionStatus;
+  database: SectionStatus;
+  packs: PackStatus[];
+};
+
 function formatLemonError(error: unknown): string {
   if (error instanceof Error) {
     return error.cause
@@ -33,102 +54,95 @@ export async function GET() {
   if (isAuthError(auth)) return auth;
 
   const status = getBillingConfigStatus();
-  const response = {
+  const configReady =
+    status.apiKeyConfigured &&
+    Boolean(status.storeId) &&
+    status.webhookSecretConfigured;
+  const rawRemoteErrors: string[] = [];
+  const rawDatabaseErrors: string[] = [];
+  const accessibleVariantIds = new Set<string>();
+
+  const response: BillingStatusResponse = {
     configured: status.ok,
     checkoutReady: false,
-    missing: status.missing,
     config: {
-      apiKeyConfigured: status.apiKeyConfigured,
-      apiKeyFingerprint: status.apiKeyFingerprint,
-      storeId: status.storeId,
-      webhookSecretConfigured: status.webhookSecretConfigured,
-      webhookSecretFingerprint: status.webhookSecretFingerprint,
-      variants: status.variants,
+      ready: configReady,
+      checked: true,
+      message: configReady
+        ? "Checkout setup looks complete."
+        : "Checkout setup is incomplete right now.",
     },
-    remote: {
-      apiKeyValid: false,
-      storeAccessible: false,
-      storeName: null as string | null,
-      storeUrl: null as string | null,
-      errors: [] as string[],
-      variants: status.variants.map((variant) => ({
-        packId: variant.packId,
-        envKey: variant.envKey,
-        configured: variant.configured,
-        variantId: variant.variantId,
-        accessible: false,
-        variantName: null as string | null,
-        errors: [] as string[],
-      })),
+    provider: {
+      ready: false,
+      checked: false,
+      message: configReady
+        ? "Payment provider connectivity has not been checked yet."
+        : "Payment provider checks are waiting for checkout setup to complete.",
     },
     database: {
       ready: false,
-      adminConfigured: false,
-      organizationReadable: false,
-      featureCostsReady: false,
-      featureCostsCount: 0,
-      purchasesReadable: false,
-      missingFeatureKeys: [] as string[],
-      errors: [] as string[],
+      checked: false,
+      message: "Billing database checks have not completed yet.",
     },
+    packs: status.variants.map((variant) => ({
+      packId: variant.packId,
+      ready: false,
+      message: variant.configured
+        ? "Availability has not been checked yet."
+        : "This pack is not available right now.",
+    })),
   };
 
-  if (!status.apiKeyConfigured || !status.storeId) {
-    return NextResponse.json(response, {
-      headers: { "Cache-Control": "no-store" },
-    });
+  if (status.apiKeyConfigured && status.storeId) {
+    try {
+      lemonSqueezySetup({ apiKey: getLemonSqueezyApiKey() });
+
+      const authResult = await getAuthenticatedUser();
+      if (authResult.error) {
+        rawRemoteErrors.push(formatLemonError(authResult.error));
+      } else {
+        const storeResult = await getStore(getLemonSqueezyStoreId());
+        if (storeResult.error) {
+          rawRemoteErrors.push(formatLemonError(storeResult.error));
+        } else {
+          response.provider.ready = true;
+          response.provider.checked = true;
+          response.provider.message = "Payment provider connectivity looks healthy.";
+
+          const variantChecks = await Promise.all(
+            status.variants.map(async (variant) => {
+              if (!variant.configured || !variant.variantId) return;
+
+              const variantResult = await getVariant(variant.variantId);
+              if (variantResult.error) {
+                rawRemoteErrors.push(
+                  `${variant.packId}: ${formatLemonError(variantResult.error)}`
+                );
+                return;
+              }
+
+              accessibleVariantIds.add(variant.packId);
+            })
+          );
+
+          void variantChecks;
+        }
+      }
+    } catch (error) {
+      rawRemoteErrors.push(formatLemonError(error));
+    }
   }
 
-  try {
-    lemonSqueezySetup({ apiKey: getLemonSqueezyApiKey() });
-
-    const authResult = await getAuthenticatedUser();
-    if (authResult.error) {
-      response.remote.errors.push(formatLemonError(authResult.error));
-      return NextResponse.json(response, {
-        headers: { "Cache-Control": "no-store" },
-      });
+  if (!response.provider.checked) {
+    response.provider.checked = status.apiKeyConfigured && Boolean(status.storeId);
+    if (response.provider.checked) {
+      response.provider.message = "Payment provider connectivity needs attention right now.";
     }
-
-    response.remote.apiKeyValid = true;
-
-    const storeResult = await getStore(getLemonSqueezyStoreId());
-    if (storeResult.error) {
-      response.remote.errors.push(formatLemonError(storeResult.error));
-      return NextResponse.json(response, {
-        headers: { "Cache-Control": "no-store" },
-      });
-    }
-
-    response.remote.storeAccessible = true;
-    response.remote.storeName = storeResult.data?.data?.attributes?.name ?? null;
-    response.remote.storeUrl = storeResult.data?.data?.attributes?.url ?? null;
-
-    response.remote.variants = await Promise.all(
-      response.remote.variants.map(async (variant) => {
-        if (!variant.configured || !variant.variantId) {
-          variant.errors.push(`Missing ${variant.envKey}`);
-          return variant;
-        }
-
-        const variantResult = await getVariant(variant.variantId);
-        if (variantResult.error) {
-          variant.errors.push(formatLemonError(variantResult.error));
-          return variant;
-        }
-
-        variant.accessible = true;
-        variant.variantName = variantResult.data?.data?.attributes?.name ?? null;
-        return variant;
-      })
-    );
-  } catch (error) {
-    response.remote.errors.push(formatLemonError(error));
   }
 
   try {
     const admin = getSupabaseAdmin();
-    response.database.adminConfigured = true;
+    response.database.checked = true;
 
     const requiredFeatureKeys = [
       FEATURE_KEYS.SCAN_UPLOAD,
@@ -162,45 +176,92 @@ export async function GET() {
     ]);
 
     if (orgError || !org) {
-      response.database.errors.push(orgError?.message || "Organization billing row is not readable.");
-    } else {
-      response.database.organizationReadable = true;
+      rawDatabaseErrors.push(
+        orgError?.message || "Organization billing row is not readable."
+      );
     }
 
     if (costsError) {
-      response.database.errors.push(costsError.message);
+      rawDatabaseErrors.push(costsError.message);
     } else {
       const foundKeys = new Set((costs || []).map((row) => row.feature_key));
-      response.database.featureCostsCount = foundKeys.size;
-      response.database.missingFeatureKeys = requiredFeatureKeys.filter((key) => !foundKeys.has(key));
-      response.database.featureCostsReady = response.database.missingFeatureKeys.length === 0;
-      if (!response.database.featureCostsReady) {
-        response.database.errors.push(
-          `Missing enabled billing costs: ${response.database.missingFeatureKeys.join(", ")}`
+      const missingFeatureKeys = requiredFeatureKeys.filter(
+        (key) => !foundKeys.has(key)
+      );
+      if (missingFeatureKeys.length > 0) {
+        rawDatabaseErrors.push(
+          `Missing enabled billing costs: ${missingFeatureKeys.join(", ")}`
         );
       }
     }
 
     if (purchasesError) {
-      response.database.errors.push(purchasesError.message);
-    } else {
-      response.database.purchasesReadable = true;
+      rawDatabaseErrors.push(purchasesError.message);
     }
   } catch (error) {
-    response.database.errors.push(formatLemonError(error));
+    response.database.checked = true;
+    rawDatabaseErrors.push(formatLemonError(error));
   }
 
-  response.database.ready =
-    response.database.adminConfigured &&
-    response.database.organizationReadable &&
-    response.database.featureCostsReady &&
-    response.database.purchasesReadable;
+  response.database.ready = rawDatabaseErrors.length === 0;
+  response.database.message = response.database.ready
+    ? "Billing records and credit pricing look healthy."
+    : "Billing records need attention before checkout can go live.";
+
+  response.packs = status.variants.map((variant) => {
+    if (!configReady) {
+      return {
+        packId: variant.packId,
+        ready: false,
+        message: "Checkout setup is incomplete right now.",
+      };
+    }
+
+    if (!response.provider.ready) {
+      return {
+        packId: variant.packId,
+        ready: false,
+        message: "Payment provider is temporarily unavailable right now.",
+      };
+    }
+
+    if (!response.database.ready) {
+      return {
+        packId: variant.packId,
+        ready: false,
+        message: "Billing system checks need attention right now.",
+      };
+    }
+
+    if (!variant.configured || !accessibleVariantIds.has(variant.packId)) {
+      return {
+        packId: variant.packId,
+        ready: false,
+        message: "This pack is not available right now.",
+      };
+    }
+
+    return {
+      packId: variant.packId,
+      ready: true,
+      message: "Ready for checkout.",
+    };
+  });
 
   response.checkoutReady =
-    response.remote.apiKeyValid &&
-    response.remote.storeAccessible &&
+    response.config.ready &&
+    response.provider.ready &&
     response.database.ready &&
-    response.remote.variants.some((variant) => variant.accessible);
+    response.packs.some((pack) => pack.ready);
+
+  if (rawRemoteErrors.length > 0 || rawDatabaseErrors.length > 0 || status.missing.length > 0) {
+    console.error("Billing status health check failed", {
+      orgId: auth.orgId,
+      missingConfig: status.missing,
+      providerErrors: rawRemoteErrors,
+      databaseErrors: rawDatabaseErrors,
+    });
+  }
 
   return NextResponse.json(response, {
     headers: { "Cache-Control": "no-store" },

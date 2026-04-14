@@ -35,38 +35,25 @@ type Transaction = {
   metadata?: unknown;
 };
 
-type BillingVariantStatus = {
+type BillingSectionStatus = {
+  ready: boolean;
+  checked: boolean;
+  message: string;
+};
+
+type BillingPackStatus = {
   packId: string;
-  envKey: string;
-  configured: boolean;
-  variantId: string | null;
-  accessible: boolean;
-  variantName: string | null;
-  errors: string[];
+  ready: boolean;
+  message: string;
 };
 
 type BillingStatusResponse = {
   configured: boolean;
   checkoutReady: boolean;
-  missing: string[];
-  remote: {
-    apiKeyValid: boolean;
-    storeAccessible: boolean;
-    storeName: string | null;
-    storeUrl: string | null;
-    errors: string[];
-    variants: BillingVariantStatus[];
-  };
-  database: {
-    ready: boolean;
-    adminConfigured: boolean;
-    organizationReadable: boolean;
-    featureCostsReady: boolean;
-    featureCostsCount: number;
-    purchasesReadable: boolean;
-    missingFeatureKeys: string[];
-    errors: string[];
-  };
+  config: BillingSectionStatus;
+  provider: BillingSectionStatus;
+  database: BillingSectionStatus;
+  packs: BillingPackStatus[];
 };
 
 const WORKSPACE_FEATURES = [
@@ -155,10 +142,10 @@ export default function BillingPage() {
 
       const data = await statusRes.json().catch(() => null);
       setBillingStatus(null);
-      setBillingStatusError(data?.error || "Failed to load billing diagnostics.");
+      setBillingStatusError(data?.error || "Failed to load billing status.");
     } catch {
       setBillingStatus(null);
-      setBillingStatusError("Failed to load billing diagnostics.");
+      setBillingStatusError("Failed to load billing status.");
     }
   }
 
@@ -208,8 +195,8 @@ export default function BillingPage() {
     loadData();
   }, []);
 
-  const variantByPackId = new Map(
-    (billingStatus?.remote.variants || []).map((variant) => [variant.packId, variant])
+  const packStatusById = new Map(
+    (billingStatus?.packs || []).map((pack) => [pack.packId, pack])
   );
 
   const getPackAvailability = (packId: string) => {
@@ -217,39 +204,39 @@ export default function BillingPage() {
       return { enabled: true, reason: null as string | null };
     }
 
-    if (!billingStatus.remote.apiKeyValid || !billingStatus.remote.storeAccessible) {
+    if (!billingStatus.config.ready) {
       return {
         enabled: false,
-        reason: billingStatus.remote.errors[0] || "Checkout provider is not reachable right now.",
+        reason: billingStatus.config.message,
       };
     }
 
     if (!billingStatus.database.ready) {
       return {
         enabled: false,
-        reason: billingStatus.database.errors[0] || "Billing database checks failed.",
+        reason: billingStatus.database.message,
       };
     }
 
-    const variant = variantByPackId.get(packId);
-    if (!variant) {
+    if (!billingStatus.provider.ready) {
       return {
         enabled: false,
-        reason: "No checkout variant is configured for this pack yet.",
+        reason: billingStatus.provider.message,
       };
     }
 
-    if (!variant.configured) {
+    const pack = packStatusById.get(packId);
+    if (!pack) {
       return {
         enabled: false,
-        reason: `Checkout is not configured for this pack yet (${variant.envKey}).`,
+        reason: "This pack is not available right now.",
       };
     }
 
-    if (!variant.accessible) {
+    if (!pack.ready) {
       return {
         enabled: false,
-        reason: variant.errors[0] || "This pack is not reachable from Lemon Squeezy right now.",
+        reason: pack.message,
       };
     }
 
@@ -341,17 +328,10 @@ export default function BillingPage() {
         body: "Local CLI is free. Buy any pack when you want shared cloud workflows and Workspace access.",
       };
 
-  const checkoutIssues = [
-    ...(billingStatus?.missing.length
-      ? [`Missing billing config: ${billingStatus.missing.join(", ")}`]
-      : []),
-    ...(billingStatus?.remote.errors || []),
-    ...((billingStatus?.remote.variants || []).flatMap((variant) =>
-      variant.errors.map((error) => `${variant.packId}: ${error}`)
-    )),
-    ...(billingStatus?.database.errors || []),
-    ...(billingStatusError ? [billingStatusError] : []),
-  ];
+  const showCheckoutStatus =
+    checkoutError !== null ||
+    billingStatusError !== null ||
+    Boolean(billingStatus && !billingStatus.checkoutReady);
 
   if (loading) {
     return (
@@ -435,7 +415,7 @@ export default function BillingPage() {
           <div className={`rounded-2xl border p-5 ${
             billingStatus && billingStatus.checkoutReady
               ? "border-emerald-200 bg-emerald-50"
-              : checkoutIssues.length > 0
+              : showCheckoutStatus
               ? "border-rose-200 bg-rose-50"
               : "border-slate-200 bg-white"
           }`}>
@@ -453,23 +433,23 @@ export default function BillingPage() {
             <p className="mt-2 text-sm text-slate-600">
               {billingStatus
                 ? billingStatus.checkoutReady
-                  ? "Billing config, Lemon Squeezy, and database checks all passed."
-                  : "One or more billing checks failed. See diagnostics before you buy."
-                : "If checkout fails, refresh diagnostics to see whether config, Lemon Squeezy, or the billing DB is the problem."}
+                  ? "Checkout setup, payment provider, and billing system checks all passed."
+                  : "Checkout is not ready yet. Review the safe status summary before you buy."
+                : "If checkout fails, refresh status to see whether setup, provider, or billing system health needs attention."}
             </p>
           </div>
         </div>
 
-        {(checkoutIssues.length > 0 || checkoutError !== null) && (
+        {showCheckoutStatus && (
           <div className="mb-8 rounded-2xl border border-rose-200 bg-rose-50 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="flex items-center gap-2 text-sm font-semibold text-rose-900">
                   <AlertTriangle className="w-4 h-4" />
-                  Checkout diagnostics
+                  Checkout status
                 </div>
                 <p className="mt-1 text-sm text-rose-800">
-                  Checkout is not fully healthy right now. The page now shows whether the blocker is billing config, Lemon Squeezy, or the billing database.
+                  Checkout is not fully healthy right now. This summary keeps the blocker actionable without exposing raw provider or secret configuration details in the UI.
                 </p>
               </div>
               <button
@@ -477,61 +457,55 @@ export default function BillingPage() {
                 className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 hover:bg-slate-50"
               >
                 {refreshingDiagnostics ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                Refresh diagnostics
+                Refresh status
               </button>
             </div>
 
             <div className="mt-4 grid gap-4 lg:grid-cols-3">
               <div className="rounded-xl border border-rose-100 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Config</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Setup</div>
                 <div className="mt-2 text-sm text-slate-700">
-                  {billingStatus?.missing.length
-                    ? `Missing: ${billingStatus.missing.join(", ")}`
-                    : "No missing billing env keys detected."}
+                  {billingStatus?.config.message || "Checkout setup has not been checked yet."}
                 </div>
               </div>
               <div className="rounded-xl border border-rose-100 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lemon Squeezy</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment provider</div>
                 <div className="mt-2 text-sm text-slate-700">
-                  {billingStatus?.remote.errors[0]
-                    ? billingStatus.remote.errors[0]
-                    : billingStatus?.remote.storeAccessible
-                    ? `Connected to ${billingStatus.remote.storeName || "your store"}.`
-                    : "Store connectivity has not been confirmed yet."}
+                  {billingStatus?.provider.message || "Payment provider checks have not completed yet."}
                 </div>
               </div>
               <div className="rounded-xl border border-rose-100 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Database</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Billing system</div>
                 <div className="mt-2 text-sm text-slate-700">
-                  {billingStatus?.database.errors[0]
-                    ? billingStatus.database.errors[0]
-                    : billingStatus?.database.ready
-                    ? "Billing tables and credit-cost rows look healthy."
-                    : "Database billing checks have not completed yet."}
+                  {billingStatus?.database.message || "Billing system checks have not completed yet."}
                 </div>
               </div>
             </div>
 
-            {billingStatus?.remote.variants.length ? (
+            {billingStatusError ? (
+              <div className="mt-4 rounded-xl border border-rose-100 bg-white/70 p-4 text-sm text-rose-700">
+                {billingStatusError}
+              </div>
+            ) : null}
+
+            {billingStatus?.packs.length ? (
               <div className="mt-4 rounded-xl border border-rose-100 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pack availability</div>
                 <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                  {billingStatus.remote.variants.map((variant) => (
-                    <div key={variant.packId} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  {billingStatus.packs.map((pack) => (
+                    <div key={pack.packId} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium text-slate-900 capitalize">{variant.packId}</span>
+                        <span className="text-sm font-medium text-slate-900 capitalize">{pack.packId}</span>
                         <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${
-                          variant.accessible
+                          pack.ready
                             ? "bg-emerald-100 text-emerald-700"
                             : "bg-rose-100 text-rose-700"
                         }`}>
-                          {variant.accessible ? "ready" : "blocked"}
+                          {pack.ready ? "ready" : "blocked"}
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
-                        {variant.accessible
-                          ? variant.variantName || "Variant reachable"
-                          : variant.errors[0] || `Missing ${variant.envKey}`}
+                        {pack.message}
                       </p>
                     </div>
                   ))}

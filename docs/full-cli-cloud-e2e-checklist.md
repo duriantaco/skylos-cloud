@@ -614,17 +614,19 @@ cd /private/tmp/skylos-e2e-fixture
   - workspace feature summary
 
 - [ ] If checkout is unavailable, confirm the diagnostics panel explains whether the blocker is:
-  - billing config
-  - Lemon Squeezy connectivity / variant setup
-  - billing database readiness
+  - checkout setup
+  - payment provider health
+  - billing system readiness
+  Expected:
+  - the page does not expose raw env var names, secrets, or low-level provider errors
 
 - [ ] Open:
   - `https://skylos.dev/api/billing/status`
   Expected:
-  - `configured` reflects env setup
-  - `remote.storeAccessible` reflects Lemon Squeezy connectivity
-  - `database.ready` reflects billing table / cost-row readiness
-  - each pack variant shows whether it is actually reachable
+  - `configured` reflects whether checkout setup is complete
+  - `checkoutReady` only becomes `true` when setup, provider, and billing system checks all pass
+  - `config`, `provider`, and `database` each return a safe status message
+  - each pack returns safe availability without exposing raw provider/config internals
 
 - [ ] Start checkout for any visible pack
   Expected:
