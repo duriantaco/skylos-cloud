@@ -1285,7 +1285,7 @@ export default function ScanDetailsPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <Fingerprint className="w-4 h-4 text-violet-600" />
-                    <span className="text-sm font-bold text-violet-900">AI provenance captured</span>
+                    <span className="text-sm font-bold text-violet-900">AI provenance available</span>
                     {scan.provenance_agent_count != null && scan.provenance_agent_count > 0 ? (
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">
                         {scan.provenance_agent_count} AI FILES
@@ -1306,8 +1306,9 @@ export default function ScanDetailsPage() {
                     ) : null}
                   </div>
                   <p className="mt-2 text-sm text-violet-900">
-                    This scan has attribution evidence from git metadata like author email, co-author trailers, or commit messages.
-                    Keep triage here for security, quality, and dead code. Open the provenance receipt when you need to inspect why Skylos marked code as AI-authored.
+                    Skylos found attribution evidence from git metadata like author email, co-author trailers, or commit messages.
+                    This is supporting context for the code scan, not a second findings stream. Keep triage here for security, quality, and dead code.
+                    Open the provenance receipt only when you want to inspect why Skylos marked code as AI-authored.
                   </p>
                   <div className="mt-2 text-xs text-violet-700">
                     {scan.provenance_confidence || scan.ai_code_stats?.confidence || "low"} confidence
@@ -1319,12 +1320,14 @@ export default function ScanDetailsPage() {
                 <div className="flex flex-wrap gap-2">
                   <Link
                     href={`/dashboard/scans/${scan.id}/provenance`}
+                    scroll
                     className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-medium text-violet-700 transition hover:bg-violet-100"
                   >
                     Open provenance receipt
                   </Link>
                   <Link
                     href={`/dashboard/projects/${scan.project_id}/provenance`}
+                    scroll
                     className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-100 px-3 py-2 text-sm font-medium text-violet-700 transition hover:bg-violet-200"
                   >
                     Project provenance
