@@ -613,12 +613,11 @@ cd /private/tmp/skylos-e2e-fixture
   - permanent workspace access unlocks after purchase
   - workspace feature summary
 
-- [ ] If checkout is unavailable, confirm the diagnostics panel explains whether the blocker is:
-  - checkout setup
-  - payment provider health
-  - billing system readiness
+- [ ] If checkout is unavailable, confirm the billing page stays user-facing
   Expected:
-  - the page does not expose raw env var names, secrets, or low-level provider errors
+  - the packs still read like normal purchase options
+  - a failed checkout attempt shows a generic user-facing error on the pack that was clicked
+  - the page does not expose diagnostics, env var names, secrets, or low-level provider/database errors
 
 - [ ] Open:
   - `https://skylos.dev/api/billing/status`

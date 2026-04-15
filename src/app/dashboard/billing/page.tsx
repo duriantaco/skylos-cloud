@@ -5,13 +5,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  AlertTriangle,
   CreditCard,
   Zap,
   Package,
   CheckCircle,
   Loader2,
-  RefreshCw,
   Shield,
   Check,
 } from "lucide-react";
@@ -33,27 +31,6 @@ type Transaction = {
   description: string;
   created_at: string;
   metadata?: unknown;
-};
-
-type BillingSectionStatus = {
-  ready: boolean;
-  checked: boolean;
-  message: string;
-};
-
-type BillingPackStatus = {
-  packId: string;
-  ready: boolean;
-  message: string;
-};
-
-type BillingStatusResponse = {
-  configured: boolean;
-  checkoutReady: boolean;
-  config: BillingSectionStatus;
-  provider: BillingSectionStatus;
-  database: BillingSectionStatus;
-  packs: BillingPackStatus[];
 };
 
 const WORKSPACE_FEATURES = [
@@ -114,46 +91,12 @@ export default function BillingPage() {
   const [balance, setBalance] = useState<number>(0);
   const [plan, setPlan] = useState<string>("free");
   const [proExpiresAt, setProExpiresAt] = useState<string | null>(null);
-  const [billingStatus, setBillingStatus] = useState<BillingStatusResponse | null>(null);
-  const [billingStatusError, setBillingStatusError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [successPack, setSuccessPack] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<{ packId: string | null; message: string } | null>(null);
-  const [refreshingDiagnostics, setRefreshingDiagnostics] = useState(false);
   const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
-
-  async function loadBillingStatus() {
-    try {
-      const statusRes = await fetch("/api/billing/status", { cache: "no-store" });
-      if (statusRes.ok) {
-        const data = await statusRes.json();
-        setBillingStatus(data);
-        setBillingStatusError(null);
-        return;
-      }
-
-      if (statusRes.status === 401 || statusRes.status === 403) {
-        setBillingStatus(null);
-        setBillingStatusError(null);
-        return;
-      }
-
-      const data = await statusRes.json().catch(() => null);
-      setBillingStatus(null);
-      setBillingStatusError(data?.error || "Failed to load billing status.");
-    } catch {
-      setBillingStatus(null);
-      setBillingStatusError("Failed to load billing status.");
-    }
-  }
-
-  async function refreshDiagnostics() {
-    setRefreshingDiagnostics(true);
-    await loadBillingStatus();
-    setRefreshingDiagnostics(false);
-  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -183,8 +126,6 @@ export default function BillingPage() {
           setProExpiresAt(data.pro_expires_at || null);
           setTransactions(data.recent_transactions || []);
         }
-
-        await loadBillingStatus();
       } catch (err) {
         console.error("Failed to load billing data:", err);
       } finally {
@@ -195,62 +136,8 @@ export default function BillingPage() {
     loadData();
   }, []);
 
-  const packStatusById = new Map(
-    (billingStatus?.packs || []).map((pack) => [pack.packId, pack])
-  );
-
-  const getPackAvailability = (packId: string) => {
-    if (!billingStatus) {
-      return { enabled: true, reason: null as string | null };
-    }
-
-    if (!billingStatus.config.ready) {
-      return {
-        enabled: false,
-        reason: billingStatus.config.message,
-      };
-    }
-
-    if (!billingStatus.database.ready) {
-      return {
-        enabled: false,
-        reason: billingStatus.database.message,
-      };
-    }
-
-    if (!billingStatus.provider.ready) {
-      return {
-        enabled: false,
-        reason: billingStatus.provider.message,
-      };
-    }
-
-    const pack = packStatusById.get(packId);
-    if (!pack) {
-      return {
-        enabled: false,
-        reason: "This pack is not available right now.",
-      };
-    }
-
-    if (!pack.ready) {
-      return {
-        enabled: false,
-        reason: pack.message,
-      };
-    }
-
-    return { enabled: true, reason: null as string | null };
-  };
-
   async function handlePurchase(packId: string) {
     setCheckoutError(null);
-
-    const availability = getPackAvailability(packId);
-    if (!availability.enabled) {
-      setCheckoutError({ packId, message: availability.reason || "Checkout is unavailable for this pack." });
-      return;
-    }
 
     setPurchasing(packId);
     try {
@@ -271,7 +158,6 @@ export default function BillingPage() {
           packId,
           message: data.error || "Checkout is unavailable right now.",
         });
-        await refreshDiagnostics();
       } else {
         setNotice({
           title: "Checkout Error",
@@ -328,11 +214,6 @@ export default function BillingPage() {
         body: "Local CLI is free. Buy any pack when you want shared cloud workflows and Workspace access.",
       };
 
-  const showCheckoutStatus =
-    checkoutError !== null ||
-    billingStatusError !== null ||
-    Boolean(billingStatus && !billingStatus.checkoutReady);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 p-8">
@@ -379,7 +260,7 @@ export default function BillingPage() {
           </div>
         )}
 
-        <div className="grid gap-4 md:grid-cols-3 mb-8">
+        <div className="grid gap-4 md:grid-cols-2 mb-8">
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <Zap className="w-4 h-4 text-amber-500" />
@@ -412,108 +293,7 @@ export default function BillingPage() {
             <p className="mt-2 text-sm text-slate-600">{accessState.body}</p>
           </div>
 
-          <div className={`rounded-2xl border p-5 ${
-            billingStatus && billingStatus.checkoutReady
-              ? "border-emerald-200 bg-emerald-50"
-              : showCheckoutStatus
-              ? "border-rose-200 bg-rose-50"
-              : "border-slate-200 bg-white"
-          }`}>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <CreditCard className="w-4 h-4 text-slate-500" />
-              Checkout
-            </div>
-            <div className="mt-3 text-lg font-bold text-slate-900">
-              {billingStatus
-                ? billingStatus.checkoutReady
-                  ? "Ready"
-                  : "Needs attention"
-                : "Not checked"}
-            </div>
-            <p className="mt-2 text-sm text-slate-600">
-              {billingStatus
-                ? billingStatus.checkoutReady
-                  ? "Checkout setup, payment provider, and billing system checks all passed."
-                  : "Checkout is not ready yet. Review the safe status summary before you buy."
-                : "If checkout fails, refresh status to see whether setup, provider, or billing system health needs attention."}
-            </p>
-          </div>
         </div>
-
-        {showCheckoutStatus && (
-          <div className="mb-8 rounded-2xl border border-rose-200 bg-rose-50 p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-rose-900">
-                  <AlertTriangle className="w-4 h-4" />
-                  Checkout status
-                </div>
-                <p className="mt-1 text-sm text-rose-800">
-                  Checkout is not fully healthy right now. This summary keeps the blocker actionable without exposing raw provider or secret configuration details in the UI.
-                </p>
-              </div>
-              <button
-                onClick={refreshDiagnostics}
-                className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 hover:bg-slate-50"
-              >
-                {refreshingDiagnostics ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                Refresh status
-              </button>
-            </div>
-
-            <div className="mt-4 grid gap-4 lg:grid-cols-3">
-              <div className="rounded-xl border border-rose-100 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Setup</div>
-                <div className="mt-2 text-sm text-slate-700">
-                  {billingStatus?.config.message || "Checkout setup has not been checked yet."}
-                </div>
-              </div>
-              <div className="rounded-xl border border-rose-100 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment provider</div>
-                <div className="mt-2 text-sm text-slate-700">
-                  {billingStatus?.provider.message || "Payment provider checks have not completed yet."}
-                </div>
-              </div>
-              <div className="rounded-xl border border-rose-100 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Billing system</div>
-                <div className="mt-2 text-sm text-slate-700">
-                  {billingStatus?.database.message || "Billing system checks have not completed yet."}
-                </div>
-              </div>
-            </div>
-
-            {billingStatusError ? (
-              <div className="mt-4 rounded-xl border border-rose-100 bg-white/70 p-4 text-sm text-rose-700">
-                {billingStatusError}
-              </div>
-            ) : null}
-
-            {billingStatus?.packs.length ? (
-              <div className="mt-4 rounded-xl border border-rose-100 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pack availability</div>
-                <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                  {billingStatus.packs.map((pack) => (
-                    <div key={pack.packId} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium text-slate-900 capitalize">{pack.packId}</span>
-                        <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${
-                          pack.ready
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-rose-100 text-rose-700"
-                        }`}>
-                          {pack.ready ? "ready" : "blocked"}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {pack.message}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
 
         {/* Credit Packs */}
         <div className="mb-10">
@@ -528,7 +308,6 @@ export default function BillingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {packs.map((pack) => {
               const presentation = PACK_PRESENTATION[pack.id];
-              const availability = getPackAvailability(pack.id);
               const isFeatured = pack.id === "team";
 
               return (
@@ -548,15 +327,6 @@ export default function BillingPage() {
                     }`}>
                       {presentation?.eyebrow || pack.name}
                     </span>
-                    {availability.enabled ? (
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                        Ready
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full">
-                        Unavailable
-                      </span>
-                    )}
                   </div>
 
                   <h3 className="text-lg font-semibold text-slate-900">{pack.name}</h3>
@@ -584,7 +354,7 @@ export default function BillingPage() {
 
                   <button
                     onClick={() => handlePurchase(pack.id)}
-                    disabled={!!purchasing || !availability.enabled}
+                    disabled={!!purchasing}
                     className={`mt-5 w-full py-2.5 rounded-lg text-sm font-medium transition ${
                       isFeatured
                         ? "bg-amber-500 text-white hover:bg-amber-600"
@@ -601,12 +371,6 @@ export default function BillingPage() {
                   {checkoutError?.packId === pack.id && (
                     <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                       {checkoutError.message}
-                    </div>
-                  )}
-
-                  {!availability.enabled && checkoutError?.packId !== pack.id && availability.reason && (
-                    <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                      {availability.reason}
                     </div>
                   )}
                 </div>
