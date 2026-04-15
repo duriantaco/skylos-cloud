@@ -1,10 +1,9 @@
 'use client'
 
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft, Shield, CheckCircle, XCircle, AlertTriangle,
+  Shield, CheckCircle, XCircle, AlertTriangle,
   TrendingUp, Layers, Eye,
 } from "lucide-react";
 import {
@@ -149,17 +148,13 @@ export default function DefensePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-slate-500 text-sm">Loading defense data...</div>
-      </main>
+      <div className="py-16 text-center text-sm text-slate-500">Loading defense data...</div>
     );
   }
 
   if (error) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-red-600 text-sm">Error: {error}</div>
-      </main>
+      <div className="py-16 text-center text-sm text-red-600">Error: {error}</div>
     );
   }
 
@@ -168,23 +163,14 @@ export default function DefensePage() {
   const opsFindings = findings.filter(f => (f.category || '').toLowerCase() === 'ops');
 
   return (
-    <main className="min-h-screen bg-gray-50 text-slate-900 font-sans">
-      {/* Top Nav */}
-      <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-3">
-          <Link
-            href={`/dashboard/projects/${id}`}
-            className="text-slate-500 hover:text-slate-900 transition"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <Shield className="w-4 h-4 text-sky-600" />
-          <span className="font-bold text-sm text-slate-900">AI Defense</span>
-        </div>
-      </nav>
-
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {!latest ? (
+    <div className="py-8 space-y-8">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-900">AI Defense</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          LLM integrations, defense scoring and OWASP coverage for this project.
+        </p>
+      </div>
+      {!latest ? (
           /* Empty state */
           <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
             <Shield className="w-12 h-12 text-slate-300 mx-auto mb-4" />
@@ -447,7 +433,6 @@ export default function DefensePage() {
             )}
           </>
         )}
-      </div>
-    </main>
+    </div>
   );
 }
