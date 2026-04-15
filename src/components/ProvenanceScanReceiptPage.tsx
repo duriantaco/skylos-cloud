@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { GitCommit, GitBranch, Shield, ChevronRight } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
-import ArtifactReceiptHeader from "@/components/ArtifactReceiptHeader";
 import ArtifactStateCard from "@/components/ArtifactStateCard";
 import ProFeatureLock from "@/components/ProFeatureLock";
 import ProvenanceDetail from "@/components/ProvenanceDetail";
 import ScrollToTopOnMount from "@/components/ScrollToTopOnMount";
+import ScanSurfaceHeader from "@/components/ScanSurfaceHeader";
 import { canUseProvenanceAudit, canViewProvenanceDetail, getEffectivePlan } from "@/lib/entitlements";
 
 type AiCodeIndicator = {
@@ -166,7 +166,7 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <ScrollToTopOnMount />
       <div className="mx-auto max-w-6xl p-6 lg:p-8">
-        <ArtifactReceiptHeader
+        <ScanSurfaceHeader
           tone="violet"
           breadcrumbLabel="Provenance Receipt"
           badgeLabel="AI Provenance Receipt"
@@ -174,7 +174,11 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
           projectHref={project?.id ? `/dashboard/projects/${project.id}` : null}
           title="One upload’s attribution evidence."
           description="Use this receipt to review the AI attribution evidence for one upload. Use Project Provenance for cross-run history and the code scan workbench for triage."
-          note={`Uploaded ${formatTimestamp(scan.created_at)} from commit ${shortCommit(scan.commit_hash)}.`}
+          metadata={[
+            { label: "Branch", value: scan.branch || "unknown" },
+            { label: "Commit", value: shortCommit(scan.commit_hash), mono: true },
+            { label: "Uploaded", value: formatTimestamp(scan.created_at) },
+          ]}
           actions={[
             { href: `/dashboard/projects/${scan.project_id}/provenance`, label: "Project Provenance", tone: "accent", scroll: true },
             { href: `/dashboard/projects/${scan.project_id}`, label: "Project Overview", scroll: true },
