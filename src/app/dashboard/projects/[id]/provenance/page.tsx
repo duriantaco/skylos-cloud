@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, ExternalLink, FileText, Fingerprint, GitBranch, GitCommit, Shield } from "lucide-react";
+import { FileText, Fingerprint, GitBranch, GitCommit, Shield } from "lucide-react";
 
-import ProjectSectionTabs from "@/components/ProjectSectionTabs";
 import ProFeatureLock from "@/components/ProFeatureLock";
 import ProvenanceDetail from "@/components/ProvenanceDetail";
 import ScrollToTopOnMount from "@/components/ScrollToTopOnMount";
@@ -91,25 +90,6 @@ export default async function ProjectProvenancePage({
   const canViewDetail = canViewProvenanceDetail(effectivePlan);
   const canAudit = canUseProvenanceAudit(effectivePlan);
 
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, name, repo_url")
-    .eq("id", id)
-    .eq("org_id", orgId)
-    .single();
-
-  if (!project) {
-    return (
-      <main className="min-h-screen bg-slate-50 p-8">
-        <div className="mx-auto max-w-5xl">
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-600">
-            Project not found.
-          </div>
-        </div>
-      </main>
-    );
-  }
-
   const { data: scansRaw } = await supabase
     .from("scans")
     .select("id, created_at, branch, commit_hash, provenance_agent_count, provenance_confidence, provenance_summary")
@@ -152,107 +132,78 @@ export default async function ProjectProvenancePage({
   );
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="py-8 space-y-8 text-slate-900">
       <ScrollToTopOnMount />
-      <div className="mx-auto max-w-7xl px-6 py-10">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                <Link href={`/dashboard/projects/${id}`} className="text-slate-500 hover:text-slate-900">
-                  <ArrowLeft className="h-4 w-4" />
-                </Link>
-                <div className="min-w-0">
-                  <div className="text-lg font-bold text-slate-900">{project.name}</div>
-                  {project.repo_url ? (
-                    <a
-                      href={project.repo_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"
-                    >
-                      {project.repo_url}
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  ) : null}
-                </div>
-              </div>
 
-              <div className="mt-5">
-                <ProjectSectionTabs projectId={id} active="provenance" />
-              </div>
-
-              <div className="mt-6 max-w-3xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-700">
-                  <Fingerprint className="h-3.5 w-3.5" />
-                  AI Provenance
-                </div>
-                <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
-                  Project-level attribution history, separate from scan triage.
-                </h1>
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  Use this page to understand whether AI-authored code keeps showing up in this project, which agents were involved,
-                  and where to open the receipt for one specific upload.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {latestScan ? (
-                <Link
-                  href={`/dashboard/scans/${latestScan.id}/provenance`}
-                  scroll
-                  className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 hover:bg-violet-100"
-                >
-                  Latest provenance receipt
-                </Link>
-              ) : null}
-              <Link
-                href={`/dashboard/projects/${id}/defense`}
-                scroll
-                className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100"
-              >
-                <Shield className="h-4 w-4" />
-                AI Defense
-              </Link>
-              <Link
-                href="/dashboard/scans"
-                scroll
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                <FileText className="h-4 w-4" />
-                Scan History
-              </Link>
-            </div>
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div className="max-w-3xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-700">
+            <Fingerprint className="h-3.5 w-3.5" />
+            AI Provenance
           </div>
-
-          {latestScan ? (
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Latest attributed files</div>
-                <div className="mt-2 text-2xl font-bold text-slate-900">{derivedAgentFileCount(latestScan, filesByScan)}</div>
-                <div className="mt-2 text-sm text-slate-500">From the latest provenance-backed upload.</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Latest confidence</div>
-                <div className="mt-2 text-2xl font-bold text-slate-900">{latestScan.provenance_confidence || "low"}</div>
-                <div className="mt-2 text-sm text-slate-500">Confidence in the attribution evidence.</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Agents seen</div>
-                <div className="mt-2 text-2xl font-bold text-slate-900">{distinctAgents.length}</div>
-                <div className="mt-2 text-sm text-slate-500">{distinctAgents.length ? distinctAgents.join(", ") : "No agents detected"}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Receipts</div>
-                <div className="mt-2 text-2xl font-bold text-slate-900">{scans.length}</div>
-                <div className="mt-2 text-sm text-slate-500">Recent provenance-backed uploads in this project.</div>
-              </div>
-            </div>
-          ) : null}
+          <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-900">
+            Project-level attribution history
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Review where AI-authored code keeps showing up in this project, which agents were involved, and which receipt to open for one specific upload.
+          </p>
         </div>
 
-        {!latestScan ? (
+        <div className="flex flex-wrap gap-2">
+          {latestScan ? (
+            <Link
+              href={`/dashboard/scans/${latestScan.id}/provenance`}
+              scroll
+              className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 hover:bg-violet-100"
+            >
+              Latest receipt
+            </Link>
+          ) : null}
+          <Link
+            href={`/dashboard/projects/${id}/defense`}
+            scroll
+            className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100"
+          >
+            <Shield className="h-4 w-4" />
+            Defense
+          </Link>
+          <Link
+            href="/dashboard/scans"
+            scroll
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <FileText className="h-4 w-4" />
+            Scan History
+          </Link>
+        </div>
+      </div>
+
+      {latestScan ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Latest attributed files</div>
+            <div className="mt-2 text-2xl font-bold text-slate-900">{derivedAgentFileCount(latestScan, filesByScan)}</div>
+            <div className="mt-2 text-sm text-slate-500">From the latest provenance-backed upload.</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Latest confidence</div>
+            <div className="mt-2 text-2xl font-bold text-slate-900">{latestScan.provenance_confidence || "low"}</div>
+            <div className="mt-2 text-sm text-slate-500">Confidence in the attribution evidence.</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Agents seen</div>
+            <div className="mt-2 text-2xl font-bold text-slate-900">{distinctAgents.length}</div>
+            <div className="mt-2 text-sm text-slate-500">{distinctAgents.length ? distinctAgents.join(", ") : "No agents detected"}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Receipts</div>
+            <div className="mt-2 text-2xl font-bold text-slate-900">{scans.length}</div>
+            <div className="mt-2 text-sm text-slate-500">Recent provenance-backed uploads in this project.</div>
+          </div>
+        </div>
+      ) : null}
+
+      {!latestScan ? (
           <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
             <Fingerprint className="mx-auto h-10 w-10 text-violet-300" />
             <h2 className="mt-4 text-lg font-bold text-slate-900">No AI provenance data yet</h2>
@@ -357,7 +308,6 @@ export default async function ProjectProvenancePage({
             </aside>
           </div>
         )}
-      </div>
-    </main>
+    </div>
   );
 }
