@@ -1280,35 +1280,21 @@ export default function ScanDetailsPage() {
 
           {(scan.provenance_agent_count != null && scan.provenance_agent_count > 0 && scan.provenance_summary) ||
           (scan.ai_code_detected && scan.ai_code_stats) ? (
-            <div className="mx-4 mb-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+            <div className="mx-4 mb-2 rounded-xl border border-violet-200 bg-white px-4 py-3 shadow-sm">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
                     <Fingerprint className="w-4 h-4 text-violet-600" />
-                    <span className="text-sm font-bold text-violet-900">AI provenance available</span>
+                    <span className="text-sm font-bold text-violet-900">AI provenance captured for this upload</span>
                     {scan.provenance_agent_count != null && scan.provenance_agent_count > 0 ? (
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">
                         {scan.provenance_agent_count} AI FILES
                       </span>
                     ) : null}
-                    {scan.ai_code_stats ? (
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        scan.ai_code_stats.gate_passed === true
-                          ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                          : scan.ai_code_stats.gate_passed === false
-                          ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                          : 'bg-purple-100 text-purple-700 border border-purple-200'
-                      }`}>
-                        {scan.ai_code_stats.gate_passed === true ? 'AI ASSURED' :
-                         scan.ai_code_stats.gate_passed === false ? 'AI ISSUES FOUND' :
-                         'AI CODE DETECTED'}
-                      </span>
-                    ) : null}
                   </div>
-                  <p className="mt-2 text-sm text-violet-900">
-                    Skylos found attribution evidence from git metadata like author email, co-author trailers, or commit messages.
-                    This is supporting context for the code scan, not a second findings stream. Keep triage here for security, quality, and dead code.
-                    Open the provenance receipt only when you want to inspect why Skylos marked code as AI-authored.
+                  <p className="mt-2 text-sm text-slate-700">
+                    Keep security, quality, dead code, and secrets triage in this workbench.
+                    Open the provenance receipt only when you need the attribution evidence for why Skylos marked code as AI-authored.
                   </p>
                   <div className="mt-2 text-xs text-violet-700">
                     {scan.provenance_confidence || scan.ai_code_stats?.confidence || "low"} confidence
@@ -1336,81 +1322,6 @@ export default function ScanDetailsPage() {
               </div>
             </div>
           ) : null}
-
-          {/* AI Defense Panel */}
-          {scan.defense_score && (
-        <div className="mx-4 mb-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-sky-600" />
-              <span className="text-sm font-bold text-sky-900">AI Defense Score</span>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                scan.defense_score.score_pct >= 90
-                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                  : scan.defense_score.score_pct >= 70
-                  ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                  : scan.defense_score.score_pct >= 40
-                  ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
-                  : 'bg-rose-100 text-rose-700 border border-rose-200'
-              }`}>
-                {scan.defense_score.score_pct}% {scan.defense_score.risk_rating}
-              </span>
-            </div>
-            <span className="text-xs text-sky-600">
-              {scan.defense_score.passed}/{scan.defense_score.total} checks passing &middot; {scan.defense_score.weighted_score}/{scan.defense_score.weighted_max} weighted
-            </span>
-          </div>
-
-          {/* Severity breakdown */}
-          {scan.defense_score.by_severity && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {Object.entries(scan.defense_score.by_severity).map(([sev, data]) => (
-                <span key={sev} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border text-[10px] ${
-                  data.failed > 0 ? 'border-red-200 text-red-700' : 'border-emerald-200 text-emerald-700'
-                }`}>
-                  <span className="font-bold uppercase">{sev}</span>
-                  <span>{data.passed}/{data.passed + data.failed}</span>
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Ops score */}
-          {scan.ops_score && scan.ops_score.total > 0 && (
-            <div className="mt-2 flex items-center gap-2">
-              <span className="text-[10px] text-sky-600 font-semibold">Ops Score:</span>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                scan.ops_score.score_pct >= 80
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : scan.ops_score.score_pct >= 60
-                  ? 'bg-blue-100 text-blue-700'
-                  : scan.ops_score.score_pct >= 40
-                  ? 'bg-yellow-100 text-yellow-700'
-                  : 'bg-red-100 text-red-700'
-              }`}>
-                {scan.ops_score.score_pct}% {scan.ops_score.rating}
-              </span>
-              <span className="text-[10px] text-sky-500">{scan.ops_score.passed}/{scan.ops_score.total} ops checks</span>
-            </div>
-          )}
-
-          {/* OWASP Coverage */}
-          {scan.owasp_coverage && (
-            <div className="mt-2 grid grid-cols-5 gap-1">
-              {Object.entries(scan.owasp_coverage).map(([id, info]) => (
-                <span key={id} className={`text-center px-1 py-0.5 rounded text-[9px] font-bold ${
-                  info.status === 'covered' ? 'bg-emerald-100 text-emerald-700' :
-                  info.status === 'partial' ? 'bg-yellow-100 text-yellow-700' :
-                  info.status === 'not_applicable' ? 'bg-slate-100 text-slate-400' :
-                  'bg-red-100 text-red-700'
-                }`}>
-                  {id}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
       </>
 
       {/* MAIN CONTENT - Takes remaining space */}
