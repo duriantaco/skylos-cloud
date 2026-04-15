@@ -1,7 +1,7 @@
 # Skylos Full CLI-Cloud E2E Checklist
 
 Status: current shipped workflow
-Last updated: 2026-04-09
+Last updated: 2026-04-11
 
 This is the full checkbox runbook for testing the live Skylos workflow end to end across both repos:
 
@@ -9,7 +9,7 @@ This is the full checkbox runbook for testing the live Skylos workflow end to en
 - CLI login, project linking, whoami, credits, and sync
 - policy save and policy pull to the repo
 - core scan upload and dashboard verification
-- issues inbox and issue detail
+- open issues and recurring issue detail
 - suppression and revoke
 - share, export, and compare
 - AI defense upload and project defense page
@@ -29,6 +29,8 @@ This checklist is for the shipped flow, not the old workaround-heavy flow.
 - If a phase is marked `Credit-gated`, check balance first and skip it only when you deliberately do not want to spend credits.
 - If you use the known fixture repos below, the expected results should match closely.
 - If you use a different repo, only the flow expectations apply, not the exact counts.
+- Start failing-gate triage from the scan page, not from the issues page.
+- Treat `/dashboard/scans/[id]` as the scan occurrence workbench and `/dashboard/issues/[id]` as the recurring issue record across scans.
 
 ## Test Data
 
@@ -250,13 +252,26 @@ cd /private/tmp/skylos-e2e-fixture
 - [x] Open:
   - `https://skylos.dev/dashboard/issues`
   Expected:
+  - the page title uses `Open Issues`
   - at least one open issue group exists for the uploaded findings
   - the page is not empty for the fixture upload
 
 - [x] Open the first issue group
   Expected:
   - issue detail page loads
+  - the page explains it is the recurring issue record across scans
   - canonical file, severity, and rule/group context are visible
+  - it offers a path back to the last seen scan
+
+- [ ] From issue detail, click `Open last seen scan`
+  Expected:
+  - the relevant scan detail page loads
+  - the scan page behaves like the primary blocker-triage surface
+
+- [ ] On the scan detail page, select a finding that belongs to an issue group
+  Expected:
+  - the detail pane offers `Open recurring issue`
+  - following that link returns to the matching recurring issue record
 
 ## Phase 6: Share, Export, And Compare
 
@@ -279,21 +294,21 @@ cd /private/tmp/skylos-e2e-fixture
 
 ### Export
 
-- [ ] Plan-gated: export requires Pro.
+- [x] Plan-gated: export requires Pro.
 
-- [ ] Open the first scan page
+- [x] Open the first scan page
 
-- [ ] Find the scan actions menu
+- [x] Find the scan actions menu
   Expected:
   - it is the `Export` button in the top-right scan header area
   - clicking it opens JSON / CSV export options
 
-- [ ] Open the actions menu and click `Export JSON`
+- [x] Open the actions menu and click `Export JSON`
   Expected:
   - a JSON download starts
   - exported scan metadata includes scan ID, project, and stats
 
-- [ ] Open the actions menu again and click `Export CSV`
+- [x] Open the actions menu again and click `Export CSV`
   Expected:
   - a CSV download starts
   - exported rows include rule, category, severity, file path, and suppression flags
@@ -319,19 +334,28 @@ cd /private/tmp/skylos-e2e-fixture
 
 ## Phase 7: Suppress A Blocking Finding
 
-- [ ] In the failing scan, open `SKY-D212`
+- [x] In the failing scan occurrence view, open `SKY-D212`
+  Expected:
+  - this is done from `/dashboard/scans/<scan-id>`, not `/dashboard/issues/<issue-group-id>`
+  - the page is framed as scan-specific blocker triage
 
-- [ ] Click `Suppress`
+- [x] Click `Suppress`
 
-- [ ] In the suppression modal, set:
+- [x] In the suppression modal, set:
   - `Reason` = `False Positive`
   - `Expiry` = `Never`
 
-- [ ] Submit suppression
+- [x] Submit suppression
   Expected:
   - success toast appears
   - top bar suppressed count increases
   - in `New only` mode the suppressed finding disappears
+
+- [ ] Open the matching recurring issue page for `SKY-D212`
+  Expected:
+  - the page explains it is a recurring issue record across scans
+  - it links back to the relevant scan occurrence
+  - it does not present the scan-only `New only` / `All` triage controls or duplicate suppression buttons
 
 - [ ] Switch from `New only` to `All`
   Expected:
@@ -414,7 +438,7 @@ cd /private/tmp/skylos-e2e-fixture
 
 ## Phase 10: AI Defense Upload
 
-- [ ] Run:
+- [x] Run:
   ```bash
   cd /private/tmp/skylos-e2e-fixture
   skylos defend . --upload
@@ -429,16 +453,16 @@ cd /private/tmp/skylos-e2e-fixture
   - score: `16%`
   - rating: `CRITICAL`
 
-- [ ] Record the defense scan URL: `________________`
+- [x] Record the defense scan URL: `________________`
 
-- [ ] Open the defense scan URL
+- [x] Open the defense scan URL
   Expected:
   - scan detail page loads
   - an `AI Defense Score` panel is visible
   - it shows `16%`
   - it shows `CRITICAL`
 
-- [ ] Open:
+- [x] Open:
   - `/dashboard/projects/<project-id>/defense`
   Expected:
   - defense data is visible at project level
@@ -448,7 +472,7 @@ cd /private/tmp/skylos-e2e-fixture
 
 ### Local Provenance
 
-- [ ] Run:
+- [x] Run:
   ```bash
   cd /private/tmp/skylos-provenance-fixture2
   skylos provenance . --json --diff-base HEAD~1
@@ -462,21 +486,21 @@ cd /private/tmp/skylos-e2e-fixture
 
 ### Cloud Provenance
 
-- [ ] Verify provenance is visible on the uploaded scan if provenance data exists
+- [x] Verify provenance is visible on the uploaded scan if provenance data exists
   Expected:
   - scan detail or related cloud views do not error
   - provenance-backed features can query the scan without 500s
 
-- [ ] Plan-gated and credit-gated: risk intersection requires Pro and costs 5 credits.
+- [x] Plan-gated and credit-gated: risk intersection requires Pro and costs 5 credits.
 
-- [ ] If testing risk intersection, open the browser console or use the UI path that triggers provenance risk analysis for the defense/core scan
+- [x] If testing risk intersection, open the browser console or use the UI path that triggers provenance risk analysis for the defense/core scan
   Expected:
   - request succeeds for a Pro plan with sufficient credits
   - high-risk or medium-risk file intersections are returned when applicable
 
-- [ ] Enterprise-gated: provenance audit export requires Enterprise.
+- [x] Enterprise-gated: provenance audit export requires Enterprise.
 
-- [ ] If testing Enterprise audit export, request:
+- [x] If testing Enterprise audit export, request:
   - `/api/provenance/audit?project_id=<project-id>&format=json`
   - `/api/provenance/audit?project_id=<project-id>&format=csv`
   Expected:
@@ -485,23 +509,23 @@ cd /private/tmp/skylos-e2e-fixture
 
 ## Phase 12: Link GitHub Later
 
-- [ ] Open project settings for the same project
+- [x] Open project settings for the same project
 
-- [ ] In `Repository URL`, enter a real, unique GitHub repository URL
+- [x] In `Repository URL`, enter a real, unique GitHub repository URL
 
-- [ ] Click `Save`
+- [x] Click `Save`
   Expected:
   - save succeeds
   - there is no uniqueness error if the repo is unused
 
-- [ ] Return to the project page
+- [x] Return to the project page
   Expected:
   - the repository URL now appears on the project
   - the same project is now GitHub-linked
 
 ## Phase 13: Project Link Regression Checks
 
-- [ ] Run:
+- [x] Run:
   ```bash
   cd /private/tmp/skylos-e2e-fixture
   skylos project unlink
@@ -510,7 +534,7 @@ cd /private/tmp/skylos-e2e-fixture
   - only the local repo-to-project link is removed
   - credentials remain intact
 
-- [ ] Run:
+- [x] Run:
   ```bash
   skylos login
   ```
@@ -518,11 +542,11 @@ cd /private/tmp/skylos-e2e-fixture
   - browser chooser opens again
   - there is still no `disconnect first` block
 
-- [ ] Select the same project again
+- [x] Select the same project again
   Expected:
   - project relinks cleanly
 
-- [ ] Run:
+- [x] Run:
   ```bash
   skylos project status
   ```
@@ -531,7 +555,7 @@ cd /private/tmp/skylos-e2e-fixture
 
 ## Phase 14: CI Workflow Generation
 
-- [ ] Run:
+- [x] Run:
   ```bash
   cd /private/tmp/skylos-e2e-fixture
   skylos . --danger --secrets --quality --json -o /tmp/skylos-results.json
@@ -539,7 +563,7 @@ cd /private/tmp/skylos-e2e-fixture
   Expected:
   - JSON results file is written successfully
 
-- [ ] Run:
+- [x] Run:
   ```bash
   skylos cicd gate --input /tmp/skylos-results.json --summary
   ```
@@ -547,7 +571,7 @@ cd /private/tmp/skylos-e2e-fixture
   - gate summary is printed
   - command exits non-zero because the fixture should fail the quality gate before suppression
 
-- [ ] Run:
+- [x] Run:
   ```bash
   skylos cicd init --upload --defend -o /tmp/skylos-e2e-workflow.yml
   ```
@@ -555,7 +579,7 @@ cd /private/tmp/skylos-e2e-fixture
   - workflow file is generated successfully
   - path is printed
 
-- [ ] Open `/tmp/skylos-e2e-workflow.yml`
+- [x] Open `/tmp/skylos-e2e-workflow.yml`
   Expected:
   - file contains a `Run Skylos Analysis` step using `--upload`
   - file contains `SKYLOS_TOKEN`
@@ -585,47 +609,3 @@ cd /private/tmp/skylos-e2e-fixture
   - selected pack is passed into the billing flow
 
 Do not complete a real purchase unless you intentionally want a real charge.
-
-## Core Pass Criteria
-
-The core workflow passes only if all of these are true:
-
-- [ ] A project can be created with only a name
-- [ ] CLI login can link a repo without forcing disconnect-first
-- [ ] `skylos whoami` and `skylos credits` work after login
-- [ ] Policy save works and `skylos sync pull` reflects the saved config
-- [ ] Core scan upload works before GitHub binding
-- [ ] The uploaded scan is visible in scans and issues views
-- [ ] Suppression works from the scan page
-- [ ] Revoke works from a modal, not a browser alert
-- [ ] Re-upload after suppression passes
-- [ ] Re-upload after revoke fails again
-- [ ] AI defense upload works and shows score in the dashboard
-- [ ] GitHub can be linked later in settings on the same project
-- [ ] Project unlink and relink work without logging the user out
-- [ ] `skylos cicd init --upload --defend` generates the expected workflow
-
-## Advanced Pass Criteria
-
-Mark these only if your plan and credits allow them:
-
-- [ ] Scan share flow works
-- [ ] Scan export JSON works
-- [ ] Scan export CSV works
-- [ ] Scan compare works
-- [ ] Project defense page renders correctly
-- [ ] Local provenance fixture output matches expected data
-- [ ] Provenance risk intersection works
-- [ ] Provenance audit export works
-- [ ] Billing checkout opens correctly
-
-## Failure Log
-
-Use this section when a step fails:
-
-- First failing phase: `________________`
-- Exact step: `________________`
-- Exact error text: `________________`
-- URL involved: `________________`
-- CLI command involved: `________________`
-- Notes / screenshot path: `________________`

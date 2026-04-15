@@ -131,7 +131,12 @@ export async function GET(req: Request) {
       custom_rules: Array.isArray(pc.custom_rules) ? pc.custom_rules : [],
     };
 
-    return NextResponse.json(config);
+    // Keep the config wrapped for CLI compatibility while also exposing the
+    // fields at the top level for any existing callers using the newer shape.
+    return NextResponse.json({
+      ...config,
+      config,
+    });
   } catch (e) {
     return serverError(e, "Sync config");
   }

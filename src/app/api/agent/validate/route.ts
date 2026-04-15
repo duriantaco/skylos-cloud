@@ -3,8 +3,6 @@ import { supabaseAdmin } from "@/utils/supabase/admin";
 import { getEffectivePlan } from "@/lib/entitlements";
 import { resolveProjectFromToken } from "@/lib/project-api-keys";
 
-// GET /api/agent/validate — lightweight API key validation for MCP/agent clients
-// Accepts: Authorization: Bearer <project_api_key> or X-API-Key: <agent_key>
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   const apiKeyHeader = request.headers.get("x-api-key");
@@ -55,7 +53,6 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // No match
     return NextResponse.json(
       { valid: false, error: "Invalid API key." },
       { status: 403 }

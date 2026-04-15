@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, ExternalLink, CheckCircle, XCircle,
   GitCommit, FileCode, Shield, Eye, History,
-  ChevronRight, Copy, Check, Sparkles, Ban, GitPullRequest,
+  ChevronRight, Copy, Check, Sparkles, GitPullRequest,
   Layers, Code2, ArrowUpRight, Trash2, Bug,
   Key, Zap
 } from 'lucide-react';
@@ -16,7 +16,6 @@ import FlowVisualizerButton from '@/components/FlowVisualizerButton';
 import ProFeatureLock from '@/components/ProFeatureLock';
 import CreditActionButton from '@/components/CreditActionButton';
 import { FEATURE_KEYS } from '@/lib/credits';
-import NoticeModal from '@/components/NoticeModal';
 
 
 type IssueGroup = {
@@ -442,7 +441,6 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
   const [project, setProject] = useState<Project | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [loadingFile, setLoadingFile] = useState(false);
-  const [isActioning, setIsActioning] = useState(false);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [, setIsCreatingPR] = useState(false);
@@ -455,10 +453,6 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
     reasoning: string;
   } | null>(null);
   const [triageError, setTriageError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [suppressOpen, setSuppressOpen] = useState(false);
-  const [suppressReason, setSuppressReason] = useState('');
-  const [suppressExpiryDays, setSuppressExpiryDays] = useState('');
 
   const ruleInfo = getRuleInfo(group.rule_id, group.category);
   const categoryContext = getCategoryContext(group.category);
@@ -524,6 +518,7 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
 
   const githubUrl = getGitHubUrl(project?.repo_url || null, group.canonical_file, group.canonical_line);
   const canCreatePR = project?.github_installation_id && findings.length > 0;
+  const lastSeenScanHref = group.last_seen_scan_id ? `/dashboard/scans/${group.last_seen_scan_id}` : null;
 
   const findingsByFile = findings.reduce((acc, f) => {
     if (!acc[f.file_path]) acc[f.file_path] = [];
@@ -552,78 +547,6 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
     }
   }
 
-  async function handleMarkFalsePositive() {
-    setIsActioning(true);
-    try {
-      const response = await fetch(`/api/issue-groups/${group.id}/suppress`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reason: 'False Positive',
-          expires_at: null
-        })
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to mark as false positive');
-      }
-
-      window.location.reload();
-    } catch (error: unknown) {
-      setNotice(getErrorMessage(error, 'Failed to mark as false positive'));
-    } finally {
-      setIsActioning(false);
-    }
-  }
-
-  function handleSuppress() {
-    setSuppressReason('');
-    setSuppressExpiryDays('');
-    setSuppressOpen(true);
-  }
-
-  async function submitSuppress() {
-    let expires_at: string | null = null;
-    const trimmedDays = suppressExpiryDays.trim();
-
-    if (trimmedDays) {
-      const days = Number.parseInt(trimmedDays, 10);
-      if (!Number.isFinite(days) || days <= 0) {
-        setNotice('Expiry days must be a positive number.');
-        return;
-      }
-
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + days);
-      expires_at = expiryDate.toISOString();
-    }
-
-    setIsActioning(true);
-    try {
-      const response = await fetch(`/api/issue-groups/${group.id}/suppress`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reason: suppressReason.trim() || null,
-          expires_at
-        })
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to suppress issue');
-      }
-
-      setSuppressOpen(false);
-      window.location.reload();
-    } catch (error: unknown) {
-      setNotice(getErrorMessage(error, 'Failed to suppress issue'));
-    } finally {
-      setIsActioning(false);
-    }
-  }
-
   async function handleTriage() {
     setTriageError(null);
     try {
@@ -646,7 +569,7 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
           <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
             <Link href="/dashboard/issues" className="hover:text-slate-900 transition flex items-center gap-1">
               <ArrowLeft className="w-4 h-4" />
-              Mission Control
+              Open Issues
             </Link>
             <ChevronRight className="w-4 h-4" />
             <span>{project?.name || 'Loading...'}</span>
@@ -667,9 +590,18 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
               </p>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              {findings.length > 0 && (
-                <FlowVisualizerButton
+	            <div className="flex items-center gap-2 shrink-0">
+	              {lastSeenScanHref && (
+	                <Link
+	                  href={lastSeenScanHref}
+	                  className="flex items-center gap-2 px-3 py-2 text-sm text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 rounded-lg transition shadow-sm"
+	                >
+	                  <History className="w-4 h-4" />
+	                  Open last seen scan
+	                </Link>
+	              )}
+	              {findings.length > 0 && (
+	                <FlowVisualizerButton
                   findingId={findings[0].id}
                   ruleId={group.rule_id}
                   category={group.category}
@@ -680,102 +612,47 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
                 <a href={githubUrl} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition shadow-sm">
                   <ExternalLink className="w-4 h-4" />
-                  View on GitHub
+                  View current file on GitHub
                 </a>
               )}
-              <button onClick={handleMarkFalsePositive} disabled={isActioning}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition shadow-sm disabled:opacity-50">
-                <XCircle className="w-4 h-4" />
-                False Positive
-              </button>
-              <button onClick={handleSuppress} disabled={isActioning}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition shadow-sm disabled:opacity-50">
-                <Ban className="w-4 h-4" />
-                Suppress
-              </button>
             </div>
           </div>
         </div>
       </header>
 
-      {suppressOpen && (
-        <div className="fixed inset-0 z-[90]">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => {
-              if (isActioning) return;
-              setSuppressOpen(false);
-            }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-              <div className="flex items-start gap-4 border-b border-slate-200 px-6 py-4">
-                <div className="min-w-0">
-                  <div className="text-sm font-bold text-slate-900">Suppress Issue</div>
-                  <div className="mt-0.5 text-xs text-slate-500">Hide this issue group across future scans.</div>
-                </div>
-                <button
-                  onClick={() => setSuppressOpen(false)}
-                  disabled={isActioning}
-                  className="ml-auto rounded-lg p-2 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  <XCircle className="h-4 w-4 text-slate-500" />
-                </button>
-              </div>
-              <div className="space-y-4 p-6">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700">
-                  {group.rule_id} :: {group.canonical_file}:{group.canonical_line}
-                </div>
+	      {/* Main content */}
+	      <main className="max-w-7xl mx-auto px-6 py-8">
+	        <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 px-5 py-4">
+	          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+	            <div>
+	              <div className="text-xs font-bold uppercase tracking-wide text-sky-700">Recurring Issue Record</div>
+	              <p className="mt-1 text-sm text-sky-900">
+	                This page tracks the same root cause across scans. Use it for recurrence history, ownership, comments,
+	                and triage context. Use the scan view when you want to work blockers or suppress findings from one specific upload.
+	              </p>
+	            </div>
+	            <div className="flex flex-wrap gap-2">
+	              {lastSeenScanHref ? (
+	                <Link
+	                  href={lastSeenScanHref}
+	                  className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+	                >
+	                  <History className="w-3.5 h-3.5" />
+	                  Open scan occurrence
+	                </Link>
+	              ) : null}
+	              <Link
+	                href={`/dashboard/projects/${group.project_id}`}
+	                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+	              >
+	                <Layers className="w-3.5 h-3.5" />
+	                Project overview
+	              </Link>
+	            </div>
+	          </div>
+	        </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-slate-700">Reason</label>
-                  <textarea
-                    value={suppressReason}
-                    onChange={(event) => setSuppressReason(event.target.value)}
-                    rows={3}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none"
-                    placeholder="Optional context for why this issue is safe to ignore"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-700">Expiry Days</label>
-                  <input
-                    type="number"
-                    min="1"
-                    inputMode="numeric"
-                    value={suppressExpiryDays}
-                    onChange={(event) => setSuppressExpiryDays(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none"
-                    placeholder="Leave blank for permanent suppression"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => setSuppressOpen(false)}
-                    disabled={isActioning}
-                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={submitSuppress}
-                    disabled={isActioning}
-                    className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    {isActioning ? 'Saving...' : 'Suppress'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+	        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column */}
           <div className="lg:col-span-2 space-y-6">
             <section className={`bg-white border ${categoryContext.borderColor} rounded-xl shadow-sm overflow-hidden`}>
@@ -1166,13 +1043,6 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
         </div>
       </main>
 
-      <NoticeModal
-        isOpen={notice !== null}
-        onClose={() => setNotice(null)}
-        title="Issue Action Failed"
-        message={notice || ''}
-        tone="error"
-      />
     </div>
   );
 }

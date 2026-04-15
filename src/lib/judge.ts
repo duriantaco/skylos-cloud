@@ -5,6 +5,7 @@ import type {
   JudgeAnalysisStatus,
   JudgeFindingPreview,
 } from "@/lib/judge-core";
+import { hasPublishedJudgeScorecard } from "@/lib/judge-public";
 
 type JudgeRepoRow = {
   id: string;
@@ -186,41 +187,24 @@ export async function getJudgeRepoIndex(): Promise<JudgeRepoSummary[]> {
   const agentSnapshotMap = firstByRepoId((agentSnapshots || []) as JudgeSnapshotRow[]);
   const jobMap = firstByRepoId((jobs || []) as JudgeJobRow[]);
 
-  return repoRows.map((repo) => ({
-    repo,
-    latestSnapshot: snapshotMap.get(repo.id) || null,
-    latestAgentSnapshot: agentSnapshotMap.get(repo.id) || null,
-    activeJob: jobMap.get(repo.id) || null,
-  }));
+  return repoRows
+    .map((repo) => ({
+      repo,
+      latestSnapshot: snapshotMap.get(repo.id) || null,
+      latestAgentSnapshot: agentSnapshotMap.get(repo.id) || null,
+      activeJob: jobMap.get(repo.id) || null,
+    }))
+    .filter(({ latestSnapshot }) => hasPublishedJudgeScorecard(latestSnapshot));
 }
 
 export async function getJudgeRepoSitemapEntries(): Promise<JudgeRepoSitemapEntry[]> {
-  if (!hasJudgeAdminAccess()) {
-    return [];
-  }
+  const summaries = await getJudgeRepoIndex();
 
-  const { data: repos, error } = await supabaseAdmin
-    .from("judge_repos")
-    .select("owner, name, last_scanned_at")
-    .eq("is_active", true)
-    .order("last_scanned_at", { ascending: false, nullsFirst: false })
-    .order("owner", { ascending: true })
-    .order("name", { ascending: true });
-
-  if (error) {
-    if (isJudgeSchemaMissing(error.message)) {
-      return [];
-    }
-    throw new Error(`Failed to load judge sitemap entries: ${error.message}`);
-  }
-
-  return ((repos || []) as Array<{ owner: string; name: string; last_scanned_at: string | null }>).map(
-    (repo) => ({
-      owner: repo.owner,
-      name: repo.name,
-      lastScannedAt: repo.last_scanned_at,
-    })
-  );
+  return summaries.map(({ repo, latestSnapshot }) => ({
+    owner: repo.owner,
+    name: repo.name,
+    lastScannedAt: latestSnapshot?.scanned_at || repo.last_scanned_at,
+  }));
 }
 
 export async function getJudgeRepoDetail(
@@ -298,7 +282,9 @@ export async function getJudgeRepoDetail(
     throw new Error(`Failed to load judge repo jobs: ${jobError.message}`);
   }
 
-  const history = (snapshots || []) as JudgeSnapshotRow[];
+  const history = ((snapshots || []) as JudgeSnapshotRow[]).filter((snapshot) =>
+    hasPublishedJudgeScorecard(snapshot)
+  );
   const latestAgentSnapshot =
     ((agentSnapshots || [])[0] as JudgeSnapshotRow | undefined) || null;
 

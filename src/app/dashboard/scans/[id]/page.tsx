@@ -17,6 +17,7 @@ import ProvenanceDetail from "@/components/ProvenanceDetail";
 
 type Scan = {
   id: string;
+  project_id: string;
   commit_hash: string;
   branch: string;
   created_at: string;
@@ -35,13 +36,15 @@ type Scan = {
     ai_findings_count?: number;
   } | null;
   defense_score?: {
+    integrations_found?: number;
+    files_scanned?: number;
     score_pct: number;
     risk_rating: string;
     weighted_score: number;
     weighted_max: number;
     passed: number;
     total: number;
-    by_severity: Record<string, { passed: number; failed: number; weight: number }>;
+    by_severity?: Record<string, { passed: number; failed: number; weight: number }>;
   } | null;
   ops_score?: {
     passed: number;
@@ -138,6 +141,43 @@ type Finding = {
   author_email?: string | null;
 };
 
+type DefenseFinding = {
+  id: string;
+  plugin_id: string;
+  category: string;
+  severity: string;
+  weight: number;
+  passed: boolean;
+  location: string | null;
+  message: string | null;
+  owasp_llm: string | null;
+  remediation: string | null;
+};
+
+type DefenseIntegration = {
+  id: string;
+  provider: string;
+  integration_type: string;
+  location: string;
+  model: string | null;
+  tools_count: number;
+  input_sources: string[] | null;
+  weighted_score: number;
+  weighted_max: number;
+  score_pct: number;
+  risk_rating: string;
+};
+
+type DefenseHistoryPoint = {
+  scan_id: string;
+  score_pct: number;
+  risk_rating: string;
+  ops_score_pct: number;
+  ops_rating: string;
+  integrations_found: number;
+  created_at: string;
+};
+
 type TabButtonProps = {
   active: boolean;
   onClick: () => void;
@@ -229,6 +269,405 @@ function TabButton({ active, onClick, label, count }: TabButtonProps) {
         {count}
       </span>
     </button>
+  );
+}
+
+function getScanFamilyBadge(tool?: string | null) {
+  if (!tool || tool === "skylos") return null;
+  if (tool === "skylos-defend") {
+    return {
+      label: "AI Defense",
+      className: "bg-sky-100 text-sky-700 border border-sky-200",
+    };
+  }
+  if (tool === "skylos-debt") {
+    return {
+      label: "Technical Debt",
+      className: "bg-amber-100 text-amber-800 border border-amber-200",
+    };
+  }
+  if (tool === "claude-code-security") {
+    return {
+      label: "Claude Security",
+      className: "bg-blue-100 text-blue-700 border border-blue-200",
+    };
+  }
+  return {
+    label: tool.toUpperCase(),
+    className: "bg-slate-100 text-slate-600 border border-slate-200",
+  };
+}
+
+function formatCompactDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function ScoreRing({ score, size = 112 }: { score: number; size?: number }) {
+  const radius = (size - 12) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+  const color =
+    score >= 90 ? "#10b981" :
+    score >= 70 ? "#3b82f6" :
+    score >= 40 ? "#f59e0b" :
+    "#ef4444";
+
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#e2e8f0" strokeWidth="8" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-black text-slate-900">{score}%</span>
+      </div>
+    </div>
+  );
+}
+
+function DefenseScanView({
+  scan,
+  defenseFindings,
+  defenseIntegrations,
+  defenseHistory,
+}: {
+  scan: Scan;
+  defenseFindings: DefenseFinding[];
+  defenseIntegrations: DefenseIntegration[];
+  defenseHistory: DefenseHistoryPoint[];
+}) {
+  const defenseScore = scan.defense_score;
+  if (!defenseScore) {
+    return (
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto p-6 lg:p-8">
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+            <Shield className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <h2 className="text-lg font-bold text-slate-900">Defense summary unavailable</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              This upload is tagged as AI Defense, but no summary data was persisted on the scan record.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              <Link
+                href={`/dashboard/projects/${scan.project_id}/defense`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                Project Defense
+              </Link>
+              <Link
+                href="/dashboard/scans"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Scan History
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const failedChecks = defenseFindings.filter((finding) => !finding.passed && finding.category.toLowerCase() === "defense");
+  const passedChecks = defenseFindings.filter((finding) => finding.passed && finding.category.toLowerCase() === "defense");
+  const opsChecks = defenseFindings.filter((finding) => finding.category.toLowerCase() === "ops");
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-slate-50">
+      <div className="max-w-6xl mx-auto p-6 lg:p-8 space-y-6">
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wide text-sky-700">AI Defense Scan</div>
+              <h1 className="mt-1 text-2xl font-black text-slate-900">Security posture for this LLM upload</h1>
+              <p className="mt-2 max-w-3xl text-sm text-sky-900">
+                This page is a defense report, not a file-triage workbench. It shows how secure the detected LLM integrations
+                were in this specific upload.
+              </p>
+              <p className="mt-2 text-xs text-sky-700">
+                Uploaded {formatCompactDate(scan.created_at)} from commit <span className="font-mono">{scan.commit_hash?.slice(0, 7) || "local"}</span>.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/dashboard/projects/${scan.project_id}/defense`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                Project Defense History
+              </Link>
+              <Link
+                href={`/dashboard/projects/${scan.project_id}`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Project Overview
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+          <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 flex items-center gap-6">
+            <ScoreRing score={defenseScore.score_pct} />
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">AI Defense Score</div>
+              <div className={`mt-1 text-lg font-black ${
+                defenseScore.score_pct >= 90 ? "text-emerald-600" :
+                defenseScore.score_pct >= 70 ? "text-blue-600" :
+                defenseScore.score_pct >= 40 ? "text-yellow-600" :
+                "text-red-600"
+              }`}>
+                {defenseScore.risk_rating}
+              </div>
+              <div className="mt-1 text-xs text-slate-500">
+                {defenseScore.passed}/{defenseScore.total} checks passing · {defenseScore.weighted_score}/{defenseScore.weighted_max} weighted
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ops Score</div>
+            <div className="mt-2 text-3xl font-black text-slate-900">{scan.ops_score?.score_pct ?? 0}%</div>
+            <div className="mt-1 text-xs font-bold text-slate-600">{scan.ops_score?.rating ?? "UNKNOWN"}</div>
+            <div className="mt-1 text-[10px] text-slate-400">
+              {scan.ops_score?.passed ?? 0}/{scan.ops_score?.total ?? 0} ops checks
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Integrations</div>
+            <div className="mt-2 text-3xl font-black text-slate-900">{defenseScore.integrations_found ?? defenseIntegrations.length}</div>
+            <div className="mt-1 text-xs text-slate-500">LLM call sites detected</div>
+            <div className="mt-1 text-[10px] text-slate-400">
+              {defenseScore.files_scanned ?? 0} files scanned
+            </div>
+          </div>
+        </div>
+
+        {defenseHistory.length > 1 && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">Recent Defense Runs</h2>
+                <p className="mt-1 text-xs text-slate-500">Use this upload as the receipt and the project defense page as the long-term trend view.</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {defenseHistory.slice(0, 4).map((point) => (
+                <Link
+                  key={point.scan_id}
+                  href={`/dashboard/scans/${point.scan_id}`}
+                  className={`rounded-xl border p-3 transition ${
+                    point.scan_id === scan.id
+                      ? "border-sky-300 bg-sky-50"
+                      : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-slate-900">{point.score_pct}%</span>
+                    <span className="text-[10px] font-bold text-slate-500">{point.risk_rating}</span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    Ops {point.ops_score_pct}% · {point.integrations_found} integration{point.integrations_found === 1 ? "" : "s"}
+                  </div>
+                  <div className="mt-2 text-[10px] text-slate-400">{formatCompactDate(point.created_at)}</div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-sky-600" />
+            <h2 className="text-sm font-bold text-slate-900">Detected Integrations</h2>
+          </div>
+          {defenseIntegrations.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              The defense score was saved, but no per-integration rows are available yet for this scan.
+            </p>
+          ) : (
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              {defenseIntegrations.map((integration) => (
+                <div key={integration.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-bold text-slate-900">{integration.location}</div>
+                      <div className="mt-1 text-[11px] uppercase tracking-wide text-slate-500">
+                        {integration.provider} · {integration.integration_type}
+                      </div>
+                    </div>
+                    <span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold ${
+                      integration.score_pct >= 90 ? "bg-emerald-100 text-emerald-700" :
+                      integration.score_pct >= 70 ? "bg-blue-100 text-blue-700" :
+                      integration.score_pct >= 40 ? "bg-yellow-100 text-yellow-700" :
+                      "bg-red-100 text-red-700"
+                    }`}>
+                      {integration.score_pct}% {integration.risk_rating}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-500">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-400">Model</div>
+                      <div className="mt-1 font-mono text-slate-700">{integration.model || "Unknown"}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-400">Weighted</div>
+                      <div className="mt-1 font-mono text-slate-700">{integration.weighted_score}/{integration.weighted_max}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-400">Tools</div>
+                      <div className="mt-1 text-slate-700">{integration.tools_count}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-400">Inputs</div>
+                      <div className="mt-1 text-slate-700">
+                        {integration.input_sources && integration.input_sources.length > 0
+                          ? integration.input_sources.join(", ")
+                          : "Not annotated"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {scan.owasp_coverage && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <h2 className="text-sm font-bold text-slate-900">OWASP LLM Coverage</h2>
+            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+              {Object.entries(scan.owasp_coverage).map(([id, info]) => (
+                <div
+                  key={id}
+                  className={`rounded-xl border p-3 ${
+                    info.status === "covered" ? "border-emerald-200 bg-emerald-50" :
+                    info.status === "partial" ? "border-yellow-200 bg-yellow-50" :
+                    info.status === "not_applicable" ? "border-slate-200 bg-slate-50" :
+                    "border-red-200 bg-red-50"
+                  }`}
+                >
+                  <div className="text-xs font-bold text-slate-900">{id}</div>
+                  <div className="mt-1 text-[11px] font-medium text-slate-600">{info.name}</div>
+                  {info.coverage_pct !== null && (
+                    <div className="mt-2 text-[10px] text-slate-500">
+                      {info.passed}/{info.total} checks · {info.coverage_pct}%
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <div className="flex items-center gap-2">
+              <XCircle className="w-4 h-4 text-red-500" />
+              <h2 className="text-sm font-bold text-slate-900">Missing Defenses</h2>
+              <span className="ml-auto rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600">
+                {failedChecks.length}
+              </span>
+            </div>
+            {failedChecks.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">All defense checks passed for this upload.</p>
+            ) : (
+              <div className="mt-4 space-y-2">
+                {failedChecks.map((finding) => (
+                  <div key={finding.id} className="rounded-xl border border-red-100 bg-red-50 p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-900">{finding.plugin_id}</span>
+                      <SeverityBadge severity={finding.severity} />
+                      {finding.owasp_llm && (
+                        <span className="text-[10px] font-mono text-slate-400">{finding.owasp_llm}</span>
+                      )}
+                      <span className="ml-auto text-[10px] font-bold text-red-600">-{finding.weight}</span>
+                    </div>
+                    {finding.message && <p className="mt-1 text-xs text-slate-700">{finding.message}</p>}
+                    {finding.location && <p className="mt-1 text-[10px] font-mono text-slate-500">{finding.location}</p>}
+                    {finding.remediation && <p className="mt-2 text-[11px] text-slate-600">Fix: {finding.remediation}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-500" />
+              <h2 className="text-sm font-bold text-slate-900">Passing Checks</h2>
+              <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-600">
+                {passedChecks.length}
+              </span>
+            </div>
+            {passedChecks.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">No passing defense checks were recorded for this upload.</p>
+            ) : (
+              <div className="mt-4 space-y-2">
+                {passedChecks.map((finding) => (
+                  <div key={finding.id} className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-900">{finding.plugin_id}</span>
+                      <SeverityBadge severity={finding.severity} />
+                      <span className="ml-auto text-[10px] font-bold text-emerald-600">+{finding.weight}</span>
+                    </div>
+                    {finding.message && <p className="mt-1 text-xs text-slate-700">{finding.message}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {opsChecks.length > 0 && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <h2 className="text-sm font-bold text-slate-900">Ops Checks</h2>
+            <p className="mt-1 text-xs text-slate-500">Operational guardrails. These do not change the defense score or CI gate directly.</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {opsChecks.map((finding) => (
+                <div
+                  key={finding.id}
+                  className={`rounded-xl border p-3 ${
+                    finding.passed
+                      ? "border-emerald-200 bg-emerald-50"
+                      : "border-slate-200 bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {finding.passed ? (
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                    ) : (
+                      <AlertTriangle className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                    <span className="text-xs font-bold text-slate-900">{finding.plugin_id}</span>
+                  </div>
+                  {finding.message && <p className="mt-2 text-[11px] text-slate-600">{finding.message}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -436,6 +875,9 @@ export default function ScanDetailsPage() {
 
   const [scan, setScan] = useState<Scan | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
+  const [defenseFindings, setDefenseFindings] = useState<DefenseFinding[]>([]);
+  const [defenseIntegrations, setDefenseIntegrations] = useState<DefenseIntegration[]>([]);
+  const [defenseHistory, setDefenseHistory] = useState<DefenseHistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [userPlan, setUserPlan] = useState<string>('free');
 
@@ -569,6 +1011,39 @@ export default function ScanDetailsPage() {
 
     if (provFiles) {
       setProvenanceFiles(provFiles.map((f: { file_path: string }) => f.file_path));
+    }
+
+    if (scanData && (scanData.tool === "skylos-defend" || !!scanData.defense_score)) {
+      const [
+        { data: defenseFindingsData },
+        { data: defenseIntegrationsData },
+        { data: defenseHistoryData },
+      ] = await Promise.all([
+        supabase
+          .from("defense_findings")
+          .select("*")
+          .eq("scan_id", id)
+          .order("passed", { ascending: true }),
+        supabase
+          .from("defense_integrations")
+          .select("*")
+          .eq("scan_id", id)
+          .order("score_pct", { ascending: true }),
+        supabase
+          .from("defense_scores")
+          .select("scan_id, score_pct, risk_rating, ops_score_pct, ops_rating, integrations_found, created_at")
+          .eq("project_id", scanData.project_id)
+          .order("created_at", { ascending: false })
+          .limit(6),
+      ]);
+
+      setDefenseFindings((defenseFindingsData || []) as DefenseFinding[]);
+      setDefenseIntegrations((defenseIntegrationsData || []) as DefenseIntegration[]);
+      setDefenseHistory((defenseHistoryData || []) as DefenseHistoryPoint[]);
+    } else {
+      setDefenseFindings([]);
+      setDefenseIntegrations([]);
+      setDefenseHistory([]);
     }
 
     // Fetch plan for gating
@@ -748,6 +1223,8 @@ export default function ScanDetailsPage() {
   }
 
   const gateFailed = !scan.quality_gate_passed;
+  const isDefenseOnlyScan = (scan.tool === "skylos-defend" || !!scan.defense_score) && findings.length === 0;
+  const toolBadge = getScanFamilyBadge(scan.tool);
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 font-sans text-slate-900 overflow-hidden">
@@ -863,13 +1340,9 @@ export default function ScanDetailsPage() {
                 {scan.analysis_mode.toUpperCase()} MODE
               </span>
             )}
-            {scan.tool && scan.tool !== "skylos" && (
-              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ml-2 ${
-                scan.tool === "claude-code-security"
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-slate-100 text-slate-600"
-              }`}>
-                {scan.tool === "claude-code-security" ? "Claude Security" : scan.tool.toUpperCase()}
+            {toolBadge && (
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ml-2 ${toolBadge.className}`}>
+                {toolBadge.label}
               </span>
             )}
           </div>
@@ -967,24 +1440,26 @@ export default function ScanDetailsPage() {
         </div>
       </header>
 
-      {/* GATE PANEL - Collapsible */}
-      <GatePanel
-        scan={scan}
-        findings={findings}
-        onJumpToFinding={(f) => {
-          setSelectedFinding(f);
-          setExpandedFiles(prev => ({ ...prev, [f.file_path]: true }));
-          setActiveTab('ALL');
-          setViewMode('NEW');
-          setSearch('');
-          setGatePanelExpanded(false);
-        }}
-        isExpanded={gatePanelExpanded}
-        onToggle={() => setGatePanelExpanded(!gatePanelExpanded)}
-      />
+      {!isDefenseOnlyScan && (
+        <>
+          {/* GATE PANEL - Collapsible */}
+          <GatePanel
+            scan={scan}
+            findings={findings}
+            onJumpToFinding={(f) => {
+              setSelectedFinding(f);
+              setExpandedFiles(prev => ({ ...prev, [f.file_path]: true }));
+              setActiveTab('ALL');
+              setViewMode('NEW');
+              setSearch('');
+              setGatePanelExpanded(false);
+            }}
+            isExpanded={gatePanelExpanded}
+            onToggle={() => setGatePanelExpanded(!gatePanelExpanded)}
+          />
 
-      {/* AI Code Assurance Panel */}
-      {scan.ai_code_detected && scan.ai_code_stats && (
+          {/* AI Code Assurance Panel */}
+          {scan.ai_code_detected && scan.ai_code_stats && (
         <div className="mx-4 mb-2 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1049,8 +1524,8 @@ export default function ScanDetailsPage() {
         </div>
       )}
 
-      {/* AI Defense Panel */}
-      {scan.defense_score && (
+          {/* AI Defense Panel */}
+          {scan.defense_score && (
         <div className="mx-4 mb-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1074,16 +1549,18 @@ export default function ScanDetailsPage() {
           </div>
 
           {/* Severity breakdown */}
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {Object.entries(scan.defense_score.by_severity).map(([sev, data]) => (
-              <span key={sev} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border text-[10px] ${
-                data.failed > 0 ? 'border-red-200 text-red-700' : 'border-emerald-200 text-emerald-700'
-              }`}>
-                <span className="font-bold uppercase">{sev}</span>
-                <span>{data.passed}/{data.passed + data.failed}</span>
-              </span>
-            ))}
-          </div>
+          {scan.defense_score.by_severity && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {Object.entries(scan.defense_score.by_severity).map(([sev, data]) => (
+                <span key={sev} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border text-[10px] ${
+                  data.failed > 0 ? 'border-red-200 text-red-700' : 'border-emerald-200 text-emerald-700'
+                }`}>
+                  <span className="font-bold uppercase">{sev}</span>
+                  <span>{data.passed}/{data.passed + data.failed}</span>
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Ops score */}
           {scan.ops_score && scan.ops_score.total > 0 && (
@@ -1121,8 +1598,18 @@ export default function ScanDetailsPage() {
           )}
         </div>
       )}
+        </>
+      )}
 
-      {/* MAIN CONTENT - Takes remaining space */}
+      {isDefenseOnlyScan ? (
+        <DefenseScanView
+          scan={scan}
+          defenseFindings={defenseFindings}
+          defenseIntegrations={defenseIntegrations}
+          defenseHistory={defenseHistory}
+        />
+      ) : (
+      /* MAIN CONTENT - Takes remaining space */
       <div className="flex flex-1 overflow-hidden">
         {/* LEFT: Findings list */}
         <div className="w-[380px] flex flex-col bg-white border-r border-slate-200">
@@ -1559,6 +2046,7 @@ export default function ScanDetailsPage() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

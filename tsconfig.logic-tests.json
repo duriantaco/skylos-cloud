@@ -19,7 +19,9 @@
     "src/lib/github-installation-core.ts",
     "src/lib/github-repo-core.ts",
     "src/lib/billing-webhook-core.ts",
-    "src/lib/report-suppressions-core.ts"
+    "src/lib/report-suppressions-core.ts",
+    "src/lib/judge-core.ts",
+    "src/lib/judge-public.ts"
   ],
   "exclude": ["node_modules", ".next", ".test-dist"]
 }

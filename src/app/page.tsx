@@ -308,6 +308,16 @@ export default async function Home() {
           }}
         />
 
+        {/* Animated aurora blobs + subtle grid overlay */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -top-24 -left-24 h-[32rem] w-[32rem] rounded-full bg-blue-300 opacity-30 mix-blend-multiply blur-3xl animate-blob" />
+          <div className="absolute top-10 right-[-6rem] h-[32rem] w-[32rem] rounded-full bg-purple-300 opacity-30 mix-blend-multiply blur-3xl animate-blob animation-delay-2000" />
+          <div className="absolute bottom-[-8rem] left-1/3 h-[32rem] w-[32rem] rounded-full bg-indigo-300 opacity-25 mix-blend-multiply blur-3xl animate-blob animation-delay-4000" />
+          <div
+            className="absolute inset-0 opacity-[0.35] [background-image:linear-gradient(to_right,rgba(100,116,139,0.12)_1px,transparent_1px),linear-gradient(to_bottom,rgba(100,116,139,0.12)_1px,transparent_1px)] [background-size:28px_28px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)]"
+          />
+        </div>
+
         <div className="relative mx-auto max-w-7xl px-6">
           <div className="mb-10 flex justify-center">
             <a
@@ -334,80 +344,58 @@ export default async function Home() {
             </a>
           </div>
 
-          <div className="relative mx-auto max-w-4xl text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/8 px-4 py-2 text-sm font-semibold text-cyan-100 animate-hero-rise hero-rise-delay-0">
-              Open source Python security scanner
+          <div className="relative max-w-5xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50/80 px-4 py-2 text-sm font-semibold text-blue-900 animate-hero-rise">
+              Built for teams shipping with Cursor, Copilot, and Claude Code
             </div>
 
-            <h1 className="relative mt-6 text-4xl font-black tracking-tight leading-tight text-white sm:text-5xl md:text-6xl lg:text-7xl">
-              <svg aria-hidden="true" className="pointer-events-none absolute -top-6 left-[6%] h-6 w-6 text-cyan-300 animate-sparkle" style={{ animationDelay: '0.20s' }} viewBox="0 0 24 24" fill="none">
-                <path d="M12 2 L13.5 10.5 L22 12 L13.5 13.5 L12 22 L10.5 13.5 L2 12 L10.5 10.5 Z" fill="currentColor" fillOpacity="0.85" />
-              </svg>
-              <svg aria-hidden="true" className="pointer-events-none absolute top-2 right-[4%] h-4 w-4 text-emerald-300 animate-sparkle" style={{ animationDelay: '0.45s' }} viewBox="0 0 24 24" fill="none">
-                <path d="M12 2 L13.5 10.5 L22 12 L13.5 13.5 L12 22 L10.5 13.5 L2 12 L10.5 10.5 Z" fill="currentColor" fillOpacity="0.85" />
-              </svg>
-              <svg aria-hidden="true" className="pointer-events-none absolute -bottom-2 left-[22%] h-5 w-5 text-violet-300 animate-sparkle" style={{ animationDelay: '0.70s' }} viewBox="0 0 24 24" fill="none">
-                <path d="M12 2 L13.5 10.5 L22 12 L13.5 13.5 L12 22 L10.5 13.5 L2 12 L10.5 10.5 Z" fill="currentColor" fillOpacity="0.85" />
-              </svg>
-
-              <span className="hero-word" style={{ animationDelay: '0.15s' }}>Catch</span>{' '}
-              <span className="relative inline-block">
-                <span className="hero-word" style={{ animationDelay: '0.27s' }}>security</span>{' '}
-                <span className="hero-word" style={{ animationDelay: '0.39s' }}>regressions</span>
-                <svg
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -inset-x-3 -inset-y-3 h-[calc(100%+1.5rem)] w-[calc(100%+1.5rem)]"
-                  viewBox="0 0 600 140"
-                  preserveAspectRatio="none"
-                  fill="none"
-                >
-                  <path
-                    d="M 300 14 C 130 10, 22 30, 18 72 C 14 116, 180 134, 312 128 C 460 122, 588 104, 584 66 C 580 28, 440 14, 296 16"
-                    stroke="#fb923c"
-                    strokeOpacity="0.85"
-                    strokeWidth="5"
-                    strokeLinecap="round"
-                    className="animate-draw-doodle doodle-delay-circle"
-                  />
-                </svg>
-              </span>{' '}
-              <span className="hero-word" style={{ animationDelay: '0.51s' }}>in</span>{' '}
-              <span className="relative inline-block">
-                <span className="hero-word" style={{ animationDelay: '0.63s' }}>AI-generated</span>{' '}
-                <span className="hero-word" style={{ animationDelay: '0.75s' }}>code</span>
-                <svg
-                  aria-hidden="true"
-                  className="pointer-events-none absolute left-0 right-0 -bottom-2 w-full h-[0.4em]"
-                  viewBox="0 0 600 40"
-                  preserveAspectRatio="none"
-                  fill="none"
-                >
-                  <path
-                    d="M6 26 C 120 8, 260 38, 380 20 S 560 12, 594 24"
-                    stroke="url(#hero-stroke-gradient)"
-                    strokeWidth="14"
-                    strokeLinecap="round"
-                    className="animate-draw-stroke"
-                  />
-                  <defs>
-                    <linearGradient id="hero-stroke-gradient" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.85" />
-                      <stop offset="50%" stopColor="#22d3ee" stopOpacity="0.85" />
-                      <stop offset="100%" stopColor="#34d399" stopOpacity="0.85" />
-                    </linearGradient>
-                  </defs>
-                </svg>
+            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.02]">
+              <span className="block mt-6 text-slate-900">
+                <span className="hero-word" style={{ animationDelay: '0.10s' }}>Catch</span>{' '}
+                <span className="hero-word" style={{ animationDelay: '0.20s' }}>what</span>{' '}
+                <span className="hero-word" style={{ animationDelay: '0.30s' }}>AI</span>
+              </span>
+              <span className="block mt-2 text-slate-900">
+                <span className="hero-word" style={{ animationDelay: '0.40s' }}>writes</span>{' '}
+                <span className="hero-word" style={{ animationDelay: '0.50s' }}>wrong.</span>
+              </span>
+              <span className="block mt-2 text-slate-900">
+                <span className="hero-word" style={{ animationDelay: '0.65s' }}>Catch</span>{' '}
+                <span className="hero-word" style={{ animationDelay: '0.75s' }}>what</span>{' '}
+                <span className="hero-word" style={{ animationDelay: '0.85s' }}>it</span>
+                <span className="relative inline-block ml-3">
+                  <span className="hero-word" style={{ animationDelay: '0.95s' }}>silently</span>{' '}
+                  <span className="hero-word" style={{ animationDelay: '1.05s' }}>removes.</span>
+                  {/* Self-drawing highlighter stroke — draws itself in once the last word lands */}
+                  <svg
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-0 right-0 -bottom-1 w-full h-[0.45em] -z-10"
+                    viewBox="0 0 600 40"
+                    preserveAspectRatio="none"
+                    fill="none"
+                  >
+                    <path
+                      d="M8 26 C 120 8, 260 38, 380 20 S 560 12, 592 24"
+                      stroke="rgba(96, 165, 250, 0.55)"
+                      strokeWidth="18"
+                      strokeLinecap="round"
+                      className="animate-draw-stroke"
+                    />
+                  </svg>
+                </span>
               </span>
             </h1>
 
-            <p className="mx-auto mt-6 max-w-3xl text-lg font-medium leading-relaxed text-slate-300 md:text-xl animate-hero-rise hero-rise-delay-2">
-              Scan Python repos for dead code, hallucinated imports, and removed auth, CSRF, or rate limits before merge.
+            <p className="mt-8 text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto leading-relaxed font-medium animate-hero-rise hero-rise-delay-2">
+              Skylos is the open source Python security scanner for teams shipping AI-generated code.
+              <br className="hidden sm:block" />
+              <span className="text-slate-500">Find dead code, hallucinated imports, and removed auth, CSRF, or rate limits before merge.</span>
             </p>
 
-            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row animate-hero-rise hero-rise-delay-3">
+            <div className="mt-12 flex flex-col sm:flex-row gap-5 justify-center items-center animate-hero-rise hero-rise-delay-3">
               <Link
                 href="/scan"
-                className="shine group inline-flex items-center gap-2 rounded-2xl bg-white px-9 py-4 text-base font-bold text-slate-950 shadow-[0_28px_55px_-28px_rgba(255,255,255,0.6)] transition-all hover:-translate-y-0.5 hover:bg-slate-100 hover:shadow-[0_34px_65px_-28px_rgba(56,189,248,0.75)]"
+                className="shine group relative overflow-hidden inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-10 py-5 text-lg font-bold text-white shadow-sm transition-all hover:bg-slate-800 hover:shadow-lg hover:-translate-y-0.5"
                 aria-label="Run your first Skylos scan"
               >
                 <span className="relative z-10 flex items-center gap-2">
@@ -1209,7 +1197,7 @@ export default async function Home() {
               <p className="mt-2 text-slate-600 text-sm">Buy credits when you need shared history and automation</p>
               <div className="mt-6">
                 <span className="text-5xl font-bold text-slate-900">$9</span>
-                <span className="text-slate-500 text-sm ml-1">/ 500 credits</span>
+                <span className="text-slate-500 text-sm ml-1">/ 50 credits</span>
               </div>
               <ul className="mt-8 space-y-3 text-sm text-slate-600 flex-1">
                 <li className="flex items-center gap-2">

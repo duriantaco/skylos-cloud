@@ -2,24 +2,34 @@
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-export function FileHotspotChart({ findings }: { findings: any[] }) {
-  const fileCounts: Record<string, number> = {};
+type ChartFinding = {
+  file_path: string;
+  rule_id?: string | null;
+};
+
+export function FileHotspotChart({ findings }: { findings: ChartFinding[] }) {
+  const fileCounts: Record<string, { label: string; value: number }> = {};
   
   findings.forEach(f => {
-    const name = f.file_path.split('/').pop() || f.file_path;
-    fileCounts[name] = (fileCounts[name] || 0) + 1;
+    const fullPath = f.file_path || "Unknown file";
+    const parts = fullPath.split('/');
+    const label = parts.length > 3 ? `.../${parts.slice(-3).join('/')}` : fullPath;
+    if (!fileCounts[fullPath]) {
+      fileCounts[fullPath] = { label, value: 0 };
+    }
+    fileCounts[fullPath].value += 1;
   });
 
-  const data = Object.entries(fileCounts)
-    .map(([name, value]) => ({ name, value }))
+  const data = Object.values(fileCounts)
+    .map(({ label, value }) => ({ name: label, value }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
   return (
     <div className="w-full h-[320px] bg-white border border-slate-200 rounded-xl p-5 flex flex-col shadow-sm">
       <div className="mb-4">
-        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Toxic Files (Top 5)</h3>
-        <p className="text-xs text-slate-500 mt-1">Refactoring these files yields the highest ROI.</p>
+        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Latest Scan Hotspots</h3>
+        <p className="text-xs text-slate-500 mt-1">Top files in the latest scan only. Use compare for project-level movement.</p>
       </div>
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
@@ -52,7 +62,7 @@ export function FileHotspotChart({ findings }: { findings: any[] }) {
   );
 }
 
-export function TopViolationsChart({ findings }: { findings: any[] }) {
+export function TopViolationsChart({ findings }: { findings: ChartFinding[] }) {
   const ruleCounts: Record<string, number> = {};
   
   findings.forEach(f => {
@@ -68,8 +78,8 @@ export function TopViolationsChart({ findings }: { findings: any[] }) {
   return (
     <div className="w-full h-[320px] bg-white border border-slate-200 rounded-xl p-5 flex flex-col shadow-sm">
        <div className="mb-4">
-        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Top Violations</h3>
-        <p className="text-xs text-slate-500 mt-1">The most frequent coding errors across the team.</p>
+        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Latest Scan Rule Mix</h3>
+        <p className="text-xs text-slate-500 mt-1">Most frequent rules in the latest uploaded scan.</p>
       </div>
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
