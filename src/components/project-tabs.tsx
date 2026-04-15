@@ -43,9 +43,9 @@ export default function ProjectTabs({ projectId }: { projectId: string }) {
   const active = activeKey(pathname, projectId);
 
   return (
-    <nav className="border-b border-slate-200 bg-white">
+    <nav className="border-t border-slate-100 border-b border-slate-200 bg-white">
       <div className="mx-auto max-w-7xl px-6">
-        <ul className="-mb-px flex items-center gap-1 overflow-x-auto">
+        <ul className="scrollbar-none -mb-px flex items-center gap-1 overflow-x-auto">
           {TABS.map((tab) => {
             const isActive = active === tab.key;
             return (
@@ -54,10 +54,10 @@ export default function ProjectTabs({ projectId }: { projectId: string }) {
                   href={buildHref(projectId, tab.segment)}
                   aria-current={isActive ? "page" : undefined}
                   className={[
-                    "relative inline-flex items-center px-4 py-3 text-sm font-medium transition whitespace-nowrap",
+                    "relative inline-flex items-center rounded-t-2xl px-4 py-3 text-sm font-medium transition whitespace-nowrap",
                     isActive
-                      ? "text-slate-900"
-                      : "text-slate-500 hover:text-slate-900",
+                      ? "bg-slate-50 text-slate-900"
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
                   ].join(" ")}
                 >
                   {tab.label}
