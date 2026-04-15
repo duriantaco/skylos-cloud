@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { Fingerprint, FileText, GitCommit, GitBranch, Shield, ChevronRight } from "lucide-react";
+import { GitCommit, GitBranch, Shield, ChevronRight } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
+import ArtifactReceiptHeader from "@/components/ArtifactReceiptHeader";
+import ArtifactStateCard from "@/components/ArtifactStateCard";
 import ProFeatureLock from "@/components/ProFeatureLock";
 import ProvenanceDetail from "@/components/ProvenanceDetail";
 import ScrollToTopOnMount from "@/components/ScrollToTopOnMount";
@@ -96,18 +98,11 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
     return (
       <main className="min-h-screen bg-slate-50">
         <div className="mx-auto max-w-4xl p-6 lg:p-8">
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-            <h1 className="text-lg font-bold text-slate-900">Scan not found</h1>
-            <div className="mt-6">
-              <Link
-                href="/dashboard/scans"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                Scan History
-              </Link>
-            </div>
-          </div>
+          <ArtifactStateCard
+            title="Scan not found"
+            message="This provenance receipt could not be found. Go back to scan history and open another uploaded run."
+            actions={[{ href: "/dashboard/scans", label: "Scan History", tone: "accent" }]}
+          />
         </div>
       </main>
     );
@@ -166,61 +161,29 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
   );
   const confidence = scan.provenance_confidence || aiCodeStats?.confidence || (attributedFileCount > 0 ? "recorded" : "unknown");
   const relatedFindingCount = Math.max(findings.length, aiCodeStats?.ai_findings_count || 0);
-  const firstFindingLabel = findings[0]?.message || null;
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <ScrollToTopOnMount />
       <div className="mx-auto max-w-6xl p-6 lg:p-8">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-700">
-                <Fingerprint className="h-3.5 w-3.5" />
-                AI Provenance Receipt
-              </div>
-              <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
-                One upload’s attribution evidence, separate from the normal findings workbench.
-              </h1>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                Use this page to answer where the AI-attributed code came from, which lines were attributed, and what git evidence Skylos used.
-                Use the normal scan page to triage security, dead code, and quality findings.
-              </p>
-            </div>
+        <ArtifactReceiptHeader
+          tone="violet"
+          breadcrumbLabel="Provenance Receipt"
+          badgeLabel="AI Provenance Receipt"
+          projectName={project?.name || "Project"}
+          projectHref={project?.id ? `/dashboard/projects/${project.id}` : null}
+          title="One upload’s attribution evidence."
+          description="Use this receipt to review the AI attribution evidence for one upload. Use Project Provenance for cross-run history and the code scan workbench for triage."
+          note={`Uploaded ${formatTimestamp(scan.created_at)} from commit ${shortCommit(scan.commit_hash)}.`}
+          actions={[
+            { href: `/dashboard/projects/${scan.project_id}/provenance`, label: "Project Provenance", tone: "accent", scroll: true },
+            { href: `/dashboard/projects/${scan.project_id}`, label: "Project Overview", scroll: true },
+            { href: "/dashboard/scans", label: "Scan History", scroll: true },
+            { href: `/dashboard/scans/${scan.id}`, label: "Code Scan Workbench", scroll: true },
+          ]}
+        />
 
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={`/dashboard/scans/${scan.id}`}
-                scroll
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                <FileText className="h-4 w-4" />
-                Code scan workbench
-              </Link>
-              <Link
-                href={`/dashboard/projects/${scan.project_id}`}
-                scroll
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Project Overview
-              </Link>
-              <Link
-                href={`/dashboard/projects/${scan.project_id}/provenance`}
-                scroll
-                className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 hover:bg-violet-100"
-              >
-                Project Provenance
-              </Link>
-              <Link
-                href="/dashboard/scans"
-                scroll
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Scan History
-              </Link>
-            </div>
-          </div>
-
+        <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">AI-attributed files</div>
@@ -249,27 +212,6 @@ export default async function ProvenanceScanReceiptPage({ scanId }: { scanId: st
                   <GitCommit className="h-3.5 w-3.5" />
                   <span title={scan.commit_hash || "unknown commit"}>{shortCommit(scan.commit_hash)}</span>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 rounded-2xl border border-violet-200 bg-violet-50 p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-violet-900">What this page means</div>
-                <p className="mt-1 text-sm text-violet-800">
-                  Provenance is attribution context, not the vulnerability itself.
-                  {firstFindingLabel ? (
-                    <>
-                      {" "}If the code scan found <span className="font-semibold">{firstFindingLabel}</span>, that remains the code-scan finding.
-                    </>
-                  ) : null}
-                  {" "}This receipt explains why Skylos believes the changed lines came from AI and what evidence supported that attribution.
-                </p>
-              </div>
-              <div className="text-sm text-violet-700">
-                Quality gate:{" "}
-                <span className="font-semibold">{scan.quality_gate_passed ? "PASS" : "FAIL"}</span>
               </div>
             </div>
           </div>

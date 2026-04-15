@@ -1,17 +1,15 @@
 'use client'
 
 import { createClient } from "@/utils/supabase/client";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle,
-  ChevronRight,
-  FileText,
-  Layers,
   Shield,
   XCircle,
 } from "lucide-react";
+import ArtifactReceiptHeader from "@/components/ArtifactReceiptHeader";
+import ArtifactStateCard from "@/components/ArtifactStateCard";
 
 type Scan = {
   id: string;
@@ -252,19 +250,12 @@ export default function DefenseScanReceiptPage({ scanId }: { scanId: string }) {
     return (
       <main className="min-h-screen bg-slate-50">
         <div className="max-w-4xl mx-auto p-6 lg:p-8">
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-8">
-            <h1 className="text-lg font-bold text-red-900">Failed to load defense receipt</h1>
-            <p className="mt-2 text-sm text-red-700">{error}</p>
-            <div className="mt-6">
-              <Link
-                href="/dashboard/scans"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                Scan History
-              </Link>
-            </div>
-          </div>
+          <ArtifactStateCard
+            title="Failed to load defense receipt"
+            message={error}
+            tone="error"
+            actions={[{ href: "/dashboard/scans", label: "Scan History", tone: "accent" }]}
+          />
         </div>
       </main>
     );
@@ -274,18 +265,11 @@ export default function DefenseScanReceiptPage({ scanId }: { scanId: string }) {
     return (
       <main className="min-h-screen bg-slate-50">
         <div className="max-w-4xl mx-auto p-6 lg:p-8">
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-            <h1 className="text-lg font-bold text-slate-900">Scan not found</h1>
-            <div className="mt-6">
-              <Link
-                href="/dashboard/scans"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                Scan History
-              </Link>
-            </div>
-          </div>
+          <ArtifactStateCard
+            title="Scan not found"
+            message="This defense receipt could not be found. Go back to scan history and open another uploaded run."
+            actions={[{ href: "/dashboard/scans", label: "Scan History", tone: "accent" }]}
+          />
         </div>
       </main>
     );
@@ -298,29 +282,16 @@ export default function DefenseScanReceiptPage({ scanId }: { scanId: string }) {
     return (
       <main className="min-h-screen bg-slate-50">
         <div className="max-w-4xl mx-auto p-6 lg:p-8">
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-            <Shield className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <h1 className="text-lg font-bold text-slate-900">This scan is not an AI Defense receipt</h1>
-            <p className="mt-2 text-sm text-slate-500">
-              Open the normal scan route for findings triage, or go back to the project defense dashboard.
-            </p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-              <Link
-                href={`/dashboard/scans/${scan.id}`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                Open scan
-              </Link>
-              <Link
-                href={`/dashboard/projects/${scan.project_id}/defense`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
-              >
-                <Shield className="w-3.5 h-3.5" />
-                Project Defense
-              </Link>
-            </div>
-          </div>
+          <ArtifactStateCard
+            title="This scan is not an AI Defense receipt"
+            message="Open the code scan workbench for triage, or go back to Project Defense for the long-lived dashboard."
+            actions={[
+              { href: `/dashboard/projects/${scan.project_id}/defense`, label: "Project Defense", tone: "accent" },
+              { href: `/dashboard/projects/${scan.project_id}`, label: "Project Overview" },
+              { href: "/dashboard/scans", label: "Scan History" },
+              { href: `/dashboard/scans/${scan.id}`, label: "Open Scan" },
+            ]}
+          />
         </div>
       </main>
     );
@@ -333,95 +304,41 @@ export default function DefenseScanReceiptPage({ scanId }: { scanId: string }) {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 pointer-events-auto">
-      <div className="border-b border-slate-200 bg-white">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            <Link href="/dashboard/scans" className="font-medium text-slate-600 hover:text-slate-900">
-              Scans
-            </Link>
-            <ChevronRight className="w-3 h-3 text-slate-300" />
-            {scan.projects?.id ? (
-              <Link
-                href={`/dashboard/projects/${scan.projects.id}`}
-                className="font-medium text-slate-600 hover:text-slate-900"
-              >
-                {scan.projects.name}
-              </Link>
-            ) : (
-              <span className="font-medium text-slate-700">{scan.projects?.name || "Project"}</span>
-            )}
-            <ChevronRight className="w-3 h-3 text-slate-300" />
-            <span className="font-semibold text-slate-900">Defense Receipt</span>
-            {toolBadge && (
-              <span className={`ml-1 inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold ${toolBadge.className}`}>
-                {toolBadge.label}
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {scan.projects?.id && (
-              <>
-                <Link
-                  href={`/dashboard/projects/${scan.projects.id}/defense`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
-                >
-                  <Shield className="w-3.5 h-3.5" />
-                  Project Defense
-                </Link>
-                <Link
-                  href={`/dashboard/projects/${scan.projects.id}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  Project Overview
-                </Link>
-              </>
-            )}
-            <Link
-              href="/dashboard/scans"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              Scan History
-            </Link>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-6xl mx-auto p-6 lg:p-8 space-y-6">
-        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <div className="text-xs font-bold uppercase tracking-wide text-sky-700">Defense Run Receipt</div>
-              <h1 className="mt-1 text-2xl font-black text-slate-900">This upload&apos;s AI defense result</h1>
-              <p className="mt-2 max-w-3xl text-sm text-sky-900">
-                This is the per-upload receipt for one defense run. Use Project Defense for the long-lived dashboard, latest posture,
-                and trend over time.
-              </p>
-              <p className="mt-2 text-xs text-sky-700">
-                Uploaded {formatCompactDate(scan.created_at)} from commit <span className="font-mono">{scan.commit_hash?.slice(0, 7) || "local"}</span>.
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-sky-200 bg-white/80 p-4 lg:w-80">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">How To Use This</div>
-              <div className="mt-2 space-y-2 text-xs text-slate-600">
-                <p>Use this receipt when you want to audit exactly what happened in this upload.</p>
-                <p>Use Project Defense when you want the project&apos;s latest posture and history.</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ArtifactReceiptHeader
+          tone="sky"
+          breadcrumbLabel="Defense Receipt"
+          badgeLabel={toolBadge?.label || "AI Defense Receipt"}
+          projectName={scan.projects?.name || "Project"}
+          projectHref={scan.projects?.id ? `/dashboard/projects/${scan.projects.id}` : null}
+          title="One upload’s AI defense result."
+          description="Use this receipt to audit one defense run. Use Project Defense for the project’s latest posture and history."
+          note={`Uploaded ${formatCompactDate(scan.created_at)} from commit ${scan.commit_hash?.slice(0, 7) || "local"}.`}
+          actions={[
+            ...(scan.projects?.id
+              ? [
+                  { href: `/dashboard/projects/${scan.projects.id}/defense`, label: "Project Defense", tone: "accent" as const },
+                  { href: `/dashboard/projects/${scan.projects.id}`, label: "Project Overview" },
+                ]
+              : []),
+            { href: "/dashboard/scans", label: "Scan History" },
+          ]}
+        />
 
         {!defenseScore ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-            <Shield className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <h2 className="text-lg font-bold text-slate-900">Defense summary unavailable</h2>
-            <p className="mt-2 text-sm text-slate-500">
-              This upload is tagged as AI Defense, but no summary data was persisted on the scan record.
-            </p>
-          </div>
+          <ArtifactStateCard
+            title="Defense summary unavailable"
+            message="This upload is tagged as AI Defense, but no summary data was persisted on the scan record."
+            actions={[
+              ...(scan.projects?.id
+                ? [
+                    { href: `/dashboard/projects/${scan.projects.id}/defense`, label: "Project Defense", tone: "accent" as const },
+                    { href: `/dashboard/projects/${scan.projects.id}`, label: "Project Overview" },
+                  ]
+                : []),
+              { href: "/dashboard/scans", label: "Scan History" },
+            ]}
+          />
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">

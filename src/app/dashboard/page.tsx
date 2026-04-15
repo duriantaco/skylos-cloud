@@ -18,7 +18,6 @@ import {
   AlertTriangle,
   TrendingUp,
   Eye,
-  FileSearch,
   Zap,
 } from "lucide-react";
 import MiniSparkline from "@/components/MiniSparkline";
@@ -387,7 +386,7 @@ export default async function DashboardPage() {
                   Start from the project overview, then drill into the failing scan.
                 </h2>
                 <p className="mt-2 text-sm text-sky-900">
-                  Projects are the entry point. Use scan detail to clear blockers in one upload. Use Recurring Issues only after scan triage when you need the recurring record for ownership or history.
+                  Projects are the entry point. Open a scan when you need to clear blockers in one upload. Open recurring issues only after scan triage when you need the long-lived root-cause record.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -423,7 +422,7 @@ export default async function DashboardPage() {
                     <h2 className="text-xl font-bold text-slate-900">Recurring Issues</h2>
                   </div>
                   <p className="mt-2 text-sm text-slate-500 max-w-md">
-                    <span className="text-slate-700 font-medium">Recurring issues are deduped root causes across scans.</span> Use this backlog after reviewing the failing scan.
+                    Recurring root causes across scans. Use this backlog after you know which upload needs attention.
                   </p>
                 </div>
                 <Link
@@ -548,18 +547,6 @@ export default async function DashboardPage() {
                 )}
               </div>
 
-              {/* Issues Explainer */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded bg-slate-200 text-slate-600 shrink-0">
-                    <FileSearch className="w-4 h-4" />
-                  </div>
-                  <div className="text-xs text-slate-600 leading-relaxed">
-                    <span className="text-slate-900 font-medium">Recurring issues are secondary to scan triage.</span> Use this surface for recurrence history,
-                    ownership, and follow-up after you know which upload needs action.
-                  </div>
-                </div>
-              </div>
             </section>
 
             {/* ========================================== */}
@@ -576,7 +563,7 @@ export default async function DashboardPage() {
                     <h2 className="text-xl font-bold text-slate-900">Latest Scan Activity</h2>
                   </div>
                   <p className="mt-2 text-sm text-slate-500 max-w-md">
-                    <span className="text-slate-700 font-medium">Scans are where active triage happens.</span> Start from the latest failed upload when you need to clear blockers or understand what changed in one run.
+                    One upload at a time. Start from the latest failed run when you need to clear blockers or understand what changed.
                   </p>
                 </div>
                 <Link
@@ -705,53 +692,12 @@ export default async function DashboardPage() {
                 )}
               </div>
 
-              {/* Scans Explainer */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded bg-slate-200 text-slate-600 shrink-0">
-                    <GitPullRequest className="w-4 h-4" />
-                  </div>
-                  <div className="text-xs text-slate-600 leading-relaxed">
-                    <span className="text-slate-900 font-medium">Use scans for upload history and evidence.</span> Use project overview to decide where to start,
-                    then open a scan when you need to act on one specific upload.
-                  </div>
-                </div>
-              </div>
-
               <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600">
-                Historical analytics is a drill-down, not a first step.{" "}
+                Need a broader trend line after triage?{" "}
                 <Link href="/dashboard/trends" className="font-medium text-slate-900 hover:text-gray-700">
-                  Open Historical Analytics
+                  Open trends
                 </Link>
-                {" "}after you know which project or scan you want to analyze.
-              </div>
-
-              {/* Add Project CTA */}
-              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-6 relative overflow-hidden">
-                <h3 className="font-bold text-lg text-slate-900 mb-2 relative z-10">Add another project</h3>
-                <p className="text-slate-600 text-sm mb-4 relative z-10">
-                  Secure more repositories. Skylos is ready to scan.
-                </p>
-                <Link
-                  href="/dashboard/projects"
-                  className="block w-full text-center bg-gray-700 text-white font-bold py-2.5 rounded-lg text-sm hover:bg-gray-500 transition relative z-10"
-                >
-                  Connect Repository
-                </Link>
-              </div>
-
-              {/* Book a Demo CTA */}
-              <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-6 text-white relative overflow-hidden">
-                <h3 className="font-bold text-lg mb-2 relative z-10">Need more from Skylos?</h3>
-                <p className="text-slate-300 text-sm mb-4 relative z-10">
-                  Unlock shared history, PR decoration, team collaboration, and more with workspace access plus credits.
-                </p>
-                <a
-                  href="mailto:founder@skylos.dev"
-                  className="block w-full text-center bg-white text-slate-900 font-bold py-2.5 rounded-lg text-sm hover:bg-slate-100 transition relative z-10"
-                >
-                  Book a Demo
-                </a>
+                {" "}when you already know which project or scan you want to analyze.
               </div>
             </section>
           </div>
