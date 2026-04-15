@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import FlowVisualizerButton from "@/components/FlowVisualizerButton";
 import FixPrButton from "@/components/FixPrButton";
+import ArtifactStateCard from "@/components/ArtifactStateCard";
 
 type Scan = {
   id: string;
@@ -1022,14 +1023,27 @@ export default function ScanDetailsPage() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin"></div>
-          <p className="text-slate-500 text-sm font-medium">Loading Analysis...</p>
+          <p className="text-slate-500 text-sm font-medium">Loading code scan workbench...</p>
         </div>
       </div>
     );
   }
 
   if (!scan) {
-    return <div className="min-h-screen bg-slate-50 text-slate-900 p-8">Scan not found</div>;
+    return (
+      <main className="min-h-screen bg-slate-50 p-8">
+        <div className="mx-auto max-w-4xl">
+          <ArtifactStateCard
+            title="Scan not found"
+            message="This uploaded scan could not be found. Go back to scan history and open another run."
+            actions={[
+              { href: "/dashboard/scans", label: "Scan History", tone: "accent" },
+              { href: "/dashboard/projects", label: "Projects" },
+            ]}
+          />
+        </div>
+      </main>
+    );
   }
 
   const gateFailed = !scan.quality_gate_passed;
@@ -1461,9 +1475,30 @@ export default function ScanDetailsPage() {
         {/* RIGHT: Detail pane */}
         <div className="flex-1 overflow-y-auto bg-slate-50">
           {!selectedFinding ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-400 p-8">
-              <Shield className="w-12 h-12 text-slate-200 mb-3" />
-              <p className="text-sm">Select a finding</p>
+            <div className="h-full flex items-center justify-center p-8">
+              <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                <Shield className="mx-auto mb-4 h-12 w-12 text-slate-200" />
+                <h2 className="text-lg font-semibold text-slate-900">Select a finding</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Pick a finding from the left to inspect evidence, fix it in a PR, or suppress it for this upload.
+                </p>
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                  {scan.projects?.id ? (
+                    <Link
+                      href={`/dashboard/projects/${scan.projects.id}`}
+                      className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Project Overview
+                    </Link>
+                  ) : null}
+                  <Link
+                    href="/dashboard/scans"
+                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Scan History
+                  </Link>
+                </div>
+              </div>
             </div>
           ) : (
 	            <div className="max-w-4xl mx-auto p-6 lg:p-8">

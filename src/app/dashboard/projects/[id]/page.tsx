@@ -14,7 +14,6 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import { FileHotspotChart, TopViolationsChart } from "@/components/AdvanceCharts";
 import MiniSparkline from "@/components/MiniSparkline";
 import ProjectSectionTabs from "@/components/ProjectSectionTabs";
 import ScanActions from "@/components/ScanActions";
@@ -351,17 +350,6 @@ export default async function ProjectPage({
   const previousGate = gateState(previousComparableScan);
   const latestAiFiles = countValue(latestScan?.provenance_agent_count);
 
-  let streakCount = 0;
-  if (latestScan) {
-    for (const scan of scans) {
-      if (gateState(scan) === latestGate) {
-        streakCount += 1;
-      } else {
-        break;
-      }
-    }
-  }
-
   const latestBlockingNew = countValue(latestScan?.stats?.new_issues);
   const previousBlockingNew = countValue(previousComparableScan?.stats?.new_issues);
   const latestSuppressed = countValue(latestScan?.stats?.suppressed_new_issues);
@@ -383,7 +371,6 @@ export default async function ProjectPage({
   const newRuleLeaders = topRules(newFindings);
   const resolvedRuleLeaders = topRules(resolvedFindings);
 
-  const historyTotals = recentScans.slice().reverse().map((scan) => totalFindings(scan.stats));
   const historyBlocking = recentScans.slice().reverse().map((scan) => countValue(scan.stats?.new_issues));
   const historyPassRate = recentScans.slice().reverse().map((scan) => (gateState(scan) === "PASS" ? 1 : 0));
   const passRateWindow = recentScans.length
@@ -468,7 +455,7 @@ export default async function ProjectPage({
                   Current Health
                 </div>
                 <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
-                  {latestScan ? "Work this project from the latest scan, not from a generic trend line." : "No scans yet. This project overview becomes useful after the first upload."}
+                  {latestScan ? "Start from the latest scan, then compare backward only when you need context." : "No scans yet. This overview becomes useful after the first upload."}
                 </h1>
                 <p className="mt-3 text-sm leading-6 text-slate-600">
                   {latestScan ? (
@@ -476,13 +463,12 @@ export default async function ProjectPage({
                       Latest {latestScan.branch || "default branch"} scan ran {timeAgo(latestScan.created_at)} and is
                       currently <span className="font-semibold text-slate-900">{latestGate.toLowerCase()}</span>.
                       {" "}
-                      {latestBlockingNew} blocking new issue{latestBlockingNew === 1 ? "" : "s"} remain, with{" "}
+                      {latestBlockingNew} blocking new issue{latestBlockingNew === 1 ? "" : "s"} remain, including{" "}
                       {latestCriticalHighBlockers} critical/high blocker{latestCriticalHighBlockers === 1 ? "" : "s"}.
                     </>
                   ) : (
                     <>
-                      Upload your first scan, then use this page to review blockers, compare against the prior baseline,
-                      and track whether the project is actually getting safer.
+                      Upload your first scan, then use this page to review blockers, compare against the prior baseline, and track whether the project is actually getting safer.
                     </>
                   )}
                 </p>
@@ -561,12 +547,6 @@ export default async function ProjectPage({
                     : "No AI-attributed files were detected in the latest scan."
                 }
               />
-              <HealthCard
-                label="Current Streak"
-                value={latestScan ? `${streakCount} ${latestGate.toLowerCase()}` : "0"}
-                meta={latestScan ? `Across the most recent consecutive scans for this project.` : "No scan history yet."}
-                sparkline={historyPassRate}
-              />
             </div>
           </section>
 
@@ -578,7 +558,7 @@ export default async function ProjectPage({
                 </div>
                 <h2 className="mt-2 text-lg font-semibold text-slate-900">Recent scan rhythm</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Keep history available, but treat it as supporting context. Day-to-day decisions should still start from the latest failing scan.
+                  Supporting context only. Day-to-day decisions should still start from the latest scan or compare.
                 </p>
               </div>
 
@@ -591,23 +571,39 @@ export default async function ProjectPage({
             </div>
 
             <div className="mt-6 space-y-4">
-              <HealthCard
-                label="Pass Rate"
-                value={recentScans.length ? `${passRateWindow}%` : "No data"}
-                meta={`Across the latest ${recentScans.length || 0} scan${recentScans.length === 1 ? "" : "s"}.`}
-                sparkline={historyPassRate}
-              />
-              <HealthCard
-                label="History Depth"
-                value={recentScans.length}
-                meta="Latest scans loaded into this overview for quick context."
-              />
-              <HealthCard
-                label="Finding Trend"
-                value={latestTotalFindings}
-                meta="Total findings in the latest scan. Use the sparkline to spot direction, then open analytics for longer-range history."
-                sparkline={historyTotals}
-              />
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pass rate</div>
+                      <div className="mt-2 text-xl font-bold text-slate-900">
+                        {recentScans.length ? `${passRateWindow}%` : "No data"}
+                      </div>
+                      <div className="mt-1 text-sm text-slate-500">
+                        Across the latest {recentScans.length || 0} scan{recentScans.length === 1 ? "" : "s"}.
+                      </div>
+                    </div>
+                    {historyPassRate.length >= 2 ? (
+                      <div className="w-28 shrink-0">
+                        <MiniSparkline data={historyPassRate} color="#0f172a" />
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">History depth</div>
+                      <div className="mt-2 text-lg font-bold text-slate-900">{recentScans.length}</div>
+                      <div className="mt-1 text-sm text-slate-500">Scans loaded into this overview.</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Latest finding total</div>
+                      <div className="mt-2 text-lg font-bold text-slate-900">{latestTotalFindings}</div>
+                      <div className="mt-1 text-sm text-slate-500">Use trends for longer-range history.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </aside>
         </div>
@@ -621,12 +617,11 @@ export default async function ProjectPage({
               <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
                 {previousComparableScan
                   ? `Compare the latest ${latestScan?.branch || "project"} scan against the most relevant prior baseline.`
-                  : "Run at least two scans before expecting history to tell you anything useful."}
+                  : "Run at least two scans before compare becomes useful."}
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 {previousComparableScan
-                  ? `Latest scan ${shortCommit(latestScan?.commit_hash)} is being compared to ${shortCommit(previousComparableScan.commit_hash)} on ${previousComparableScan.branch || "the same project"}.
-                      Use this section to answer “what regressed?” before you spend time reading charts.`
+                  ? `Latest scan ${shortCommit(latestScan?.commit_hash)} is being compared to ${shortCommit(previousComparableScan.commit_hash)} on ${previousComparableScan.branch || "the same project"}. Use this section to answer what regressed before opening deeper analytics.`
                   : "This view becomes useful once the project has a previous scan to compare against."}
               </p>
             </div>
@@ -757,37 +752,12 @@ export default async function ProjectPage({
           )}
         </section>
 
-        {latestFindings.length > 0 ? (
-          <section className="mb-8">
-            <div className="mb-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                Latest Scan Snapshot
-              </div>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-                Keep snapshot charts honest: useful for the current scan, not for project strategy.
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                These widgets summarize the latest uploaded scan only. They help you spot concentration and repetition fast, but they are not a substitute for compare or historical analytics.
-              </p>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <FileHotspotChart findings={latestFindings} />
-              <TopViolationsChart findings={latestFindings} />
-            </div>
-          </section>
-        ) : latestScan ? (
-          <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
-            The latest scan loaded without findings details. Open the scan directly if you need the full triage view.
-          </div>
-        ) : null}
-
         <section className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/60 px-6 py-4">
             <div>
               <div className="font-semibold text-slate-900">Recent scans</div>
               <div className="mt-1 text-xs text-slate-500">
-                {recentScans.length} shown. Open the latest scan to triage, then compare backwards only when you need context.
+                {recentScans.length} shown. Open the latest scan to triage, then compare backward only when you need context.
               </div>
             </div>
             <Link href={historyHref} className="text-sm font-medium text-slate-500 hover:text-slate-900">
