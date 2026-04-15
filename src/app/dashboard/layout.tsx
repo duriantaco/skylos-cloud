@@ -5,9 +5,11 @@ import { redirect } from "next/navigation";
 import { getEffectivePlan } from "@/lib/entitlements";
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, Target, FolderOpen, History, Layers, Zap, type LucideIcon } from "lucide-react";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { BookOpen, Zap } from "lucide-react";
 import DashboardUserMenu from "@/components/DashboardUserMenu";
 import OrganizationSwitcher from "@/components/OrganizationSwitcher";
+import DashboardSidebarNav from "@/components/DashboardSidebarNav";
 import {
   resolveActiveOrganizationForRequest,
   unwrapOrganization,
@@ -30,6 +32,20 @@ type MemberOrganization = {
   plan: string | null;
   pro_expires_at: string | null;
 };
+
+const dashboardSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-dashboard-sans",
+  display: "swap",
+});
+
+const dashboardMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-dashboard-mono",
+  display: "swap",
+});
 
 export default async function DashboardLayout({
   children,
@@ -71,71 +87,131 @@ export default async function DashboardLayout({
   });
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="flex items-center gap-2.5 font-bold text-lg tracking-tight text-slate-900">
-              <Image src={dogImg} alt="Skylos" width={32} height={32} className="h-8 w-8 object-contain" priority />
-              Skylos
+    <div className={`${dashboardSans.variable} ${dashboardMono.variable} dashboard-surface min-h-screen bg-[#f7f8fa] text-slate-900`}>
+      <div className="lg:grid lg:min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="hidden border-r border-slate-200 bg-white lg:flex lg:min-h-screen lg:flex-col">
+          <div className="flex items-center gap-3 border-b border-slate-200 px-6 py-6">
+            <Link href="/dashboard" className="flex items-center gap-3 text-slate-900">
+              <Image src={dogImg} alt="Skylos" width={34} height={34} className="h-8 w-8 object-contain" priority />
+              <div>
+                <div className="text-lg font-semibold tracking-tight">Skylos</div>
+                <div className="text-xs text-slate-500">Cloud security workspace</div>
+              </div>
             </Link>
-
-            <div className="hidden md:flex items-center gap-1">
-              <NavLink href="/dashboard" icon={Target}>Overview</NavLink>
-              <NavLink href="/dashboard/projects" icon={FolderOpen}>Projects</NavLink>
-              <NavLink href="/dashboard/scans" icon={History}>Scans</NavLink>
-              <NavLink href="/dashboard/issues" icon={Layers}>Issues</NavLink>
-              <NavLink href="/dashboard/trends" icon={History}>Trends</NavLink>
-            </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-1 flex-col px-4 py-5">
             <OrganizationSwitcher
               organizations={organizations}
               activeOrgId={activeOrg.orgId}
+              className="w-full"
             />
-            {/* Credit balance badge */}
-            {credits !== null && (
-              <Link
-                href="/dashboard/billing"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
-                  isUnlimited
-                    ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                    : credits < 50
-                    ? "bg-red-50 text-red-700 hover:bg-red-100"
-                    : credits < 200
-                    ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
+
+            <div className="mt-6">
+              <DashboardSidebarNav />
+            </div>
+
+            <div className="mt-auto space-y-3 pt-8">
+              {credits !== null && (
+                <Link
+                  href="/dashboard/billing"
+                  className={[
+                    "flex items-center justify-between rounded-2xl border px-4 py-3 transition",
+                    isUnlimited
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                      : credits < 50
+                      ? "border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
+                      : credits < 200
+                      ? "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                      : "border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100",
+                  ].join(" ")}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="rounded-xl bg-white/70 p-2 shadow-sm">
+                      <Zap className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Credits
+                      </div>
+                      <div className="mt-0.5 text-base font-semibold">
+                        {isUnlimited ? "Unlimited" : credits.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-xs font-medium text-slate-500">Billing</span>
+                </Link>
+              )}
+
+              <a
+                href="https://docs.skylos.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
               >
-                <Zap className="w-3.5 h-3.5" />
-                {isUnlimited ? "Unlimited" : credits.toLocaleString()}
-              </Link>
-            )}
+                <BookOpen className="h-4 w-4 text-slate-400" />
+                Docs
+              </a>
 
-            <a href="https://docs.skylos.dev" target="_blank" rel="noopener noreferrer" className="text-sm text-slate-500 hover:text-slate-900 transition flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4" />
-              <span className="hidden md:inline">Docs</span>
-            </a>
-            <div className="h-4 w-px bg-slate-200" />
-            <DashboardUserMenu email={user.email || ""} logoutAction="/auth/logout" />
+              <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                <DashboardUserMenu email={user.email || ""} logoutAction="/auth/logout" />
+              </div>
+            </div>
           </div>
+        </aside>
+
+        <div className="min-w-0">
+          <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur-md lg:hidden">
+            <div className="flex h-16 items-center justify-between px-4">
+              <Link href="/dashboard" className="flex items-center gap-2.5 text-slate-900">
+                <Image src={dogImg} alt="Skylos" width={30} height={30} className="h-7 w-7 object-contain" priority />
+                <span className="text-lg font-semibold tracking-tight">Skylos</span>
+              </Link>
+              <div className="flex items-center gap-2">
+                {credits !== null ? (
+                  <Link
+                    href="/dashboard/billing"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700"
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    {isUnlimited ? "Unlimited" : credits.toLocaleString()}
+                  </Link>
+                ) : null}
+                <DashboardUserMenu email={user.email || ""} logoutAction="/auth/logout" />
+              </div>
+            </div>
+            <div className="scrollbar-none overflow-x-auto border-t border-slate-200 px-4 py-2">
+              <div className="flex items-center gap-2">
+                <OrganizationSwitcher
+                  organizations={organizations}
+                  activeOrgId={activeOrg.orgId}
+                  className="min-w-[180px]"
+                />
+                <Link
+                  href="/dashboard/projects"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600"
+                >
+                  Projects
+                </Link>
+                <Link
+                  href="/dashboard/scans"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600"
+                >
+                  Scans
+                </Link>
+                <Link
+                  href="/dashboard/issues"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600"
+                >
+                  Issues
+                </Link>
+              </div>
+            </div>
+          </header>
+
+          {children}
         </div>
-      </nav>
-
-      {children}
+      </div>
     </div>
-  );
-}
-
-function NavLink({ href, icon: Icon, children }: { href: string; icon: LucideIcon; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition"
-    >
-      <Icon className="w-4 h-4" />
-      {children}
-    </Link>
   );
 }

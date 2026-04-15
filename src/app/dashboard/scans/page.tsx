@@ -73,23 +73,20 @@ function GateBadge({ passed }: { passed: boolean | null }) {
 }
 
 function SourceBadge({ tool }: { tool?: string | null }) {
-  if (!tool || tool === "skylos") return null;
-  const isDefense = tool === "skylos-defend";
+  if (!tool || tool === "skylos" || tool === "skylos-defend") return null;
   const isDebt = tool === "skylos-debt";
   const isClaudeSecurity = tool === "claude-code-security";
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-md border ${
-        isDefense
-          ? "bg-sky-50 text-sky-700 border-sky-200"
-          : isDebt
+        isDebt
           ? "bg-amber-50 text-amber-800 border-amber-200"
           : isClaudeSecurity
           ? "bg-blue-50 text-blue-700 border-blue-200"
           : "bg-slate-50 text-slate-600 border-slate-200"
       }`}
     >
-      {isDefense ? "AI Defense" : isDebt ? "Technical Debt" : isClaudeSecurity ? "Claude Security" : tool.toUpperCase()}
+      {isDebt ? "Technical Debt" : isClaudeSecurity ? "Claude Security" : tool.toUpperCase()}
     </span>
   );
 }
@@ -103,27 +100,51 @@ function ProvenanceBadge({ count }: { count?: number | null }) {
   );
 }
 
+function scanDestinationMeta(scan: Scan) {
+  const isDefense = scan.tool === "skylos-defend";
+  if (isDefense) {
+    return {
+      href: `/dashboard/scans/${scan.id}/defense`,
+      family: "AI Defense",
+      detail: "Opens defense receipt",
+      familyClass: "bg-sky-50 text-sky-700 border-sky-200",
+    };
+  }
+
+  return {
+    href: `/dashboard/scans/${scan.id}`,
+    family: "Code Scan",
+    detail: scan.provenance_agent_count
+      ? "Opens findings workbench · provenance receipt available"
+      : "Opens findings workbench",
+    familyClass: "bg-slate-100 text-slate-700 border-slate-200",
+  };
+}
+
 function ScanCard({ scan }: { scan: Scan }) {
   const stats = scan.stats || {};
   const newIssues = stats.new_issues ?? 0;
   const legacyIssues = stats.legacy_issues ?? 0;
   const total = stats.total ?? newIssues + legacyIssues;
   const criticalHigh = (stats.by_severity?.CRITICAL ?? 0) + (stats.by_severity?.HIGH ?? 0);
-  const scanHref = scan.tool === "skylos-defend" ? `/dashboard/scans/${scan.id}/defense` : `/dashboard/scans/${scan.id}`;
+  const destination = scanDestinationMeta(scan);
 
   return (
     <Link
-      href={scanHref}
+      href={destination.href}
       className="block bg-white border border-slate-200 rounded-xl p-5 hover:border-slate-300 hover:shadow-md transition group"
     >
       <div className="flex items-start justify-between gap-4">
         {/* Left side */}
         <div className="flex-1 min-w-0">
-          {/* Project + Gate status */}
-          <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center gap-3 mb-2">
             <span className="font-semibold text-slate-900 group-hover:text-gray-700 transition">
               {scan.projects?.name || "Unknown Project"}
             </span>
+            <span className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-md border ${destination.familyClass}`}>
+              {destination.family}
+            </span>
+            <ProvenanceBadge count={scan.tool === "skylos-defend" ? 0 : scan.provenance_agent_count} />
             <GateBadge passed={scan.quality_gate_passed} />
             {scan.analysis_mode && scan.analysis_mode !== "static" && (
               <span className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-md bg-purple-50 text-purple-700 border border-purple-200">
@@ -131,7 +152,10 @@ function ScanCard({ scan }: { scan: Scan }) {
               </span>
             )}
             <SourceBadge tool={scan.tool} />
-            <ProvenanceBadge count={scan.provenance_agent_count} />
+          </div>
+
+          <div className="mb-3 text-xs font-medium text-slate-500">
+            {destination.detail}
           </div>
 
           {/* Branch + Commit */}
@@ -239,7 +263,7 @@ export default async function ScansPage() {
                 <h1 className="text-2xl font-bold text-slate-900">Scan History</h1>
               </div>
               <p className="text-slate-500 text-sm">
-                Point-in-time snapshots of your codebase. Each scan is an event, not an entity.
+                Every row is one uploaded run. Project name tells you where it came from, and the scan-family label tells you which surface opens next.
               </p>
             </div>
 

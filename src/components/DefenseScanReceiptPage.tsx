@@ -8,8 +8,8 @@ import {
   Shield,
   XCircle,
 } from "lucide-react";
-import ArtifactReceiptHeader from "@/components/ArtifactReceiptHeader";
 import ArtifactStateCard from "@/components/ArtifactStateCard";
+import ScanSurfaceHeader from "@/components/ScanSurfaceHeader";
 
 type Scan = {
   id: string;
@@ -305,7 +305,7 @@ export default function DefenseScanReceiptPage({ scanId }: { scanId: string }) {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 pointer-events-auto">
       <div className="max-w-6xl mx-auto p-6 lg:p-8 space-y-6">
-        <ArtifactReceiptHeader
+        <ScanSurfaceHeader
           tone="sky"
           breadcrumbLabel="Defense Receipt"
           badgeLabel={toolBadge?.label || "AI Defense Receipt"}
@@ -313,7 +313,11 @@ export default function DefenseScanReceiptPage({ scanId }: { scanId: string }) {
           projectHref={scan.projects?.id ? `/dashboard/projects/${scan.projects.id}` : null}
           title="One upload’s AI defense result."
           description="Use this receipt to audit one defense run. Use Project Defense for the project’s latest posture and history."
-          note={`Uploaded ${formatCompactDate(scan.created_at)} from commit ${scan.commit_hash?.slice(0, 7) || "local"}.`}
+          metadata={[
+            { label: "Branch", value: scan.branch || "unknown" },
+            { label: "Commit", value: scan.commit_hash?.slice(0, 7) || "local", mono: true },
+            { label: "Uploaded", value: formatCompactDate(scan.created_at) },
+          ]}
           actions={[
             ...(scan.projects?.id
               ? [

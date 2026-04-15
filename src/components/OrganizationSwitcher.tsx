@@ -13,9 +13,11 @@ type OrganizationOption = {
 export default function OrganizationSwitcher({
   organizations,
   activeOrgId,
+  className = "",
 }: {
   organizations: OrganizationOption[];
   activeOrgId: string | null;
+  className?: string;
 }) {
   const router = useRouter();
   const [selectedOrgId, setSelectedOrgId] = useState(activeOrgId || "");
@@ -65,7 +67,7 @@ export default function OrganizationSwitcher({
 
   if (organizations.length === 1) {
     return (
-      <div className="hidden lg:flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+      <div className={`flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 ${className}`}>
         <Building2 className="h-4 w-4 text-slate-500" />
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
@@ -80,7 +82,7 @@ export default function OrganizationSwitcher({
   }
 
   return (
-    <div className="block max-w-[170px]">
+    <div className={`block ${className}`}>
       <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
         <Building2 className="h-4 w-4 text-slate-500" />
         <div className="min-w-0">
@@ -92,7 +94,7 @@ export default function OrganizationSwitcher({
               value={selectedOrgId}
               onChange={(event) => handleChange(event.target.value)}
               disabled={isPending}
-              className="max-w-[180px] truncate bg-transparent text-sm font-semibold text-slate-900 outline-none"
+              className="w-full truncate bg-transparent text-sm font-semibold text-slate-900 outline-none"
             >
               {organizations.map((organization) => (
                 <option key={organization.orgId} value={organization.orgId}>

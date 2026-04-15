@@ -10,8 +10,12 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import { FileHotspotChart, TopViolationsChart } from "@/components/AdvanceCharts";
-import MiniSparkline from "@/components/MiniSparkline";
+import {
+  FileHotspotChart,
+  ProjectCompositionChart,
+  ProjectIssueTrendChart,
+  TopViolationsChart,
+} from "@/components/AdvanceCharts";
 import { getEffectivePlan } from "@/lib/entitlements";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
 
@@ -160,23 +164,16 @@ function StatCard({
   label,
   value,
   meta,
-  sparkline,
 }: {
   label: string;
   value: React.ReactNode;
   meta: React.ReactNode;
-  sparkline?: number[];
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{value}</div>
-      <div className="mt-1.5 text-xs text-slate-500">{meta}</div>
-      {sparkline && sparkline.length >= 2 ? (
-        <div className="mt-2">
-          <MiniSparkline data={sparkline} color="#0f172a" />
-        </div>
-      ) : null}
+    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="text-[12px] font-medium tracking-[0.02em] text-slate-500">{label}</div>
+      <div className="mt-3 text-[2rem] font-semibold tracking-[-0.04em] text-slate-950">{value}</div>
+      <div className="mt-2 text-sm text-slate-500">{meta}</div>
     </div>
   );
 }
@@ -302,14 +299,6 @@ export default async function ProjectOverviewPage({
   const latestGate = gateState(latestScan);
   const previousGate = gateState(previousComparableScan);
 
-  let streakCount = 0;
-  if (latestScan) {
-    for (const scan of scans) {
-      if (gateState(scan) === latestGate) streakCount += 1;
-      else break;
-    }
-  }
-
   const latestBlockingNew = countValue(latestScan?.stats?.new_issues);
   const previousBlockingNew = countValue(previousComparableScan?.stats?.new_issues);
   const latestSuppressed = countValue(latestScan?.stats?.suppressed_new_issues);
@@ -330,8 +319,6 @@ export default async function ProjectOverviewPage({
   const newRuleLeaders = topRules(newFindings);
   const resolvedRuleLeaders = topRules(resolvedFindings);
 
-  const historyBlocking = recentScans.slice().reverse().map((scan) => countValue(scan.stats?.new_issues));
-  const historyPassRate = recentScans.slice().reverse().map((scan) => (gateState(scan) === "PASS" ? 1 : 0));
   const blockingDelta = deltaMeta(latestBlockingNew, previousBlockingNew);
   const totalDelta = deltaMeta(latestTotalFindings, previousTotalFindings);
   const BlockingDeltaIcon = blockingDelta.icon;
@@ -358,26 +345,26 @@ export default async function ProjectOverviewPage({
   }
 
   return (
-    <div className="py-8 space-y-8">
+    <div className="py-10 space-y-10">
       {/* Header row: latest scan summary + primary action */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-5">
         <div>
           <div className="flex items-center gap-2">
             <GateBadge state={latestGate} />
-            <span className="text-xs text-slate-500">
+            <span className="text-sm text-slate-500">
               {latestScan.branch || "default branch"} · {timeAgo(latestScan.created_at)}
             </span>
           </div>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-3 max-w-2xl text-base text-slate-600">
             {latestBlockingNew} blocking new issue{latestBlockingNew === 1 ? "" : "s"},{" "}
-            {latestCriticalHighBlockers} critical/high.
+            {latestCriticalHighBlockers} critical/high. Use the overview for recent movement and open the latest scan when you need line-level triage.
           </p>
         </div>
         <div className="flex items-center gap-2">
           {compareHref && canCompare ? (
             <Link
               href={compareHref}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
             >
               <GitCompareArrows className="h-3.5 w-3.5" />
               Compare
@@ -385,7 +372,7 @@ export default async function ProjectOverviewPage({
           ) : null}
           <Link
             href={`/dashboard/scans/${latestScan.id}`}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
             Review latest scan
             <ChevronRight className="h-4 w-4" />
@@ -404,7 +391,6 @@ export default async function ProjectOverviewPage({
           label="Blocking New"
           value={latestBlockingNew}
           meta={`${latestCriticalHighBlockers} critical/high unsuppressed`}
-          sparkline={historyBlocking}
         />
         <StatCard
           label="Active Suppressions"
@@ -412,11 +398,23 @@ export default async function ProjectOverviewPage({
           meta={`${latestSuppressed} suppressed in latest scan`}
         />
         <StatCard
-          label="Streak"
-          value={latestScan ? `${streakCount} ${latestGate.toLowerCase()}` : "0"}
-          meta="Consecutive scans with same gate"
-          sparkline={historyPassRate}
+          label="Total Findings"
+          value={latestTotalFindings}
+          meta={`${newFindings.length} introduced · ${resolvedFindings.length} resolved vs previous`}
         />
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Recent scan trends</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            The shape of the project matters more than a single scan. These charts show whether pressure is trending down and whether noise is being carried forward.
+          </p>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          <ProjectIssueTrendChart scans={recentScans.slice(0, 12)} />
+          <ProjectCompositionChart scans={recentScans.slice(0, 12)} />
+        </div>
       </section>
 
       {/* What changed vs previous scan */}
@@ -505,7 +503,7 @@ export default async function ProjectOverviewPage({
       {latestFindings.length > 0 ? (
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Latest scan snapshot</h2>
+            <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Latest scan snapshot</h2>
             <p className="mt-1 text-sm text-slate-500">
               Concentration of findings in the latest scan.
             </p>

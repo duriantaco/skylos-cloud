@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, CheckCircle, XCircle, FileText, ChevronRight, ChevronDown,
+  CheckCircle, XCircle, FileText, ChevronDown,
   Search, ExternalLink, AlertTriangle, Lock, Unlock, Ban, Shield, Terminal, X, ChevronUp, History,
   Share2, Link2, Check, Fingerprint, Layers,
   Download,
@@ -13,6 +13,7 @@ import {
 import FlowVisualizerButton from "@/components/FlowVisualizerButton";
 import FixPrButton from "@/components/FixPrButton";
 import ArtifactStateCard from "@/components/ArtifactStateCard";
+import ScanSurfaceHeader from "@/components/ScanSurfaceHeader";
 
 type Scan = {
   id: string;
@@ -501,10 +502,10 @@ function GatePanel({
   };
 
   return (
-    <div className={`border-b border-slate-200 bg-white transition-all ${statusColors[status]}`}>
+    <div className={`overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all ${statusColors[status]}`}>
       <button
         onClick={onToggle}
-        className="w-full px-6 py-3 flex items-center justify-between hover:bg-black/5 transition-colors"
+        className="flex w-full items-center justify-between px-6 py-4 transition-colors hover:bg-black/5"
       >
         <div className="flex items-center gap-4">
           <div className={`flex items-center gap-2 font-bold text-sm ${statusTextColors[status]}`}>
@@ -538,7 +539,7 @@ function GatePanel({
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="px-6 pb-4 border-t border-slate-200/50 pt-4 space-y-4">
+        <div className="space-y-4 border-t border-slate-200/60 px-6 pb-5 pt-5">
           <div className="rounded-lg border border-slate-200 bg-white p-4">
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Compared against</div>
             {comparisonScope === "pr-diff" ? (
@@ -1059,7 +1060,7 @@ export default function ScanDetailsPage() {
   const toolBadge = getScanFamilyBadge(scan.tool);
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50 font-sans text-slate-900 overflow-hidden">
+    <div className="min-h-screen bg-[#f7f8fa] font-sans text-slate-900">
       {/* Toast */}
       {toast && (
         <div className="fixed top-4 right-4 z-[100]">
@@ -1156,34 +1157,44 @@ export default function ScanDetailsPage() {
         </div>
       )}
 
-      {/* HEADER - Compact */}
-      <header className="h-14 shrink-0 border-b border-slate-200 bg-white px-4 flex items-center justify-between z-20">
-        <div className="flex items-center gap-3">
-          <Link
-            href={scan.projects?.id ? `/dashboard/projects/${scan.projects.id}` : "/dashboard/projects"}
-            className="p-2 -ml-2 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <span>Project overview</span>
-            <ChevronRight className="w-3 h-3 text-slate-300" />
-            <span className="font-semibold text-slate-900">{scan.projects?.name}</span>
-            <span className="text-xs text-slate-400 font-mono ml-2">{scan.commit_hash?.slice(0, 7)}</span>
-            {scan.analysis_mode && scan.analysis_mode !== "static" && (
-              <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-bold ml-2">
-                {scan.analysis_mode.toUpperCase()} MODE
-              </span>
-            )}
-            {toolBadge && (
-              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ml-2 ${toolBadge.className}`}>
-                {toolBadge.label}
-              </span>
-            )}
-          </div>
-        </div>
+      <div className="mx-auto max-w-[1680px] space-y-4 px-6 py-8">
+        <ScanSurfaceHeader
+          tone="slate"
+          breadcrumbLabel="Code Scan"
+          badgeLabel={toolBadge?.label || "Code Scan Workbench"}
+          projectName={scan.projects?.name || "Project"}
+          projectHref={scan.projects?.id ? `/dashboard/projects/${scan.projects.id}` : "/dashboard/projects"}
+          title="Triage one uploaded run."
+          description="Use this workbench to clear blockers, inspect finding evidence, and decide whether this scan should pass. Defense and provenance stay on their own receipt routes."
+          metadata={[
+            { label: "Branch", value: scan.branch || "unknown" },
+            { label: "Commit", value: scan.commit_hash?.slice(0, 7) || "local", mono: true },
+            ...(formatScanTimestamp(scan.created_at) ? [{ label: "Uploaded", value: formatScanTimestamp(scan.created_at) as string }] : []),
+            ...(scan.analysis_mode && scan.analysis_mode !== "static"
+              ? [{ label: "Mode", value: scan.analysis_mode.toUpperCase(), mono: false }]
+              : []),
+          ]}
+          actions={[
+            ...(scan.projects?.id
+              ? [
+                  { href: `/dashboard/projects/${scan.projects.id}`, label: "Project Overview", tone: "accent" as const },
+                  { href: `/dashboard/projects/${scan.project_id}/defense`, label: "Project Defense" },
+                  { href: `/dashboard/projects/${scan.project_id}/provenance`, label: "Project Provenance" },
+                ]
+              : []),
+            { href: "/dashboard/scans", label: "Scan History" },
+          ]}
+        />
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 rounded-[28px] border border-slate-200 bg-white px-5 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Work with this upload</div>
+            <p className="mt-2 text-sm text-slate-600">
+              Export or share this specific run, or override the gate if you need an explicit exception for this commit.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <button
               onClick={() => {
@@ -1273,9 +1284,8 @@ export default function ScanDetailsPage() {
             </button>
           )}
         </div>
-      </header>
+        </div>
 
-      <>
           {/* GATE PANEL - Collapsible */}
           <GatePanel
             scan={scan}
@@ -1294,8 +1304,8 @@ export default function ScanDetailsPage() {
 
           {(scan.provenance_agent_count != null && scan.provenance_agent_count > 0 && scan.provenance_summary) ||
           (scan.ai_code_detected && scan.ai_code_stats) ? (
-            <div className="mx-4 mb-2 rounded-xl border border-violet-200 bg-white px-4 py-3 shadow-sm">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="rounded-[28px] border border-violet-200 bg-white px-5 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
                     <Fingerprint className="w-4 h-4 text-violet-600" />
@@ -1306,10 +1316,9 @@ export default function ScanDetailsPage() {
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-2 text-sm text-slate-700">
-                    Keep security, quality, dead code, and secrets triage in this workbench.
-                    Open the provenance receipt only when you need the attribution evidence for why Skylos marked code as AI-authored.
-                  </p>
+                  <div className="mt-2 text-sm text-slate-600">
+                    Attribution evidence lives on the provenance receipt. Keep triage here.
+                  </div>
                   <div className="mt-2 text-xs text-violet-700">
                     {scan.provenance_confidence || scan.ai_code_stats?.confidence || "low"} confidence
                     {scan.provenance_summary?.agents_seen?.length ? ` · ${scan.provenance_summary.agents_seen.join(', ')}` : ""}
@@ -1336,12 +1345,11 @@ export default function ScanDetailsPage() {
               </div>
             </div>
           ) : null}
-      </>
 
       {/* MAIN CONTENT - Takes remaining space */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="grid min-h-[calc(100vh-29rem)] gap-4 xl:grid-cols-[390px_minmax(0,1fr)]">
         {/* LEFT: Findings list */}
-        <div className="w-[380px] flex flex-col bg-white border-r border-slate-200">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
           <div className="p-3 border-b border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-900">Findings</h2>
@@ -1473,7 +1481,7 @@ export default function ScanDetailsPage() {
         </div>
 
         {/* RIGHT: Detail pane */}
-        <div className="flex-1 overflow-y-auto bg-slate-50">
+        <div className="min-h-0 overflow-y-auto rounded-[32px] border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
           {!selectedFinding ? (
             <div className="h-full flex items-center justify-center p-8">
               <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
@@ -1825,6 +1833,7 @@ export default function ScanDetailsPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

@@ -10,7 +10,17 @@ type Action = {
   scroll?: boolean;
 };
 
+type MetadataItem = {
+  label: string;
+  value: string;
+  mono?: boolean;
+};
+
 const TONE_STYLES = {
+  slate: {
+    badge: "border-slate-200 bg-slate-100 text-slate-700",
+    accentButton: "border-slate-300 bg-slate-900 text-white hover:bg-slate-800",
+  },
   sky: {
     badge: "border-sky-200 bg-sky-50 text-sky-700",
     accentButton: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100",
@@ -21,7 +31,7 @@ const TONE_STYLES = {
   },
 } as const;
 
-export default function ArtifactReceiptHeader({
+export default function ScanSurfaceHeader({
   tone,
   breadcrumbLabel,
   badgeLabel,
@@ -29,7 +39,7 @@ export default function ArtifactReceiptHeader({
   projectHref,
   title,
   description,
-  note,
+  metadata = [],
   actions,
 }: {
   tone: keyof typeof TONE_STYLES;
@@ -39,13 +49,13 @@ export default function ArtifactReceiptHeader({
   projectHref?: string | null;
   title: string;
   description: string;
-  note?: string | null;
+  metadata?: MetadataItem[];
   actions: Action[];
 }) {
   const styles = TONE_STYLES[tone];
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
@@ -67,9 +77,24 @@ export default function ArtifactReceiptHeader({
           <div className={`mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${styles.badge}`}>
             {badgeLabel}
           </div>
-          <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">{title}</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
-          {note ? <p className="mt-3 text-xs text-slate-500">{note}</p> : null}
+          <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950">{title}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{description}</p>
+
+          {metadata.length > 0 ? (
+            <div className="mt-5 flex flex-wrap gap-2">
+              {metadata.map((item) => (
+                <div
+                  key={`${item.label}:${item.value}`}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600"
+                >
+                  <span className="font-medium text-slate-500">{item.label}</span>
+                  <span className={`ml-2 ${item.mono ? "font-mono text-slate-800" : "font-semibold text-slate-800"}`}>
+                    {item.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -78,7 +103,7 @@ export default function ArtifactReceiptHeader({
               key={`${action.href}:${action.label}`}
               href={action.href}
               scroll={action.scroll}
-              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+              className={`inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition ${
                 action.tone === "accent"
                   ? styles.accentButton
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
