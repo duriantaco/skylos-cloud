@@ -85,7 +85,7 @@ export default async function DashboardLayout({
               <NavLink href="/dashboard/projects" icon={FolderOpen}>Projects</NavLink>
               <NavLink href="/dashboard/scans" icon={History}>Scans</NavLink>
               <NavLink href="/dashboard/issues" icon={Layers}>Issues</NavLink>
-              <NavLink href="/dashboard/trends" icon={History}>History</NavLink>
+              <NavLink href="/dashboard/trends" icon={History}>Trends</NavLink>
             </div>
           </div>
 
