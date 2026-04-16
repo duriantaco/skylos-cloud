@@ -5,6 +5,13 @@ import { estimateReadingTime } from '@/lib/toc'
 import { getAuthorMeta, getMethodology, getUpdatedAt, getWhyThisExists } from '@/lib/content-meta'
 
 export type ContentCollection = 'blog' | 'compare' | 'use-cases'
+export type BlogArticleType = 'Guide' | 'Benchmark' | 'Case Study' | 'Comparison' | 'Research'
+export type BlogTopic =
+  | 'AI Code Security'
+  | 'Dead Code Detection'
+  | 'Python Static Analysis'
+  | 'Developer Workflow'
+  | 'CI Hardening'
 
 export type FAQItem = {
   question: string
@@ -35,6 +42,10 @@ export type ContentEntry = {
   faq: FAQItem[]
   howToSteps: HowToStep[]
   comparedItems: string[]
+  articleType?: BlogArticleType
+  topic?: BlogTopic
+  frameworks: string[]
+  featuredReason?: string
   readingTime: number
   content: string
 }
@@ -65,6 +76,10 @@ function asStringArray(value: unknown): string[] {
   }
 
   return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+}
+
+function asOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
 }
 
 function asFaqItems(value: unknown): FAQItem[] {
@@ -152,6 +167,10 @@ function toContentEntry(
     faq: asFaqItems(frontmatter.faq),
     howToSteps: asHowToSteps(frontmatter.howToSteps),
     comparedItems: asStringArray(frontmatter.comparedItems),
+    articleType: asOptionalString(frontmatter.articleType) as BlogArticleType | undefined,
+    topic: asOptionalString(frontmatter.topic) as BlogTopic | undefined,
+    frameworks: asStringArray(frontmatter.frameworks),
+    featuredReason: asOptionalString(frontmatter.featuredReason),
     readingTime: estimateReadingTime(content),
     content,
   }

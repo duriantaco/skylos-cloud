@@ -1,0 +1,363 @@
+---
+title: "Flask Security Scanning: What Static Analysis Actually Catches in 2026"
+excerpt: "Flask gives you flexibility, but that flexibility means more security decisions land in your own code. Here are 7 real Flask vulnerability patterns static analysis can catch — from SQL injection and SSTI to path traversal and unsafe subprocess calls."
+publishedAt: "2026-04-16"
+updatedAt: "2026-04-16"
+author:
+  name: "Skylos team"
+  role: "Product engineering"
+  type: "Organization"
+whyThisExists: "Flask is still one of the most common Python web frameworks in production, but most guidance treats it as either too simple to scan or too dynamic to analyze well. This guide documents real Flask vulnerability patterns with examples so teams can judge scanner coverage on realistic code."
+articleType: "Guide"
+topic: "Python Static Analysis"
+featuredReason: "This completes the Django / FastAPI / Flask framework cluster and gives Python teams a cleaner way to evaluate scanner coverage by framework."
+frameworks: ["Flask"]
+methodology:
+  - "Mapped common Flask security failures to concrete patterns that show up in request handlers, utility functions, template rendering, and file-handling code."
+  - "Compared what generic Python linters usually flag against what framework-aware static analysis can surface when Flask-specific entry points are involved."
+  - "Kept the examples small enough to reproduce locally so teams can test multiple scanners on the same snippets."
+tags: ["security", "flask", "sast", "python"]
+keywords:
+  - flask security scanning
+  - flask static analysis
+  - flask vulnerability scanner
+  - flask SAST
+  - flask security best practices 2026
+  - flask SQL injection detection
+  - flask SSTI detection
+  - flask path traversal
+  - flask security audit
+  - secure flask application
+  - flask code review security
+  - python flask security scanner
+canonicalUrl: "/blog/flask-security-scanning-what-static-analysis-catches"
+keyTakeaways:
+  - "Flask security issues rarely come from Flask itself. They come from the raw Python and library calls Flask apps make around requests, templates, files, and subprocesses."
+  - "Static analysis is strong on direct dangerous sinks like SQL injection, shell injection, hardcoded secrets, and unsafe template rendering, but coverage depends on whether the tool understands Flask request sources."
+  - "Framework-aware analysis matters because Flask apps rely heavily on decorators, globals like `request`, and helper patterns that generic scanners often treat as plain Python."
+faq:
+  - question: "Can static analysis catch security issues in Flask applications?"
+    answer: "Yes. Static analysis is useful for common Flask risk patterns such as raw SQL execution, unsafe subprocess calls, template injection, path traversal, hardcoded secrets, and some SSRF flows. The exact coverage depends on how framework-aware the scanner is."
+  - question: "Does Flask prevent SQL injection by default?"
+    answer: "No. Flask is intentionally minimal. SQL injection prevention depends on the database layer and whether you use parameterized queries instead of string interpolation or unsafe raw SQL execution."
+  - question: "Is Flask harder to scan than Django?"
+    answer: "Usually yes. Django ships more built-in conventions and guardrails. Flask gives you more freedom, which means the dangerous code often lives in your own handlers, helpers, and glue code instead of one obvious framework abstraction."
+howToSteps:
+  - name: "Scan locally first"
+    text: "Run a static scan on your Flask repo before changing CI so you can see whether the findings are high-signal on your own code patterns."
+  - name: "Review the request and helper flows"
+    text: "Pay special attention to file uploads, URL fetches, subprocesses, raw SQL, and template rendering. Those are the highest-leverage Flask review zones."
+  - name: "Gate pull requests"
+    text: "Once the signal looks right, add the scanner to GitHub Actions so Flask security regressions fail during review instead of after merge."
+---
+
+# Flask security scanning: what static analysis actually catches
+
+Flask is simple on purpose. It gives you routing, request handling, templates, and just enough glue to build almost anything.
+
+That flexibility is also the security problem.
+
+Unlike Django, Flask does not wrap most dangerous operations in opinionated framework abstractions. Your app code decides how SQL is executed, how files are served, how templates are rendered, how subprocesses are invoked, and how external URLs are fetched.
+
+That means Flask security scanning is mostly about catching dangerous **Python patterns inside Flask request flows**, not auditing Flask itself.
+
+Here are 7 Flask vulnerability patterns static analysis can catch, where generic tools usually stop, and what to test on your own codebase.
+
+## TL;DR
+
+| Vulnerability pattern | Bandit | Semgrep | Skylos |
+|:---|:---|:---|:---|
+| Raw SQL with string interpolation | Partial | Yes | Yes |
+| Server-side template injection (`render_template_string`) | Partial | Partial | Yes |
+| Path traversal in file download helpers | No | Partial | Yes |
+| Unsafe subprocess or shell execution | Yes | Yes | Yes |
+| SSRF from user-controlled URLs | No | Partial | Yes |
+| Hardcoded secrets or insecure config | Yes | Yes | Yes |
+| Unsafe file upload handling | Partial | Partial | Yes |
+
+Coverage depends on rules and exact APIs. The table reflects typical out-of-the-box behavior on Flask-style code rather than every custom rule pack.
+
+---
+
+## Pattern 1: SQL injection in raw SQL and ad-hoc query helpers
+
+Flask does not give you an ORM by default. Many apps use SQLAlchemy, psycopg, sqlite3, or internal helpers directly from request handlers.
+
+```python
+# VULNERABLE: user input interpolated into raw SQL
+from flask import Flask, request
+import sqlite3
+
+app = Flask(__name__)
+
+@app.get("/users")
+def get_user():
+    email = request.args["email"]
+    conn = sqlite3.connect("app.db")
+    row = conn.execute(
+        f"SELECT id, email FROM users WHERE email = '{email}'"
+    ).fetchone()
+    return {"row": row}
+```
+
+This is the classic Flask failure mode: request data goes straight into a query string.
+
+```python
+# SAFE: parameterized query
+row = conn.execute(
+    "SELECT id, email FROM users WHERE email = ?",
+    (email,),
+).fetchone()
+```
+
+**Bandit** can catch some SQL string formatting patterns, but it does not understand every database wrapper.
+
+**Semgrep** is stronger when the query call matches a rule it knows, especially for common SQLAlchemy and Python DB APIs.
+
+**Skylos** traces taint from Flask request sources such as `request.args`, `request.form`, and `request.json` through to raw query execution and flags the dataflow.
+
+---
+
+## Pattern 2: Server-side template injection through `render_template_string`
+
+Flask makes it easy to render templates dynamically, which is exactly why teams accidentally hand user input to Jinja at runtime.
+
+```python
+# VULNERABLE: user-controlled template string
+from flask import Flask, request, render_template_string
+
+app = Flask(__name__)
+
+@app.post("/preview")
+def preview_template():
+    body = request.form["body"]
+    return render_template_string(body)
+```
+
+If the user controls the template string, they control Jinja evaluation. That turns a harmless preview feature into a template injection surface.
+
+Even “lightly sanitized” versions are risky:
+
+```python
+template = "<div>" + request.form["body"] + "</div>"
+return render_template_string(template)
+```
+
+The dangerous sink is still `render_template_string`.
+
+**Bandit** may catch some template injection patterns, but coverage is not very Flask-specific.
+
+**Semgrep** can catch direct `render_template_string` misuse if the dataflow is short and the ruleset includes SSTI patterns.
+
+**Skylos** models Flask request data flowing into template rendering helpers and treats dynamic template execution as a high-risk sink.
+
+---
+
+## Pattern 3: Path traversal in download and export endpoints
+
+Flask apps often expose file downloads, exports, backups, invoices, and report generation endpoints. The risky version looks deceptively clean:
+
+```python
+# VULNERABLE: path traversal
+from flask import Flask, request, send_file
+import os
+
+app = Flask(__name__)
+
+@app.get("/download")
+def download():
+    name = request.args["name"]
+    return send_file(os.path.join("/srv/reports", name))
+```
+
+If `name` is `../../etc/passwd`, the joined path escapes the expected directory.
+
+The Flask-friendly safe version is to validate against an allowlist or use helpers that enforce a base directory boundary.
+
+**Bandit** usually will not flag this.
+
+**Semgrep** sometimes catches traversal when the path building is obvious, but framework-specific handler context is uneven.
+
+**Skylos** treats request-to-filesystem flows as a risk category and flags user-controlled paths reaching file-serving sinks.
+
+---
+
+## Pattern 4: Unsafe subprocess and shell usage in admin endpoints
+
+Flask apps often grow operational endpoints for image processing, git sync, PDF conversion, cache warming, or debugging. That is where shell injection appears.
+
+```python
+# VULNERABLE: shell injection from a Flask form field
+from flask import Flask, request
+import subprocess
+
+app = Flask(__name__)
+
+@app.post("/admin/reindex")
+def reindex():
+    target = request.form["target"]
+    subprocess.run(f"python tools/reindex.py {target}", shell=True)
+    return {"ok": True}
+```
+
+This is one of the easiest classes for static analysis to catch.
+
+**Bandit** is good at direct dangerous subprocess usage like `shell=True`.
+
+**Semgrep** is good at this too when the API usage is explicit.
+
+**Skylos** catches the sink and additionally preserves the Flask request source context so the issue explains why it is exploitable.
+
+If your Flask app has maintenance routes, cron-trigger endpoints, or internal admin actions, scan these paths aggressively.
+
+---
+
+## Pattern 5: SSRF in webhook testers and URL-fetch endpoints
+
+Flask apps frequently fetch external resources: webhook verifiers, URL preview tools, avatar downloads, screenshot jobs, and metadata scrapers.
+
+```python
+# VULNERABLE: user-controlled URL fetched server-side
+from flask import Flask, request
+import requests
+
+app = Flask(__name__)
+
+@app.post("/webhook/test")
+def test_webhook():
+    url = request.form["url"]
+    response = requests.get(url, timeout=5)
+    return {"status": response.status_code}
+```
+
+This is SSRF if the caller can point the server at internal services, cloud metadata endpoints, or localhost-only admin ports.
+
+**Bandit** generally does not catch SSRF flows.
+
+**Semgrep** may catch some obvious source-to-HTTP-client patterns, but coverage depends heavily on the library and rule pack.
+
+**Skylos** is stronger here because it follows user-controlled request data into outbound HTTP sinks across common Python clients.
+
+This is one of the highest-value categories for Flask scanning because the endpoints often look like harmless utilities during review.
+
+---
+
+## Pattern 6: Hardcoded secrets and insecure config defaults
+
+Flask apps often centralize secrets and debug behavior in simple config modules. That makes secrets scanning and config scanning useful even on smaller codebases.
+
+```python
+# VULNERABLE: hardcoded secret and insecure debug config
+SECRET_KEY = "dev-secret-change-me"
+DEBUG = True
+SQLALCHEMY_DATABASE_URI = "postgresql://admin:password@db.internal/app"
+```
+
+Hardcoded credentials, debug mode defaults, and insecure cookie/session settings are straightforward static wins.
+
+**Bandit** catches a meaningful slice of hardcoded secret patterns.
+
+**Semgrep** catches many secret and weak-config patterns depending on the ruleset.
+
+**Skylos** covers the obvious secret/config issues and can surface them in the same scan as your request-flow findings, which matters when Flask security problems span config plus code.
+
+---
+
+## Pattern 7: Unsafe file upload handling
+
+File upload handlers look harmless until user-controlled file names or content handling crosses into the filesystem.
+
+```python
+# VULNERABLE: user-controlled filename written directly
+from flask import Flask, request
+import os
+
+app = Flask(__name__)
+
+UPLOAD_DIR = "/srv/uploads"
+
+@app.post("/upload")
+def upload():
+    file = request.files["file"]
+    file.save(os.path.join(UPLOAD_DIR, file.filename))
+    return {"ok": True}
+```
+
+Problems here:
+
+- `file.filename` can carry traversal payloads
+- file type validation is usually missing
+- apps often save executable or user-accessible files in predictable locations
+
+The safer version sanitizes the name, validates type/content, and keeps uploads outside any executable or public path until processing is complete.
+
+**Bandit** has uneven coverage here.
+
+**Semgrep** may catch parts of the flow, especially if the sink is direct.
+
+**Skylos** treats request/file-upload flows as security-sensitive and can flag untrusted filenames reaching filesystem sinks.
+
+---
+
+## What Flask makes harder for scanners
+
+Flask itself is not the problem. The challenge is that Flask apps push a lot of security-critical behavior into:
+
+- thin route handlers
+- helper modules
+- decorators
+- blueprint-local utilities
+- ad-hoc CLI and admin endpoints
+
+That means a useful Flask scanner needs to do more than pattern-match dangerous functions. It needs to understand that `request.args`, `request.form`, `request.files`, and JSON bodies are real untrusted sources inside a request flow.
+
+This is also why Flask apps often feel noisier to generic tools than Django apps. Django centralizes more behavior in ORM, forms, middleware, and framework conventions. Flask leaves more of the dangerous decisions to app code.
+
+---
+
+## How to test Flask security scanning on your own repo
+
+Start with a local scan:
+
+```bash
+pip install skylos
+skylos . --danger
+```
+
+Then wire it into pull requests:
+
+```bash
+skylos cicd init
+```
+
+The highest-value Flask review zones are:
+
+1. request handlers that touch SQL, subprocesses, files, or outbound HTTP
+2. any use of `render_template_string`
+3. upload and download routes
+4. config files with secrets, debug flags, or session settings
+5. internal admin endpoints that were never designed with hostile input in mind
+
+---
+
+## Bottom line
+
+Flask security scanning works best when the scanner follows **request data into dangerous sinks**, not when it treats a Flask app as generic Python code.
+
+If you only scan for broad lint issues, you will miss the highest-leverage Flask risks:
+
+- raw SQL built from request parameters
+- `render_template_string` with untrusted input
+- path traversal in file routes
+- shell injection in operational endpoints
+- SSRF in utility fetchers
+- unsafe upload handling
+
+That is the real value of framework-aware static analysis on Flask: the framework is small, but the app-level security surface is large.
+
+## Related
+
+- [Django Security Scanning: What Static Analysis Actually Catches in 2026](/blog/django-security-scanning-what-static-analysis-catches)
+- [FastAPI Security Scanning: 8 Vulnerability Patterns Static Analysis Catches](/blog/fastapi-security-scanning-vulnerabilities-static-analysis)
+- [Finding Dead Code in Flask (69k Stars): Skylos vs Vulture Benchmark](/blog/flask-dead-code-case-study)
+- [How to Secure GitHub Actions for Python Repos](/use-cases/secure-github-actions-python)

@@ -8,6 +8,10 @@ author:
   role: "Benchmarking and product engineering"
   type: "Organization"
 whyThisExists: "This benchmark shows how framework-heavy Python code changes dead-code accuracy, using Flask because it stresses the exact decorator and fixture patterns that often create false positives."
+articleType: "Benchmark"
+topic: "Dead Code Detection"
+featuredReason: "This benchmark shows what framework awareness changes on a real Flask codebase instead of a toy example."
+frameworks: ["Flask"]
 methodology:
   - "Cloned the Flask repository and ran both Skylos and Vulture at confidence level 20."
   - "Manually reviewed flagged symbols against the source tree to separate genuinely dead code from framework-driven false positives."
