@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Calendar, Clock, RefreshCw, Rss, Search, Sparkles } from 'lucide-react';
+import type { BlogArticleType, BlogTopic } from '@/lib/content';
 import { BLOG_ARTICLE_TYPES, BLOG_TOPICS, formatBlogDiscoveryLabel } from '@/lib/blog';
 
 interface Post {
@@ -16,8 +17,8 @@ interface Post {
   keywords: string[];
   keyTakeaways: string[];
   readingTime: number;
-  articleType?: string;
-  topic?: string;
+  articleType?: BlogArticleType;
+  topic?: BlogTopic;
   frameworks: string[];
   featuredReason?: string;
 }
@@ -26,7 +27,15 @@ interface BlogListProps {
   posts: Post[];
 }
 
-const discoveryPaths = [
+type DiscoveryPath = {
+  id: string;
+  title: string;
+  description: string;
+  topic?: string;
+  format?: string;
+};
+
+const discoveryPaths: DiscoveryPath[] = [
   {
     id: 'python-static-analysis',
     title: 'Python SAST',

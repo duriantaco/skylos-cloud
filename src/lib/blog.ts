@@ -102,7 +102,7 @@ export function getRelatedBlogPosts(currentPost: ContentEntry, entries: ContentE
     .map(({ entry }) => entry)
 }
 
-export function formatBlogDiscoveryLabel(post: ContentEntry) {
+export function formatBlogDiscoveryLabel(post: Pick<ContentEntry, 'articleType' | 'topic'>) {
   if (post.articleType && post.topic) {
     return `${post.articleType} • ${post.topic}`
   }
