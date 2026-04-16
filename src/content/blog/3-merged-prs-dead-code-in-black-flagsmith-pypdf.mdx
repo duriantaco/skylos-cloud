@@ -8,6 +8,10 @@ author:
   role: "Product engineering"
   type: "Organization"
 whyThisExists: "We wanted to test Skylos findings against real maintainer review. Submitting PRs to well-maintained projects is the hardest validation you can do — if the maintainers merge it, the findings were real. This post documents what happened."
+articleType: "Case Study"
+topic: "Dead Code Detection"
+featuredReason: "Proof beats theory. This is the strongest evidence that the dead-code signal survives real maintainer review."
+frameworks: []
 methodology:
   - "Ran `skylos . -a` and `skylos agent verify` on each repository."
   - "Submitted PRs only for findings we were confident about — not everything the tool flagged."

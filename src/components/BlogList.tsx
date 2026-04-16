@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Calendar, Clock, RefreshCw, Search, User } from 'lucide-react';
+import { ArrowRight, Calendar, Clock, RefreshCw, Rss, Search, Sparkles } from 'lucide-react';
+import type { BlogArticleType, BlogTopic } from '@/lib/content';
+import { BLOG_ARTICLE_TYPES, BLOG_TOPICS, formatBlogDiscoveryLabel } from '@/lib/blog';
 
 interface Post {
   slug: string;
@@ -12,293 +14,477 @@ interface Post {
   updatedAt?: string;
   authorName: string;
   tags: string[];
+  keywords: string[];
+  keyTakeaways: string[];
   readingTime: number;
+  articleType?: BlogArticleType;
+  topic?: BlogTopic;
+  frameworks: string[];
+  featuredReason?: string;
 }
 
 interface BlogListProps {
   posts: Post[];
 }
 
-const tagColors: Record<string, string> = {
-  security: 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200',
-  sast: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
-  appsec: 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200',
-  devtools: 'bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200',
-  python: 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200',
-  'code quality': 'bg-indigo-100 text-indigo-700 border-indigo-200 hover:bg-indigo-200',
-  'dead code': 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200',
-  default: 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200',
+type DiscoveryPath = {
+  id: string;
+  title: string;
+  description: string;
+  topic?: string;
+  format?: string;
 };
+
+const discoveryPaths: DiscoveryPath[] = [
+  {
+    id: 'python-static-analysis',
+    title: 'Python SAST',
+    description: 'Comparison pages, scanner tradeoffs, and framework-specific coverage guides.',
+    topic: 'Python Static Analysis',
+  },
+  {
+    id: 'ai-code-security',
+    title: 'AI Code Security',
+    description: 'Hallucinated imports, AI PR review, provenance, and regression detection.',
+    topic: 'AI Code Security',
+  },
+  {
+    id: 'framework-guides',
+    title: 'Framework Guides',
+    description: 'Django, FastAPI, Flask, and Python app patterns that change scanner signal.',
+    format: 'Guide',
+  },
+  {
+    id: 'benchmarks',
+    title: 'Benchmarks',
+    description: 'Real repo scans, tool comparisons, merged PRs, and benchmark-style evidence.',
+    format: 'Benchmark',
+  },
+] as const;
+
+function formatDate(date: string, short = false) {
+  return new Date(date).toLocaleDateString('en-US', {
+    month: short ? 'short' : 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 export default function BlogList({ posts }: BlogListProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
+  const [selectedFramework, setSelectedFramework] = useState<string | null>(null);
 
-  // Get all unique tags
-  const allTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    posts.forEach(post => {
-      post.tags.forEach(tag => tagSet.add(tag));
+  const allFrameworks = useMemo(() => {
+    const set = new Set<string>();
+    posts.forEach((post) => {
+      post.frameworks.forEach((framework) => set.add(framework));
     });
-    return Array.from(tagSet).sort();
+    return Array.from(set).sort();
   }, [posts]);
 
-  // Filter posts
   const filteredPosts = useMemo(() => {
-    return posts.filter(post => {
-      const matchesSearch = searchQuery === '' ||
-        post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        post.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
+    const query = searchQuery.trim().toLowerCase();
 
-      const matchesTag = selectedTag === null || post.tags.includes(selectedTag);
+    return posts.filter((post) => {
+      const searchable = [
+        post.title,
+        post.excerpt,
+        post.authorName,
+        post.articleType ?? '',
+        post.topic ?? '',
+        ...post.tags,
+        ...post.keywords,
+        ...post.frameworks,
+        ...post.keyTakeaways,
+      ]
+        .join(' ')
+        .toLowerCase();
 
-      return matchesSearch && matchesTag;
+      const matchesQuery = query.length === 0 || searchable.includes(query);
+      const matchesTopic = selectedTopic === null || post.topic === selectedTopic;
+      const matchesFormat =
+        selectedFormat === null ||
+        (selectedFormat === 'Benchmark'
+          ? post.articleType === 'Benchmark' || post.articleType === 'Case Study'
+          : post.articleType === selectedFormat);
+      const matchesFramework =
+        selectedFramework === null || post.frameworks.includes(selectedFramework);
+
+      return matchesQuery && matchesTopic && matchesFormat && matchesFramework;
     });
-  }, [posts, searchQuery, selectedTag]);
+  }, [posts, searchQuery, selectedTopic, selectedFormat, selectedFramework]);
 
   const featuredPost = filteredPosts[0];
   const regularPosts = filteredPosts.slice(1);
 
+  const activeFilterCount = [selectedTopic, selectedFormat, selectedFramework].filter(Boolean).length + (searchQuery.trim() ? 1 : 0);
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSelectedTopic(null);
+    setSelectedFormat(null);
+    setSelectedFramework(null);
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12">
-      {/* Search and Filter Section */}
-      <div className="mb-10 space-y-6">
-        {/* Search Bar */}
-        <div className="relative max-w-2xl mx-auto">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search articles..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition"
-          />
+    <div className="max-w-7xl mx-auto px-6 pb-16">
+      <section className="-mt-8 rounded-[2rem] border border-slate-200 bg-white/90 p-6 shadow-[0_32px_100px_-70px_rgba(15,23,42,0.45)] backdrop-blur-xl md:p-8">
+        <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Start here</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+              Explore the blog by job, not just by publish date
+            </h2>
+            <p className="mt-3 max-w-3xl text-base leading-relaxed text-slate-600">
+              Use these paths when you already know what you need: compare scanners, review AI-generated code, understand framework-specific signal, or dig into proof-heavy benchmarks.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <Link
+              href="/compare"
+              className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 transition hover:border-slate-300 hover:bg-white"
+            >
+              <div className="text-sm font-semibold text-slate-900">Compare pages</div>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">Go straight to vendor and tool comparisons.</p>
+            </Link>
+            <Link
+              href="/blog/feed.xml"
+              className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 transition hover:border-slate-300 hover:bg-white"
+            >
+              <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <Rss className="h-4 w-4" />
+                RSS feed
+              </div>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">Follow new research and framework guides in your reader.</p>
+            </Link>
+          </div>
         </div>
 
-        {/* Tag Filter */}
-        {allTags.length > 0 && (
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <button
-              onClick={() => setSelectedTag(null)}
-              className={`px-4 py-2 text-sm font-semibold rounded-full border transition ${
-                selectedTag === null
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              All posts
-            </button>
-            {allTags.map(tag => (
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {discoveryPaths.map((path) => {
+            const count = posts.filter((post) => {
+              if (path.topic) return post.topic === path.topic;
+              if (path.format === 'Benchmark') return post.articleType === 'Benchmark' || post.articleType === 'Case Study';
+              return post.articleType === path.format;
+            }).length;
+
+            return (
               <button
-                key={tag}
-                onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
-                className={`px-4 py-2 text-sm font-semibold rounded-full border transition ${
-                  selectedTag === tag
-                    ? tagColors[tag.toLowerCase()] || tagColors.default
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                key={path.id}
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedFramework(null);
+                  setSelectedTopic(path.topic ?? null);
+                  setSelectedFormat(path.format ?? null);
+                }}
+                className="group rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5 text-left transition hover:border-slate-300 hover:bg-white"
+              >
+                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {count} articles
+                </div>
+                <h3 className="mt-4 text-lg font-bold tracking-tight text-slate-900">{path.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{path.description}</p>
+                <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 transition group-hover:gap-3">
+                  Open this path
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mt-10 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_28px_90px_-70px_rgba(15,23,42,0.4)] md:p-7">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by topic, framework, tool, or vulnerability pattern..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="w-full rounded-[1.25rem] border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-start gap-3 lg:justify-end">
+            <span className="text-sm text-slate-500">
+              {filteredPosts.length === posts.length
+                ? `${posts.length} articles`
+                : `${filteredPosts.length} of ${posts.length} articles`}
+            </span>
+            {activeFilterCount > 0 ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+              >
+                Clear filters
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="mt-6 space-y-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Topic</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedTopic(null)}
+                className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                  selectedTopic === null ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
                 }`}
               >
-                {tag}
+                All topics
               </button>
-            ))}
+              {BLOG_TOPICS.filter((topic) => posts.some((post) => post.topic === topic)).map((topic) => (
+                <button
+                  key={topic}
+                  type="button"
+                  onClick={() => setSelectedTopic(topic === selectedTopic ? null : topic)}
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    selectedTopic === topic ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                  }`}
+                >
+                  {topic}
+                </button>
+              ))}
+            </div>
           </div>
-        )}
 
-        {/* Results count */}
-        <p className="text-center text-sm text-slate-500">
-          {filteredPosts.length === posts.length
-            ? `${posts.length} ${posts.length === 1 ? 'article' : 'articles'}`
-            : `${filteredPosts.length} of ${posts.length} articles`}
-        </p>
-      </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Format</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedFormat(null)}
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    selectedFormat === null ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                  }`}
+                >
+                  All formats
+                </button>
+                {BLOG_ARTICLE_TYPES.filter((format) => posts.some((post) => post.articleType === format)).map((format) => (
+                  <button
+                    key={format}
+                    type="button"
+                    onClick={() => setSelectedFormat(format === selectedFormat ? null : format)}
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                      selectedFormat === format ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                    }`}
+                  >
+                    {format}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Framework</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedFramework(null)}
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    selectedFramework === null ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                  }`}
+                >
+                  All frameworks
+                </button>
+                {allFrameworks.map((framework) => (
+                  <button
+                    key={framework}
+                    type="button"
+                    onClick={() => setSelectedFramework(framework === selectedFramework ? null : framework)}
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                      selectedFramework === framework ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                    }`}
+                  >
+                    {framework}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {filteredPosts.length === 0 ? (
-        <div className="bg-white border border-slate-200 border-dashed rounded-xl p-12 text-center">
-          <p className="text-slate-500 mb-2">No articles found</p>
+        <div className="mt-10 rounded-[2rem] border border-dashed border-slate-300 bg-white p-12 text-center">
+          <p className="text-lg font-semibold text-slate-900">No articles match this filter set.</p>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            Clear the filters or switch to another topic path to keep exploring the library.
+          </p>
           <button
-            onClick={() => {
-              setSearchQuery('');
-              setSelectedTag(null);
-            }}
-            className="text-sm text-slate-700 font-medium hover:text-slate-900"
+            type="button"
+            onClick={clearFilters}
+            className="mt-5 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
-            Clear filters
+            Reset discovery
           </button>
         </div>
       ) : (
-        <div className="space-y-10">
-          {/* Featured Post */}
-          {featuredPost && (
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">
-                Latest Article
-              </h2>
+        <div className="mt-10 space-y-10">
+          {featuredPost ? (
+            <section>
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                    {activeFilterCount > 0 ? 'Top match' : 'Featured article'}
+                  </p>
+                  <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+                    {activeFilterCount > 0 ? 'Best fit for your current filters' : 'Start with this article'}
+                  </h2>
+                </div>
+              </div>
+
               <Link
                 href={`/blog/${featuredPost.slug}`}
-                className="group block bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-slate-300 hover:shadow-xl transition-all"
+                className="group block rounded-[2rem] border border-slate-200 bg-white p-7 shadow-[0_32px_100px_-70px_rgba(15,23,42,0.45)] transition hover:border-slate-300 hover:shadow-[0_40px_110px_-70px_rgba(15,23,42,0.48)] md:p-8"
               >
-                <div className="p-8 md:p-10">
-                  {/* Tags */}
-                  {featuredPost.tags.length > 0 && (
-                    <div className="flex gap-2 mb-4">
-                      {featuredPost.tags.map(tag => (
-                        <span
-                          key={tag}
-                          className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
-                            tagColors[tag.toLowerCase()] || tagColors.default
-                          }`}
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">
+                    {formatBlogDiscoveryLabel(featuredPost)}
+                  </span>
+                  {featuredPost.frameworks.map((framework) => (
+                    <span
+                      key={framework}
+                      className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-sky-700"
+                    >
+                      {framework}
+                    </span>
+                  ))}
+                </div>
 
-                  {/* Title */}
-                  <h3 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4 group-hover:text-slate-700 transition">
-                    {featuredPost.title}
-                  </h3>
+                <h3 className="mt-5 text-3xl font-bold tracking-tight text-slate-900 transition group-hover:text-slate-700 md:text-4xl">
+                  {featuredPost.title}
+                </h3>
 
-                  {/* Excerpt */}
-                  <p className="text-lg text-slate-600 mb-6 leading-relaxed line-clamp-3">
-                    {featuredPost.excerpt}
+                <p className="mt-4 text-lg leading-relaxed text-slate-600">{featuredPost.excerpt}</p>
+
+                <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                    Why this is worth your time
                   </p>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-700">
+                    {activeFilterCount > 0
+                      ? 'This article is the best match for your current filters and search context.'
+                      : featuredPost.featuredReason ?? featuredPost.keyTakeaways[0] ?? featuredPost.excerpt}
+                  </p>
+                </div>
 
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mb-6">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      <span>{featuredPost.authorName}</span>
-                    </div>
+                {featuredPost.keyTakeaways.length > 0 ? (
+                  <div className="mt-6 grid gap-3 md:grid-cols-3">
+                    {featuredPost.keyTakeaways.slice(0, 3).map((takeaway) => (
+                      <div key={takeaway} className="rounded-[1.3rem] border border-slate-200 bg-white px-4 py-4">
+                        <p className="text-sm leading-relaxed text-slate-700">{takeaway}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-5">
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
+                    <span className="inline-flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      {formatDate(featuredPost.publishedAt)}
+                    </span>
                     {featuredPost.updatedAt && featuredPost.updatedAt !== featuredPost.publishedAt ? (
-                      <div className="flex items-center gap-2">
-                        <RefreshCw className="w-4 h-4" />
-                        <span>
-                          Updated {new Date(featuredPost.updatedAt).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </div>
+                      <span className="inline-flex items-center gap-2">
+                        <RefreshCw className="h-4 w-4" />
+                        Updated {formatDate(featuredPost.updatedAt)}
+                      </span>
                     ) : null}
+                    <span className="inline-flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      {featuredPost.readingTime} min read
+                    </span>
                   </div>
 
-                  {/* Meta */}
-                  <div className="flex items-center justify-between pt-6 border-t border-slate-100">
-                    <div className="flex items-center gap-5 text-sm text-slate-500">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        <time>
-                          {new Date(featuredPost.publishedAt).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </time>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        <span>{featuredPost.readingTime} min read</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-base font-semibold text-slate-900 group-hover:gap-3 transition-all">
-                      Read article
-                      <ArrowRight className="w-5 h-5" />
-                    </div>
-                  </div>
+                  <span className="inline-flex items-center gap-2 text-base font-semibold text-slate-900 transition group-hover:gap-3">
+                    Read article
+                    <ArrowRight className="h-5 w-5" />
+                  </span>
                 </div>
               </Link>
-            </div>
-          )}
+            </section>
+          ) : null}
 
-          {/* Regular Posts Grid */}
-          {regularPosts.length > 0 && (
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">
-                More Articles
-              </h2>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {regularPosts.map(post => (
+          {regularPosts.length > 0 ? (
+            <section>
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Library</p>
+                  <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Keep exploring</h2>
+                </div>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {regularPosts.map((post) => (
                   <Link
                     key={post.slug}
                     href={`/blog/${post.slug}`}
-                    className="group bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-slate-300 hover:shadow-lg transition-all"
+                    className="group rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_24px_80px_-65px_rgba(15,23,42,0.38)] transition hover:border-slate-300 hover:shadow-[0_32px_100px_-65px_rgba(15,23,42,0.42)]"
                   >
-                    <div className="p-6">
-                      {/* Tags */}
-                      {post.tags.length > 0 && (
-                        <div className="flex gap-2 mb-3 flex-wrap">
-                          {post.tags.slice(0, 2).map(tag => (
-                            <span
-                              key={tag}
-                              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                                tagColors[tag.toLowerCase()] || tagColors.default
-                              }`}
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">
+                        {formatBlogDiscoveryLabel(post)}
+                      </span>
+                      {post.frameworks.slice(0, 1).map((framework) => (
+                        <span
+                          key={framework}
+                          className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-sky-700"
+                        >
+                          {framework}
+                        </span>
+                      ))}
+                    </div>
 
-                      {/* Title */}
-                      <h3 className="text-xl font-bold text-slate-900 mb-3 group-hover:text-slate-700 transition line-clamp-2">
-                        {post.title}
-                      </h3>
+                    <h3 className="mt-4 text-xl font-bold tracking-tight text-slate-900 transition group-hover:text-slate-700">
+                      {post.title}
+                    </h3>
 
-                      {/* Excerpt */}
-                      <p className="text-slate-600 mb-4 line-clamp-3 leading-relaxed text-sm">
-                        {post.excerpt}
+                    <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                      {post.keyTakeaways[0] ?? post.excerpt}
+                    </p>
+
+                    <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                        What you&apos;ll get
                       </p>
+                      <p className="mt-2 text-sm leading-relaxed text-slate-700">
+                        {post.featuredReason ?? post.excerpt}
+                      </p>
+                    </div>
 
-                      <div className="flex items-center gap-2 text-xs text-slate-500 mb-4">
-                        <User className="w-3.5 h-3.5" />
-                        <span>{post.authorName}</span>
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-sm text-slate-500">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Calendar className="h-4 w-4" />
+                          {formatDate(post.publishedAt, true)}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Clock className="h-4 w-4" />
+                          {post.readingTime} min
+                        </span>
                       </div>
-
-                      {/* Meta */}
-                      <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-100">
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5" />
-                            <time>
-                              {new Date(post.publishedAt).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric'
-                              })}
-                            </time>
-                          </div>
-                          {post.updatedAt && post.updatedAt !== post.publishedAt ? (
-                            <div className="flex items-center gap-1.5">
-                              <RefreshCw className="w-3.5 h-3.5" />
-                              <span>
-                                {new Date(post.updatedAt).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric'
-                                })}
-                              </span>
-                            </div>
-                          ) : null}
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>{post.readingTime} min</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1 text-sm font-medium text-slate-900 group-hover:gap-2 transition-all">
-                          Read
-                          <ArrowRight className="w-4 h-4" />
-                        </div>
-                      </div>
+                      <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900 transition group-hover:gap-2">
+                        Read
+                        <ArrowRight className="h-4 w-4" />
+                      </span>
                     </div>
                   </Link>
                 ))}
               </div>
-            </div>
-          )}
+            </section>
+          ) : null}
         </div>
       )}
     </div>

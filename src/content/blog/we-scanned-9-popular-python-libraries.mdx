@@ -8,6 +8,10 @@ author:
   role: "Benchmarking and product engineering"
   type: "Organization"
 whyThisExists: "This writeup documents what happened when we ran the current Skylos ruleset against widely used Python libraries, so readers can judge the signal quality and tradeoffs with real repositories instead of marketing copy."
+articleType: "Benchmark"
+topic: "Python Static Analysis"
+featuredReason: "This is the broadest benchmark in the library set and the best top-level proof page for signal and tradeoffs."
+frameworks: []
 methodology:
   - "Scanned FastAPI, Flask, Pydantic, Rich, Requests, httpx, Click, Starlette, and tqdm with `skylos . --danger --quality --table`."
   - "Used each repository as-is, with no extra tuning or per-project suppression rules."

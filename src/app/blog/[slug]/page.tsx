@@ -8,7 +8,8 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeSlug from 'rehype-slug';
 import { extractHeadings } from '@/lib/toc';
-import { getCollectionStaticParams, getContentEntry } from '@/lib/content';
+import { getCollectionEntries, getCollectionStaticParams, getContentEntry } from '@/lib/content';
+import { formatBlogDiscoveryLabel, getRelatedBlogPosts } from '@/lib/blog';
 import { getSiteUrl } from '@/lib/site';
 import {
   buildBreadcrumbList,
@@ -18,6 +19,8 @@ import {
 } from '@/lib/structured-data';
 import TableOfContents from '@/components/TableOfContents';
 import ArticleTrustPanel from '@/components/ArticleTrustPanel';
+import BlogArticleCta from '@/components/BlogArticleCta';
+import BlogRelatedPosts from '@/components/BlogRelatedPosts';
 import '../blog.css';
 
 interface Props {
@@ -44,6 +47,7 @@ export default async function BlogPost({ params }: Props) {
   const siteUrl = getSiteUrl();
   const articleUrl = new URL(post.canonicalUrl, siteUrl).toString();
   const articleUpdatedAt = post.updatedAt ?? post.publishedAt;
+  const relatedPosts = getRelatedBlogPosts(post, getCollectionEntries('blog'));
 
   const structuredData = [
     {
@@ -134,54 +138,53 @@ export default async function BlogPost({ params }: Props) {
           </div>
         </nav>
 
-        <div className="border-b border-slate-200/70 bg-white/60 backdrop-blur-xl">
-          <div className="max-w-7xl mx-auto px-6 py-3">
-            <nav className="flex items-center gap-2 text-sm">
-              <Link href="/" className="text-slate-500 hover:text-slate-900 transition">
-                Home
-              </Link>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-              <Link href="/blog" className="text-slate-500 hover:text-slate-900 transition">
-                Blog
-              </Link>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-              <span className="text-slate-900 font-medium truncate">{post.title}</span>
-            </nav>
-          </div>
-        </div>
-
         <div className="max-w-7xl mx-auto px-6 py-14">
           <div className="grid lg:grid-cols-[1fr_250px] gap-12">
             <article className="article-shell article-shell--blue min-w-0">
               <div className="px-6 py-7 md:px-10 md:py-10">
-                <Link
-                  href="/blog"
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm shadow-slate-900/5 hover:text-slate-900 transition"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back to blog
-                </Link>
-
-                <header className="article-hero mb-12">
-                  <div className="flex flex-wrap items-center gap-3 mb-6">
-                    <span className="article-kicker article-kicker--blue">Blog</span>
-                    {post.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {post.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
-                              tagColors[tag.toLowerCase()] || tagColors.default
-                            }`}
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                <header className="article-hero mb-10">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <Link
+                      href="/blog"
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm shadow-slate-900/5 transition hover:text-slate-900"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Back to blog
+                    </Link>
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                      <Link href="/" className="transition hover:text-slate-900">
+                        Home
+                      </Link>
+                      <ChevronRight className="h-4 w-4 text-slate-400" />
+                      <Link href="/blog" className="transition hover:text-slate-900">
+                        Blog
+                      </Link>
+                    </div>
                   </div>
 
-                  <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-slate-900 mb-4 leading-[1.05]">
+                  <div className="mt-7 flex flex-wrap items-center gap-3">
+                    <span className="article-kicker article-kicker--blue">{formatBlogDiscoveryLabel(post)}</span>
+                    {post.frameworks.map((framework) => (
+                      <span
+                        key={framework}
+                        className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700"
+                      >
+                        {framework}
+                      </span>
+                    ))}
+                    {post.tags.slice(0, 3).map((tag) => (
+                      <span
+                        key={tag}
+                        className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
+                          tagColors[tag.toLowerCase()] || tagColors.default
+                        }`}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+
+                  <h1 className="mt-6 text-4xl md:text-6xl font-bold tracking-tight text-slate-900 leading-[1.05]">
                     {post.title}
                   </h1>
 
@@ -199,13 +202,13 @@ export default async function BlogPost({ params }: Props) {
                 </header>
 
                 {(post.keyTakeaways.length > 0 || post.howToSteps.length > 0) && (
-                  <section className="mb-10 rounded-2xl border border-sky-200 bg-sky-50/70 p-6">
+                  <section className="mb-8 rounded-[1.75rem] border border-sky-200 bg-sky-50/70 p-5 md:p-6">
                     <div className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Quick answer</div>
-                    <p className="mt-3 text-base leading-relaxed text-slate-700">{post.excerpt}</p>
+                    <p className="mt-3 text-sm leading-relaxed text-slate-700 md:text-base">{post.excerpt}</p>
 
                     {post.keyTakeaways.length > 0 && (
-                      <ul className="mt-4 space-y-2 text-sm text-slate-700">
-                        {post.keyTakeaways.map((takeaway) => (
+                      <ul className="mt-4 grid gap-2 text-sm text-slate-700">
+                        {post.keyTakeaways.slice(0, 4).map((takeaway) => (
                           <li key={takeaway} className="flex gap-2">
                             <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-sky-600" />
                             <span>{takeaway}</span>
@@ -228,6 +231,12 @@ export default async function BlogPost({ params }: Props) {
                   </section>
                 )}
 
+                <div className="mb-10">
+                  <BlogArticleCta post={post} compact />
+                </div>
+
+                <TableOfContents headings={headings} mobileOnly />
+
                 <div className="blog-content article-body">
                   <MDXRemote
                     source={post.content}
@@ -244,7 +253,7 @@ export default async function BlogPost({ params }: Props) {
                 </div>
 
                 {post.faq.length > 0 && (
-                  <section className="mt-14 rounded-2xl border border-slate-200 bg-slate-50 p-6">
+                  <section className="mt-14 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6">
                     <h2 className="text-2xl font-bold tracking-tight text-slate-900">Frequently asked questions</h2>
                     <div className="mt-6 space-y-3">
                       {post.faq.map((item) => (
@@ -259,20 +268,16 @@ export default async function BlogPost({ params }: Props) {
                   </section>
                 )}
 
-                <div className="mt-16 pt-8 border-t border-slate-200">
-                  <Link
-                    href="/blog"
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm shadow-slate-900/5 hover:text-slate-900 transition"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back to all posts
-                  </Link>
+                <div className="mt-14">
+                  <BlogArticleCta post={post} />
                 </div>
+
+                <BlogRelatedPosts posts={relatedPosts} />
               </div>
             </article>
 
             <aside className="hidden lg:block">
-              <TableOfContents headings={headings} />
+              <TableOfContents headings={headings} desktopOnly />
             </aside>
           </div>
         </div>
