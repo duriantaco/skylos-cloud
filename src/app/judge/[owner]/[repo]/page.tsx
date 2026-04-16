@@ -2,7 +2,17 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ComponentType } from "react";
-import { AlertTriangle, ArrowRight, Clock3, GitBranch, Scale, Shield, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Bot,
+  Clock3,
+  GitBranch,
+  Scale,
+  Shield,
+  Sparkles,
+  UploadCloud,
+} from "lucide-react";
 import { getJudgeRepoDetail } from "@/lib/judge";
 import type { JudgeFindingPreview } from "@/lib/judge-core";
 import { getSiteUrl } from "@/lib/site";
@@ -58,32 +68,32 @@ function formatJudgeDate(value: string): string {
   });
 }
 
-function describeStaticStatus(input: {
+function describePublicGradeStatus(input: {
   hasSnapshot: boolean;
   activeJobStatus: string | null | undefined;
   staticStatus: string | null | undefined;
 }): { label: string; description: string } {
   if (input.hasSnapshot) {
     return {
-      label: "Ready",
-      description: "Static analysis produced the public Judge grade on this page.",
+      label: "Published",
+      description: "This deterministic static snapshot is the public grade users see on this page.",
     };
   }
 
   if (input.staticStatus === "running" || input.activeJobStatus === "running") {
     return {
       label: "Running",
-      description: "The worker is currently running the deterministic static pass.",
+      description: "The pinned static pass is running now. This pass produces the public grade.",
     };
   }
 
   return {
     label: "Queued",
-    description: "A static Judge snapshot has not been imported yet.",
+    description: "A public static snapshot has not been imported yet.",
   };
 }
 
-function describeAgentStatus(input: {
+function describeAiReviewStatus(input: {
   hasSnapshot: boolean;
   agentStatus: string | null | undefined;
 }): { label: string; description: string } {
@@ -91,27 +101,27 @@ function describeAgentStatus(input: {
     return {
       label: "Available",
       description:
-        "A separate Skylos agent snapshot exists for this repo. It can deepen the analysis later without changing the public grade.",
+        "An optional AI review snapshot exists for this same repo. It adds context, but it does not rewrite the public grade.",
     };
   }
 
   if (input.agentStatus === "running") {
     return {
       label: "Running",
-      description: "The optional Skylos agent pass is in progress.",
+      description: "The optional AI review pass is running now.",
     };
   }
 
   if (input.agentStatus === "pending") {
     return {
       label: "Queued",
-      description: "The optional Skylos agent pass is requested after static analysis.",
+      description: "The optional AI review pass is requested after the public static grade.",
     };
   }
 
   return {
-    label: "Not requested",
-    description: "Judge can publish static-only pages. Agent analysis is an optional second pass.",
+    label: "Not attached",
+    description: "No AI review is attached yet. Judge can publish a static-only scorecard.",
   };
 }
 
@@ -125,15 +135,18 @@ export default async function JudgeRepoPage({ params }: PageProps) {
 
   const snapshot = detail.latestSnapshot;
   const agentSnapshot = detail.latestAgentSnapshot;
-  const countSummary = (snapshot?.summary?.counts || {}) as Record<string, number>;
+  const countSummary = ((snapshot?.summary?.counts || {}) as Record<string, number>) || {};
+  const staticSummary = ((snapshot?.summary || {}) as Record<string, unknown>) || {};
+  const agentSummary = ((agentSnapshot?.summary || {}) as Record<string, unknown>) || {};
   const siteUrl = getSiteUrl();
   const pageUrl = `${siteUrl}/judge/${detail.repo.owner}/${detail.repo.name}`;
-  const staticStatus = describeStaticStatus({
+  const submitHref = `/judge/submit?owner=${encodeURIComponent(detail.repo.owner)}&repo=${encodeURIComponent(detail.repo.name)}&source_url=${encodeURIComponent(detail.repo.source_url)}&branch=${encodeURIComponent(detail.repo.default_branch || "main")}`;
+  const publicGradeStatus = describePublicGradeStatus({
     hasSnapshot: Boolean(snapshot),
     activeJobStatus: detail.activeJob?.status,
     staticStatus: detail.activeJob?.static_status,
   });
-  const agentStatus = describeAgentStatus({
+  const aiReviewStatus = describeAiReviewStatus({
     hasSnapshot: Boolean(agentSnapshot),
     agentStatus: detail.activeJob?.agent_status,
   });
@@ -191,7 +204,7 @@ export default async function JudgeRepoPage({ params }: PageProps) {
                   {detail.repo.owner}/{detail.repo.name}
                 </h1>
                 <p className="mt-4 text-lg leading-8 text-slate-600">
-                  Public repo scorecard generated from a pinned commit using deterministic Skylos scoring. The grade comes from static analysis only, while Skylos agent runs as an optional second pass for deeper context.
+                  This page separates the public deterministic grade from the optional AI review. Users should be able to tell immediately what affects the score, what is extra context, and which commit the score belongs to.
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3 text-sm text-slate-500">
                   <a
@@ -203,162 +216,268 @@ export default async function JudgeRepoPage({ params }: PageProps) {
                     Open repository
                   </a>
                   <Link
-                    href="/judge#suggest-repo"
+                    href={submitHref}
                     className="rounded-full border border-slate-200 bg-white px-3 py-1.5 transition hover:border-slate-300 hover:text-slate-900"
                   >
-                    Suggest a repo
+                    Run or import a new snapshot
                   </Link>
                 </div>
               </div>
 
-              {snapshot ? (
-                <div className="rounded-[28px] bg-slate-950 px-8 py-7 text-white shadow-lg">
-                  <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Overall</div>
-                  <div className="mt-2 flex items-end gap-4">
-                    <div className="text-6xl font-black">{snapshot.grade}</div>
-                    <div className="pb-1 text-right">
-                      <div className="text-3xl font-bold">{snapshot.overall_score}</div>
-                      <div className="text-sm text-slate-300">/ 100</div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-[28px] bg-amber-50 px-8 py-7 text-amber-950 shadow-sm">
-                  <div className="text-xs font-bold uppercase tracking-[0.18em]">Status</div>
-                  <div className="mt-3 text-2xl font-bold">{staticStatus.label}</div>
-                </div>
-              )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <StatusHeroCard
+                  label="Public grade"
+                  tone={snapshot ? "dark" : "amber"}
+                  value={snapshot ? snapshot.grade : publicGradeStatus.label}
+                  subvalue={snapshot ? `${snapshot.overall_score}/100` : "Pinned static snapshot"}
+                />
+                <StatusHeroCard
+                  label="AI review"
+                  tone={agentSnapshot ? "violet" : "slate"}
+                  value={aiReviewStatus.label}
+                  subvalue={agentSnapshot ? "Optional second pass attached" : "Does not affect public grade"}
+                />
+              </div>
             </div>
           </div>
         </section>
 
         <section className="mx-auto max-w-6xl px-6 py-10">
           {snapshot ? (
-            <>
-              <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
-                <div className="space-y-5">
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <BreakdownCard label="Security" value={snapshot.security_score} icon={Shield} />
-                    <BreakdownCard label="Quality" value={snapshot.quality_score} icon={Sparkles} />
-                    <BreakdownCard label="Dead Code" value={snapshot.dead_code_score} icon={Scale} />
-                  </div>
-
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-950">Finding summary</h2>
-                    <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                      <StatCard label="Critical" value={countSummary.critical || 0} tone="rose" />
-                      <StatCard label="High" value={countSummary.high || 0} tone="orange" />
-                      <StatCard label="Quality" value={countSummary.quality || 0} tone="blue" />
-                      <StatCard label="Dead Code" value={countSummary.dead_code || 0} tone="slate" />
+            <div className="grid gap-5 lg:grid-cols-[1.55fr_0.95fr]">
+              <div className="space-y-5">
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+                    <div>
+                      <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Public score breakdown</div>
+                      <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">What this repo scored on the pinned static snapshot</h2>
+                      <p className="mt-3 text-sm leading-7 text-slate-600">
+                        The public grade comes from the static snapshot only. The optional AI review appears separately so it can add context without moving the public score.
+                      </p>
                     </div>
-                  </div>
-
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-950">Top findings</h2>
-                    <div className="mt-5 space-y-3">
-                      {Array.isArray(snapshot.top_findings) && snapshot.top_findings.length > 0 ? (
-                        snapshot.top_findings.map((finding: JudgeFindingPreview, index: number) => (
-                          <div key={`${finding.ruleId}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em]">
-                              <span className="rounded-full bg-slate-900 px-2 py-1 text-white">{finding.severity}</span>
-                              <span className="text-slate-500">{finding.category}</span>
-                              <span className="text-slate-400">{finding.ruleId}</span>
-                            </div>
-                            <p className="mt-3 text-sm font-medium text-slate-900">{finding.message}</p>
-                            <p className="mt-2 text-sm text-slate-500">
-                              {finding.filePath}:{finding.lineNumber}
-                            </p>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-slate-500">No preview findings were stored for this snapshot.</p>
-                      )}
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <BreakdownCard label="Security" value={snapshot.security_score} icon={Shield} />
+                      <BreakdownCard label="Quality" value={snapshot.quality_score} icon={Sparkles} />
+                      <BreakdownCard label="Dead code" value={snapshot.dead_code_score} icon={Scale} />
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-5">
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-950">Analysis pipeline</h2>
-                    <div className="mt-5 space-y-4">
-                      <PipelineRow
-                        label="Skylos static"
-                        status={staticStatus.label}
-                        description={staticStatus.description}
-                        meta={snapshot ? `${snapshot.commit_sha.slice(0, 7)} • ${formatJudgeDate(snapshot.scanned_at)}` : null}
-                      />
-                      <PipelineRow
-                        label="Skylos agent"
-                        status={agentStatus.label}
-                        description={agentStatus.description}
-                        meta={agentSnapshot ? `${agentSnapshot.commit_sha.slice(0, 7)} • ${formatJudgeDate(agentSnapshot.scanned_at)}` : null}
-                      />
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-start justify-between gap-6">
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-950">Finding summary</h2>
+                      <p className="mt-2 text-sm leading-7 text-slate-600">
+                        Severity and category counts from the same pinned static snapshot that produced the public grade.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Total issues</div>
+                      <div className="mt-1 text-2xl font-black text-slate-950">{countSummary.total_issues || 0}</div>
                     </div>
                   </div>
-
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-950">Snapshot metadata</h2>
-                    <div className="mt-5 space-y-3 text-sm text-slate-600">
-                      <MetaRow
-                        icon={GitBranch}
-                        label="Commit"
-                        value={`${snapshot.branch || detail.repo.default_branch || "main"} @ ${snapshot.commit_sha}`}
-                      />
-                      <MetaRow icon={Clock3} label="Scanned" value={formatJudgeDate(snapshot.scanned_at)} />
-                      <MetaRow icon={Scale} label="Scoring" value={snapshot.scoring_version} />
-                      <MetaRow icon={Sparkles} label="Confidence" value={`${snapshot.confidence_score}/100`} />
-                    </div>
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                    <StatCard label="Critical" value={countSummary.critical || 0} tone="rose" />
+                    <StatCard label="High" value={countSummary.high || 0} tone="amber" />
+                    <StatCard label="Secrets" value={countSummary.secrets || 0} tone="violet" />
+                    <StatCard label="Quality" value={countSummary.quality || 0} tone="blue" />
+                    <StatCard label="Dead code" value={countSummary.dead_code || 0} tone="slate" />
                   </div>
+                </div>
 
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-950">Fairness notes</h2>
-                    <div className="mt-4 space-y-3">
-                      {Array.isArray(snapshot.fairness_notes) && snapshot.fairness_notes.length > 0 ? (
-                        snapshot.fairness_notes.map((note: string) => (
-                          <div key={note} className="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950">
-                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                            <span>{note}</span>
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="text-xl font-bold text-slate-950">Top findings</h2>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    The highest-priority preview findings from the public static snapshot. This is the fast way to understand why the score landed where it did.
+                  </p>
+                  <div className="mt-5 space-y-3">
+                    {Array.isArray(snapshot.top_findings) && snapshot.top_findings.length > 0 ? (
+                      snapshot.top_findings.map((finding: JudgeFindingPreview, index: number) => (
+                        <div key={`${finding.ruleId}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em]">
+                            <span className="rounded-full bg-slate-900 px-2 py-1 text-white">{finding.severity}</span>
+                            <span className="text-slate-500">{finding.category}</span>
+                            <span className="text-slate-400">{finding.ruleId}</span>
                           </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-slate-500">
-                          No fairness caveats were attached to this snapshot. It was imported as a normal deterministic grade.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-950">Static history</h2>
-                    <div className="mt-4 space-y-3">
-                      {detail.history.map((entry) => (
-                        <div key={entry.id} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
-                          <div>
-                            <div className="font-semibold text-slate-900">{entry.commit_sha.slice(0, 7)}</div>
-                            <div className="text-slate-500">{formatJudgeDate(entry.scanned_at)}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold text-slate-950">{entry.grade}</div>
-                            <div className="text-slate-500">{entry.overall_score}/100</div>
-                          </div>
+                          <p className="mt-3 text-sm font-medium text-slate-900">{finding.message}</p>
+                          <p className="mt-2 text-sm text-slate-500">
+                            {finding.filePath}:{finding.lineNumber}
+                          </p>
                         </div>
-                      ))}
-                    </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500">No preview findings were stored for this snapshot.</p>
+                    )}
                   </div>
                 </div>
               </div>
-            </>
+
+              <div className="space-y-5">
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="text-xl font-bold text-slate-950">How this scorecard was produced</h2>
+                  <div className="mt-5 space-y-4">
+                    <PipelineRow
+                      label="Public grade"
+                      status={publicGradeStatus.label}
+                      description={publicGradeStatus.description}
+                      meta={`${snapshot.commit_sha.slice(0, 7)} • ${formatJudgeDate(snapshot.scanned_at)}`}
+                    />
+                    <PipelineRow
+                      label="AI review"
+                      status={aiReviewStatus.label}
+                      description={aiReviewStatus.description}
+                      meta={agentSnapshot ? `${agentSnapshot.commit_sha.slice(0, 7)} • ${formatJudgeDate(agentSnapshot.scanned_at)}` : null}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="text-xl font-bold text-slate-950">Snapshot metadata</h2>
+                  <div className="mt-5 space-y-3 text-sm text-slate-600">
+                    <MetaRow
+                      icon={GitBranch}
+                      label="Commit"
+                      value={`${snapshot.branch || detail.repo.default_branch || "main"} @ ${snapshot.commit_sha}`}
+                    />
+                    <MetaRow icon={Clock3} label="Scanned" value={formatJudgeDate(snapshot.scanned_at)} />
+                    <MetaRow
+                      icon={Scale}
+                      label="Scoring"
+                      value={`${snapshot.scoring_version} • ${String(staticSummary.tool || "skylos")}`}
+                    />
+                    <MetaRow icon={Sparkles} label="Confidence" value={`${snapshot.confidence_score}/100`} />
+                    {snapshot.analysis_mode ? (
+                      <MetaRow icon={Sparkles} label="Analysis mode" value={snapshot.analysis_mode} />
+                    ) : null}
+                    {agentSnapshot ? (
+                      <MetaRow
+                        icon={Bot}
+                        label="AI review source"
+                        value={`${String(agentSummary.tool || agentSummary.source || "agent")} • ${agentSnapshot.confidence_score}/100 confidence`}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6">
+                  <h2 className="text-xl font-bold text-slate-950">Need to refresh this repo?</h2>
+                  <p className="mt-3 text-sm leading-7 text-slate-600">
+                    Open Judge submit with this repo prefilled. That gives you a direct operator path to run a new static snapshot and optionally attach an AI review.
+                  </p>
+                  <Link
+                    href={submitHref}
+                    className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    Open Judge submit
+                    <UploadCloud className="h-4 w-4" />
+                  </Link>
+                </div>
+
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="text-xl font-bold text-slate-950">Fairness notes</h2>
+                  <div className="mt-4 space-y-3">
+                    {Array.isArray(snapshot.fairness_notes) && snapshot.fairness_notes.length > 0 ? (
+                      snapshot.fairness_notes.map((note: string) => (
+                        <div key={note} className="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>{note}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500">
+                        No fairness caveats were attached to this snapshot.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="text-xl font-bold text-slate-950">Static history</h2>
+                  <div className="mt-4 space-y-3">
+                    {detail.history.map((entry) => (
+                      <div key={entry.id} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
+                        <div>
+                          <div className="font-semibold text-slate-900">{entry.commit_sha.slice(0, 7)}</div>
+                          <div className="text-slate-500">{formatJudgeDate(entry.scanned_at)}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-slate-950">{entry.grade}</div>
+                          <div className="text-slate-500">{entry.overall_score}/100</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 shadow-sm">
-              <h2 className="text-2xl font-bold text-slate-950">This repo is in the Judge queue.</h2>
-              <p className="mt-3 max-w-2xl text-slate-600">
-                The repo row exists, but no static snapshot has been imported yet. The production flow is: shallow clone a pinned commit in a worker, run Skylos static, optionally run Skylos agent, then import immutable snapshots into Judge.
-              </p>
+            <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="rounded-[28px] border border-dashed border-slate-300 bg-white p-10 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">No public grade yet</div>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">This repo is in the Judge queue</h2>
+                <p className="mt-4 max-w-2xl text-slate-600">
+                  The repo exists, but no static snapshot has been imported yet. Public scorecards only appear after the pinned static pass is uploaded. AI review is optional and can be imported after that.
+                </p>
+                <Link
+                  href={submitHref}
+                  className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                >
+                  Import the first snapshot
+                  <UploadCloud className="h-4 w-4" />
+                </Link>
+              </div>
+
+              <div className="space-y-5">
+                <PipelineRow
+                  label="Public grade"
+                  status={publicGradeStatus.label}
+                  description={publicGradeStatus.description}
+                  meta={null}
+                />
+                <PipelineRow
+                  label="AI review"
+                  status={aiReviewStatus.label}
+                  description={aiReviewStatus.description}
+                  meta={null}
+                />
+              </div>
             </div>
           )}
         </section>
       </main>
     </>
+  );
+}
+
+function StatusHeroCard({
+  label,
+  tone,
+  value,
+  subvalue,
+}: {
+  label: string;
+  tone: "dark" | "violet" | "amber" | "slate";
+  value: string;
+  subvalue: string;
+}) {
+  const classes =
+    tone === "dark"
+      ? "bg-slate-950 text-white"
+      : tone === "violet"
+      ? "bg-violet-50 text-violet-950"
+      : tone === "amber"
+      ? "bg-amber-50 text-amber-950"
+      : "bg-slate-100 text-slate-950";
+
+  const subClasses =
+    tone === "dark" ? "text-slate-300" : tone === "violet" ? "text-violet-700" : tone === "amber" ? "text-amber-700" : "text-slate-500";
+
+  return (
+    <div className={`rounded-[28px] px-6 py-5 shadow-sm ${classes}`}>
+      <div className={`text-xs font-bold uppercase tracking-[0.18em] ${subClasses}`}>{label}</div>
+      <div className="mt-3 text-3xl font-black tracking-tight">{value}</div>
+      <div className={`mt-2 text-sm ${subClasses}`}>{subvalue}</div>
+    </div>
   );
 }
 
@@ -372,12 +491,12 @@ function BreakdownCard({
   icon: ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-semibold text-slate-500">{label}</div>
-        <Icon className="h-4 w-4 text-slate-400" />
+        <div className="text-sm font-semibold text-slate-700">{label}</div>
+        <Icon className="h-5 w-5 text-slate-400" />
       </div>
-      <div className="mt-4 text-4xl font-black text-slate-950">{value}</div>
+      <div className="mt-4 text-5xl font-black tracking-tight text-slate-950">{value}</div>
     </div>
   );
 }
@@ -389,41 +508,23 @@ function StatCard({
 }: {
   label: string;
   value: number;
-  tone: "rose" | "orange" | "blue" | "slate";
+  tone: "rose" | "amber" | "blue" | "violet" | "slate";
 }) {
-  const classes =
+  const toneClass =
     tone === "rose"
       ? "bg-rose-50 text-rose-950"
-      : tone === "orange"
-      ? "bg-orange-50 text-orange-950"
+      : tone === "amber"
+      ? "bg-amber-50 text-amber-950"
       : tone === "blue"
       ? "bg-blue-50 text-blue-950"
+      : tone === "violet"
+      ? "bg-violet-50 text-violet-950"
       : "bg-slate-50 text-slate-950";
 
   return (
-    <div className={`rounded-2xl p-4 ${classes}`}>
-      <div className="text-xs font-bold uppercase tracking-[0.14em]">{label}</div>
-      <div className="mt-2 text-3xl font-black">{value}</div>
-    </div>
-  );
-}
-
-function MetaRow({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <Icon className="mt-0.5 h-4 w-4 text-slate-400" />
-      <div>
-        <div className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">{label}</div>
-        <div className="mt-1 text-sm font-medium text-slate-900">{value}</div>
-      </div>
+    <div className={`rounded-[24px] p-5 ${toneClass}`}>
+      <div className="text-xs font-bold uppercase tracking-[0.16em] opacity-80">{label}</div>
+      <div className="mt-4 text-4xl font-black tracking-tight">{value}</div>
     </div>
   );
 }
@@ -440,15 +541,35 @@ function PipelineRow({
   meta: string | null;
 }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-semibold text-slate-900">{label}</div>
-        <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-slate-600">
+    <div className="rounded-[24px] bg-slate-50 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-lg font-bold text-slate-950">{label}</div>
+        <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
           {status}
         </div>
       </div>
-      <p className="mt-3 text-sm leading-relaxed text-slate-600">{description}</p>
-      {meta ? <div className="mt-3 text-xs font-medium text-slate-500">{meta}</div> : null}
+      <p className="mt-3 text-sm leading-7 text-slate-600">{description}</p>
+      {meta ? <div className="mt-4 text-sm font-semibold text-slate-500">{meta}</div> : null}
+    </div>
+  );
+}
+
+function MetaRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+      <Icon className="mt-0.5 h-4 w-4 text-slate-400" />
+      <div>
+        <div className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">{label}</div>
+        <div className="mt-1 font-medium text-slate-900">{value}</div>
+      </div>
     </div>
   );
 }

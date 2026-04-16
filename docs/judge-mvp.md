@@ -29,6 +29,17 @@ Ship a production-safe public Judge surface for the first 2-3 repos without coup
 4. Admin promotes a suggestion into `judge_repos` and `judge_jobs`:
    `POST /api/judge/admin/suggestions`
 
+## Operator import flow
+
+1. Operator opens:
+   `/judge/submit`
+2. Operator runs Skylos static on a pinned commit and exports JSON or SARIF.
+3. Operator optionally runs a second AI review pass and exports JSON.
+4. Operator imports the static snapshot first.
+5. Operator optionally imports the AI review as `analysis_kind = agent`.
+
+This page is an operator surface, not the public suggestion queue.
+
 ## Seed and queue flow
 
 1. Seed the initial repos:

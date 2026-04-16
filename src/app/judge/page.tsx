@@ -1,6 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight, Clock3, GitBranch, ShieldCheck, TimerReset } from "lucide-react";
+import {
+  ArrowRight,
+  Bot,
+  Clock3,
+  GitBranch,
+  ShieldCheck,
+  TimerReset,
+  UploadCloud,
+} from "lucide-react";
 import { getJudgeRepoIndex } from "@/lib/judge";
 import { DEFAULT_JUDGE_SEED_REPOS } from "@/lib/judge-seeds";
 import SuggestJudgeRepoForm from "@/components/judge/SuggestJudgeRepoForm";
@@ -10,47 +18,41 @@ import { buildCollectionPageSchema } from "@/lib/structured-data";
 export const metadata: Metadata = {
   title: "Skylos Judge",
   description:
-    "Public repository scorecards powered by Skylos. Deterministic grades for security, quality, and dead code on pinned commits.",
+    "Public repo scorecards with deterministic static grades, pinned commits, and an optional AI review lane.",
   alternates: {
     canonical: "/judge",
   },
   openGraph: {
     title: "Skylos Judge",
     description:
-      "Public repository scorecards powered by Skylos. Deterministic grades for security, quality, and dead code on pinned commits.",
+      "Public repo scorecards with deterministic static grades, pinned commits, and an optional AI review lane.",
     type: "website",
   },
 };
 
-function statusCopy(activeJob: { status: string } | null) {
-  if (!activeJob) return null;
-  if (activeJob.status === "running") return "Scanning now";
+function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function describeJobStatus(activeJob: { status: string } | null) {
+  if (!activeJob) return "Waiting for first import";
+  if (activeJob.status === "running") return "Import running";
   return "Queued for first scan";
 }
 
-function analysisCopy(input: {
+function describeAiReview(input: {
   hasAgentSnapshot: boolean;
-  activeJob: {
-    agent_status: string;
-  } | null;
-}): string | null {
-  if (input.hasAgentSnapshot) {
-    return "Agent review available";
-  }
-
-  if (!input.activeJob) {
-    return null;
-  }
-
-  if (input.activeJob.agent_status === "running") {
-    return "Agent review running";
-  }
-
-  if (input.activeJob.agent_status === "pending") {
-    return "Agent review queued";
-  }
-
-  return null;
+  activeJob: { agent_status: string } | null;
+}): string {
+  if (input.hasAgentSnapshot) return "AI review available";
+  if (!input.activeJob) return "AI review not attached";
+  if (input.activeJob.agent_status === "running") return "AI review running";
+  if (input.activeJob.agent_status === "pending") return "AI review queued";
+  return "AI review not attached";
 }
 
 export default async function JudgeIndexPage() {
@@ -76,32 +78,124 @@ export default async function JudgeIndexPage() {
 
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-16">
-          <div className="max-w-3xl">
+          <div className="max-w-4xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
               <ShieldCheck className="h-4 w-4" />
               Public repo scorecards
             </div>
             <h1 className="mt-6 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-              Skylos Judge
+              Judge should read clearly the moment you land on it
             </h1>
             <p className="mt-4 text-lg leading-8 text-slate-600">
-              Deterministic public grades for security, quality, and dead code. Every scorecard is tied to a pinned commit, a scan date, and a scoring version.
+              Judge now has two explicit lanes. Public users browse deterministic repo scorecards. Operators run a pinned static scan,
+              then optionally attach an AI review as a second pass.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3 text-sm text-slate-500">
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">No request-time scanning</span>
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Pinned commit snapshots</span>
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Static score, not LLM-graded</span>
-            </div>
+          </div>
+
+          <div className="mt-10 flex flex-wrap gap-3">
+            <Link
+              href="#scorecards"
+              className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              Browse scorecards
+            </Link>
+            <Link
+              href="/judge/submit"
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-300"
+            >
+              Run and import a snapshot
+            </Link>
+            <Link
+              href="#suggest-repo"
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+            >
+              Suggest a public repo
+            </Link>
+          </div>
+
+          <div className="mt-10 grid gap-4 lg:grid-cols-3">
+            <JudgeLaneCard
+              icon={ShieldCheck}
+              title="Public grade"
+              description="Static, deterministic, and tied to one pinned commit. This is the public score users compare over time."
+            />
+            <JudgeLaneCard
+              icon={Bot}
+              title="AI review"
+              description="Optional second pass for richer context. It is visible separately so the public grade never feels like an arbitrary LLM verdict."
+            />
+            <JudgeLaneCard
+              icon={UploadCloud}
+              title="Operator import"
+              description="There is now a real submit surface at `/judge/submit` so importing a snapshot no longer requires guessing the admin API contract."
+            />
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-12">
+      <section className="mx-auto max-w-6xl px-6 py-10">
+        <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">How Judge works</div>
+            <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">One public score, one optional AI review, one pinned commit</h2>
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <StepCard
+                step="1"
+                title="Run static on a pinned commit"
+                body="This creates the deterministic public grade and the historical scorecard."
+              />
+              <StepCard
+                step="2"
+                title="Optionally run an AI review"
+                body="Import it as a separate `agent` snapshot so it adds context without rewriting the public grade."
+              />
+              <StepCard
+                step="3"
+                title="Publish the scorecard"
+                body="Users see the grade, commit, scan date, findings summary, and whether an AI review exists."
+              />
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6">
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Operator quick path</div>
+            <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">Need to run and upload a repo yourself?</h2>
+            <p className="mt-4 text-sm leading-7 text-slate-600">
+              Use the Judge submit page. It gives you the run commands, the accepted report formats, and a real import form wired to the existing admin endpoint.
+            </p>
+            <div className="mt-6 space-y-3 text-sm text-slate-600">
+              <div className="rounded-2xl bg-white px-4 py-3">Supports Skylos JSON, SARIF, Claude Code Security JSON, and normalized summary/findings payloads.</div>
+              <div className="rounded-2xl bg-white px-4 py-3">Static imports publish the public score. Agent imports attach the optional AI review.</div>
+            </div>
+            <Link
+              href="/judge/submit"
+              className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              Open Judge submit
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section id="scorecards" className="mx-auto max-w-6xl px-6 py-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Tracked repos</div>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Public scorecards</h2>
+          </div>
+          <div className="text-sm text-slate-500">
+            Every card shows the public grade first, then whether an AI review exists.
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-6 py-8">
         {repos.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 shadow-sm">
-            <h2 className="text-2xl font-bold text-slate-950">Judge is wired, but no snapshots are imported yet.</h2>
+          <div className="rounded-[28px] border border-dashed border-slate-300 bg-white p-10 shadow-sm">
+            <h2 className="text-2xl font-bold text-slate-950">Judge is ready, but no snapshots are published yet.</h2>
             <p className="mt-3 max-w-2xl text-slate-600">
-              Seed the first repos, scan them out of band, then POST the results into the Judge import route. Starting set:
+              Seed a starting set or open Judge submit to import the first pinned static grade. After that, optionally attach an AI review for the same commit.
             </p>
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
               {DEFAULT_JUDGE_SEED_REPOS.map((repo) => (
@@ -111,12 +205,19 @@ export default async function JudgeIndexPage() {
                 </div>
               ))}
             </div>
+            <Link
+              href="/judge/submit"
+              className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              Import the first snapshot
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         ) : (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {repos.map(({ repo, latestSnapshot, latestAgentSnapshot, activeJob }) => {
-              const queuedStatus = statusCopy(activeJob);
-              const pipelineCopy = analysisCopy({
+              const queuedStatus = describeJobStatus(activeJob);
+              const aiReviewCopy = describeAiReview({
                 hasAgentSnapshot: Boolean(latestAgentSnapshot),
                 activeJob,
               });
@@ -125,25 +226,37 @@ export default async function JudgeIndexPage() {
                 <Link
                   key={`${repo.owner}/${repo.name}`}
                   href={`/judge/${repo.owner}/${repo.name}`}
-                  className="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                  className="group rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">{repo.language || "unknown"}</div>
-                      <h2 className="mt-2 text-2xl font-bold text-slate-950">{repo.owner}/{repo.name}</h2>
+                      <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{repo.language || "unknown"}</div>
+                      <h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">{repo.owner}/{repo.name}</h3>
                     </div>
-                    {latestSnapshot ? (
-                      <div className="rounded-2xl bg-slate-950 px-4 py-3 text-center text-white">
-                        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">Grade</div>
-                        <div className="mt-1 text-2xl font-black">{latestSnapshot.grade}</div>
-                        <div className="text-sm font-semibold text-slate-200">{latestSnapshot.overall_score}</div>
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl bg-amber-50 px-4 py-3 text-center text-amber-900">
-                        <div className="text-[10px] font-bold uppercase tracking-[0.14em]">Status</div>
-                        <div className="mt-1 text-sm font-semibold">{queuedStatus || "Unscanned"}</div>
-                      </div>
-                    )}
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Public grade</div>
+                      {latestSnapshot ? (
+                        <>
+                          <div className="mt-1 text-2xl font-black text-slate-950">{latestSnapshot.grade}</div>
+                          <div className="text-sm font-semibold text-slate-500">{latestSnapshot.overall_score}/100</div>
+                        </>
+                      ) : (
+                        <div className="mt-1 text-sm font-semibold text-amber-900">{queuedStatus}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                    <MiniStatusCard
+                      label="Public grade"
+                      value={latestSnapshot ? "Published" : queuedStatus}
+                      tone={latestSnapshot ? "emerald" : "amber"}
+                    />
+                    <MiniStatusCard
+                      label="AI review"
+                      value={aiReviewCopy}
+                      tone={latestAgentSnapshot ? "violet" : "slate"}
+                    />
                   </div>
 
                   {latestSnapshot ? (
@@ -160,24 +273,19 @@ export default async function JudgeIndexPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Clock3 className="h-4 w-4" />
-                          <span>Scanned {new Date(latestSnapshot.scanned_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                          <span>Scanned {formatDate(latestSnapshot.scanned_at)}</span>
                         </div>
-                        {pipelineCopy ? (
-                          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                            {pipelineCopy}
-                          </div>
-                        ) : null}
                       </div>
                     </>
                   ) : (
                     <div className="mt-6 flex items-center gap-2 text-sm text-slate-500">
                       <TimerReset className="h-4 w-4" />
-                      <span>{queuedStatus || "Waiting for first import."}</span>
+                      <span>{queuedStatus}</span>
                     </div>
                   )}
 
                   <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    View scorecard
+                    Open scorecard
                     <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
                   </div>
                 </Link>
@@ -188,36 +296,97 @@ export default async function JudgeIndexPage() {
       </section>
 
       <section id="suggest-repo" className="mx-auto max-w-6xl px-6 pb-16">
-        <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <SuggestJudgeRepoForm />
 
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-            <h2 className="text-2xl font-bold text-slate-950">How future libraries get added</h2>
-            <div className="mt-5 space-y-4 text-sm leading-relaxed text-slate-600">
+          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6">
+            <h2 className="text-2xl font-bold tracking-tight text-slate-950">Choose the right Judge path</h2>
+            <div className="mt-5 space-y-4 text-sm leading-7 text-slate-600">
               <p>
-                Judge is not a manual upload tool. Future libraries enter through a queue: repo suggestion, review, worker execution, then immutable snapshot import.
+                <strong className="text-slate-900">Public repo suggestion</strong>: use the form on the left when you want a repo added to the queue.
               </p>
               <p>
-                The intended execution path is:
-                <br />
-                1. Suggest repo
-                <br />
-                2. Approve suggestion
-                <br />
-                3. Run Skylos static on a pinned commit
-                <br />
-                4. Optionally run Skylos agent
-                <br />
-                5. Import snapshots and publish the scorecard
+                <strong className="text-slate-900">Operator import</strong>: use Judge submit when you already have a pinned report and want to publish or update a scorecard yourself.
               </p>
               <p>
-                Public grades are tied to the static snapshot. Agent output is tracked separately so it can deepen the analysis later without making the grade feel arbitrary.
+                <strong className="text-slate-900">AI judge / AI review</strong>: yes, Judge can store it. Import it as the optional <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">agent</code> snapshot so it stays separate from the deterministic public score.
               </p>
             </div>
+            <Link
+              href="/judge/submit"
+              className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              Open Judge submit
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </section>
     </main>
+  );
+}
+
+function JudgeLaneCard({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: typeof ShieldCheck;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-white">
+        <Icon className="h-5 w-5" />
+      </div>
+      <h2 className="mt-4 text-xl font-bold text-slate-950">{title}</h2>
+      <p className="mt-3 text-sm leading-7 text-slate-600">{description}</p>
+    </div>
+  );
+}
+
+function StepCard({
+  step,
+  title,
+  body,
+}: {
+  step: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">{step}</div>
+      <h3 className="mt-4 text-lg font-bold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-7 text-slate-600">{body}</p>
+    </div>
+  );
+}
+
+function MiniStatusCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "emerald" | "amber" | "violet" | "slate";
+}) {
+  const toneClass =
+    tone === "emerald"
+      ? "bg-emerald-50 text-emerald-950"
+      : tone === "amber"
+      ? "bg-amber-50 text-amber-950"
+      : tone === "violet"
+      ? "bg-violet-50 text-violet-950"
+      : "bg-slate-50 text-slate-900";
+
+  return (
+    <div className={`rounded-2xl px-4 py-3 ${toneClass}`}>
+      <div className="text-[10px] font-bold uppercase tracking-[0.14em] opacity-70">{label}</div>
+      <div className="mt-2 text-sm font-semibold">{value}</div>
+    </div>
   );
 }
 

@@ -25,6 +25,7 @@ This repo contains the public website, comparison pages, use-case content, blog 
 - `/compare` Python tool comparisons
 - `/use-cases` workflow guides
 - `/judge` public repository scorecards
+- `/judge/submit` Judge operator import surface
 - `/vscode` VS Code landing page
 - `/llms.txt` compact AI-facing site summary
 - `/llms-full.txt` expanded AI-facing page inventory
