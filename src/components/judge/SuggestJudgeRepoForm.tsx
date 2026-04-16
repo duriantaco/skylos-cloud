@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { FormEvent } from "react";
 import { useState, useTransition } from "react";
 
@@ -77,7 +78,11 @@ export default function SuggestJudgeRepoForm() {
       <div className="max-w-2xl">
         <h2 className="text-2xl font-bold text-slate-950">Suggest a repo for Judge</h2>
         <p className="mt-3 text-sm leading-relaxed text-slate-600">
-          Users do not manually upload grades. They suggest a public GitHub repo, we queue it, and the Judge worker runs Skylos static first and optionally Skylos agent as a second pass.
+          Public visitors use the suggestion queue. If you already have a pinned report and an admin token, use{" "}
+          <Link href="/judge/submit" className="font-semibold text-slate-900 underline underline-offset-2">
+            Judge submit
+          </Link>{" "}
+          to import a snapshot directly.
         </p>
       </div>
 
@@ -154,7 +159,7 @@ export default function SuggestJudgeRepoForm() {
           {isPending ? "Submitting..." : "Suggest repo"}
         </button>
         <div className="text-xs text-slate-500">
-          Queue model only. No public score is created until the worker runs.
+          Queue model only for public suggestions. Operators can import via Judge submit.
         </div>
       </div>
 
