@@ -5,12 +5,11 @@ import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
-  CreditCard,
   FolderOpen,
   Layers3,
   ScanSearch,
-  Settings,
   Sparkles,
+  Shield,
 } from "lucide-react";
 
 type NavItem = {
@@ -25,12 +24,8 @@ const PRIMARY_ITEMS: NavItem[] = [
   { href: "/dashboard/projects", label: "Projects", icon: FolderOpen, startsWith: "/dashboard/projects" },
   { href: "/dashboard/scans", label: "Scans", icon: ScanSearch, startsWith: "/dashboard/scans" },
   { href: "/dashboard/issues", label: "Issues", icon: Layers3, startsWith: "/dashboard/issues" },
+  { href: "/dashboard/rules", label: "Rules", icon: Shield, startsWith: "/dashboard/rules" },
   { href: "/dashboard/trends", label: "Trends", icon: Sparkles, startsWith: "/dashboard/trends" },
-];
-
-const SECONDARY_ITEMS: NavItem[] = [
-  { href: "/dashboard/billing", label: "Billing", icon: CreditCard, startsWith: "/dashboard/billing" },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings, startsWith: "/dashboard/settings" },
 ];
 
 function itemIsActive(pathname: string, item: NavItem) {
@@ -81,9 +76,6 @@ function NavGroup({ items, title }: { items: NavItem[]; title: string }) {
 
 export default function DashboardSidebarNav() {
   return (
-    <div className="space-y-6">
-      <NavGroup title="Workspace" items={PRIMARY_ITEMS} />
-      <NavGroup title="Manage" items={SECONDARY_ITEMS} />
-    </div>
+    <NavGroup title="Workspace" items={PRIMARY_ITEMS} />
   );
 }
