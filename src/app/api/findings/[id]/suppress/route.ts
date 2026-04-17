@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
 import { getEffectivePlan, getCapabilities } from "@/lib/entitlements";
+import { isGovernedPlan } from "@/lib/exception-governance";
+
+type ProjectRef = { org_id?: string | null; repo_url?: string | null } | null;
+type ProjectRefValue = ProjectRef | ProjectRef[];
 
 export async function POST(
   request: Request,
@@ -17,7 +21,7 @@ export async function POST(
 
   const { data: finding, error: fErr } = await supabase
     .from("findings")
-    .select("id, scan_id, rule_id, file_path, line_number, is_new")
+    .select("id, scan_id, rule_id, file_path, line_number, is_new, group_id")
     .eq("id", id)
     .single();
 
@@ -35,7 +39,12 @@ export async function POST(
     return NextResponse.json({ error: "Scan not found" }, { status: 404 });
   }
 
-  const orgId = (scan.projects as any)?.org_id;
+  const projectRef = scan.projects as ProjectRefValue;
+  const projectRecord = Array.isArray(projectRef) ? (projectRef[0] ?? null) : projectRef;
+  const orgId = projectRecord?.org_id ?? undefined;
+  if (!orgId) {
+    return NextResponse.json({ error: "Workspace not found for scan" }, { status: 404 });
+  }
   const auth = await requirePermission(supabase, "suppress:findings", orgId);
   if (isAuthError(auth)) return auth;
 
@@ -47,6 +56,15 @@ export async function POST(
     .single();
   const effectivePlan = getEffectivePlan({ plan: org?.plan || "free", pro_expires_at: org?.pro_expires_at });
   const caps = getCapabilities(effectivePlan);
+
+  if (isGovernedPlan(effectivePlan) && finding.group_id) {
+    return NextResponse.json({
+      error: "Exception Governance is enabled for this workspace. Request review from the recurring issue page instead of suppressing directly.",
+      code: "EXCEPTION_REQUEST_REQUIRED",
+      issue_group_id: finding.group_id,
+      issue_url: `/dashboard/issues/${finding.group_id}?requestException=1`,
+    }, { status: 409 });
+  }
 
   // Free users must provide an expiry date
   if (!caps.suppressionGovernanceEnabled && !expires_at) {
@@ -112,11 +130,16 @@ export async function POST(
 
   const passed = (unsuppressedNewCount || 0) === 0 || !!scan.is_overridden;
 
+  const stats =
+    scan.stats && typeof scan.stats === "object" && !Array.isArray(scan.stats)
+      ? scan.stats
+      : {};
+
   const { error: scanUpErr } = await supabase
     .from("scans")
     .update({
       quality_gate_passed: passed,
-      stats: { ...(scan.stats as any || {}), new_issues: unsuppressedNewCount || 0 }
+      stats: { ...stats, new_issues: unsuppressedNewCount || 0 }
     })
     .eq("id", scan.id);
 
@@ -124,8 +147,7 @@ export async function POST(
     return serverError(scanUpErr, "Scan update query");
   }
 
-  const projectRef = scan.projects as any;
-  const repoUrl = Array.isArray(projectRef) ? projectRef[0]?.repo_url : projectRef?.repo_url;
+  const repoUrl = projectRecord?.repo_url;
 
   if (passed && process.env.GITHUB_TOKEN && repoUrl) {
     try {

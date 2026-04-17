@@ -2,7 +2,7 @@
 
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle, XCircle, FileText, ChevronDown,
@@ -14,6 +14,7 @@ import FlowVisualizerButton from "@/components/FlowVisualizerButton";
 import FixPrButton from "@/components/FixPrButton";
 import ArtifactStateCard from "@/components/ArtifactStateCard";
 import ScanSurfaceHeader from "@/components/ScanSurfaceHeader";
+import { isGovernedPlan } from "@/lib/exception-governance";
 
 type Scan = {
   id: string;
@@ -716,6 +717,7 @@ function GatePanel({
 
 export default function ScanDetailsPage() {
   const { id } = useParams() as { id: string };
+  const router = useRouter();
 
   const [scan, setScan] = useState<Scan | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
@@ -904,6 +906,10 @@ export default function ScanDetailsPage() {
 
   const handleSuppress = () => {
     if (!selectedFinding) return;
+    if (selectedFinding.group_id && isGovernedPlan(userPlan)) {
+      router.push(`/dashboard/issues/${selectedFinding.group_id}?requestException=1`);
+      return;
+    }
     setSuppressReason("False Positive");
     setSuppressExpiry('NEVER');
     setSuppressOpen(true);
@@ -925,9 +931,14 @@ export default function ScanDetailsPage() {
         body: JSON.stringify({ reason: reasonText, expires_at })
       });
 
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Server rejected suppression");
+        if (data.code === "EXCEPTION_REQUEST_REQUIRED" && data.issue_group_id) {
+          setSuppressOpen(false);
+          router.push(`/dashboard/issues/${data.issue_group_id}?requestException=1`);
+          return;
+        }
+        throw new Error(data.error || "Server rejected suppression");
       }
 
       setSuppressOpen(false);
@@ -1597,8 +1608,12 @@ export default function ScanDetailsPage() {
                   
                   {!selectedFinding.is_suppressed && (
                     <button onClick={handleSuppress} disabled={isSuppressing} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
-                      <Ban className="w-3 h-3" />
-                      Suppress
+                      {selectedFinding.group_id && isGovernedPlan(userPlan) ? (
+                        <Shield className="w-3 h-3" />
+                      ) : (
+                        <Ban className="w-3 h-3" />
+                      )}
+                      {selectedFinding.group_id && isGovernedPlan(userPlan) ? "Request exception" : "Suppress"}
                     </button>
                   )}
                 </div>

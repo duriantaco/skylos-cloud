@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
 import { getEffectivePlan, getCapabilities } from "@/lib/entitlements";
+import { isGovernedPlan } from "@/lib/exception-governance";
 
 type IssueGroupProjectRelation =
   | { org_id?: string | null }
@@ -52,6 +53,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .single();
   const effectivePlan = getEffectivePlan({ plan: org?.plan || "free", pro_expires_at: org?.pro_expires_at });
   const caps = getCapabilities(effectivePlan);
+
+  if (isGovernedPlan(effectivePlan)) {
+    return NextResponse.json({
+      error: "Exception Governance is enabled for this workspace. Request review from the recurring issue page instead of suppressing directly.",
+      code: "EXCEPTION_REQUEST_REQUIRED",
+      issue_group_id: group.id,
+      issue_url: `/dashboard/issues/${group.id}?requestException=1`,
+    }, { status: 409 });
+  }
 
   // Free users must provide an expiry date
   if (!caps.suppressionGovernanceEnabled && !expires_at) {

@@ -134,6 +134,30 @@ async function createOrUpdateIssueGroups(
     return mapping;
   }
 
+  const fingerprints = upsertRows.map((row) => row.fingerprint);
+  const { data: existingGroups, error: existingGroupsError } = await supabase
+    .from("issue_groups")
+    .select("fingerprint, status")
+    .eq("org_id", orgId)
+    .eq("project_id", projectId)
+    .in("fingerprint", fingerprints);
+
+  if (existingGroupsError) {
+    throw new Error(`Failed to load existing issue groups: ${existingGroupsError.message}`);
+  }
+
+  const existingStatusByFingerprint = new Map(
+    (existingGroups || []).map((row) => [row.fingerprint, row.status])
+  );
+
+  for (const row of upsertRows) {
+    const priorStatus = existingStatusByFingerprint.get(row.fingerprint);
+    row.status =
+      priorStatus === "suppressed" || priorStatus === "pending_exception"
+        ? priorStatus
+        : "open";
+  }
+
   const BATCH_SIZE = 100;
   for (let i = 0; i < upsertRows.length; i += BATCH_SIZE) {
     const batch = upsertRows.slice(i, i + BATCH_SIZE);
