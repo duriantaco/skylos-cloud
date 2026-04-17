@@ -74,7 +74,18 @@ export const metadata: Metadata = {
       'max-video-preview': -1,
     },
   },
-  icons: { icon: '/assets/favicon-96x96.png' },
+  manifest: '/assets/site.webmanifest',
+  icons: {
+    icon: [
+      { url: '/assets/favicon copy.ico', sizes: 'any' },
+      { url: '/assets/web-app-manifest-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/assets/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    shortcut: ['/assets/favicon copy.ico'],
+    apple: [
+      { url: '/assets/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
 }
 
 const organizationJsonLd = {
@@ -82,7 +93,7 @@ const organizationJsonLd = {
   '@type': 'Organization',
   name: 'Skylos',
   url: siteUrl,
-  logo: `${siteUrl}/assets/favicon-96x96.png`,
+  logo: `${siteUrl}/assets/web-app-manifest-512x512.png`,
   description: 'Open source AI code security for Python teams. Finds dead code, risky patterns, and removed security controls during AI-assisted refactors.',
   sameAs: [
     'https://github.com/duriantaco/skylos',
