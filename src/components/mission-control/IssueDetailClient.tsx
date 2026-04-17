@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -13,7 +13,11 @@ import {
 import IssueComments from '@/components/IssueComments';
 import AssignIssue from '@/components/AssignIssue';
 import ProFeatureLock from '@/components/ProFeatureLock';
-import { getIssueGroupStatusLabel } from '@/lib/exception-governance';
+import {
+  getExceptionStatusLabel,
+  getIssueGroupStatusLabel,
+  type ExceptionRequestStatus,
+} from '@/lib/exception-governance';
 
 
 type IssueGroup = {
@@ -60,7 +64,9 @@ type Project = {
 type ExceptionRequestSummary = {
   id: string;
   status: string;
+  effective_status: ExceptionRequestStatus;
   justification: string;
+  expires_at: string | null;
   requested_at: string;
   decided_at: string | null;
   requester_email: string | null;
@@ -322,6 +328,12 @@ function formatDate(dateString: string | null) {
   });
 }
 
+function addDaysIso(days: number) {
+  const next = new Date();
+  next.setDate(next.getDate() + days);
+  return next.toISOString();
+}
+
 function SeverityBadge({ severity, size = 'md' }: { severity: string; size?: 'sm' | 'md' | 'lg' }) {
   const s = (severity || 'UNKNOWN').toUpperCase();
   const styles = {
@@ -399,12 +411,19 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
   const [exceptionRequests, setExceptionRequests] = useState<ExceptionRequestSummary[]>([]);
   const [exceptionOpen, setExceptionOpen] = useState(false);
   const [exceptionJustification, setExceptionJustification] = useState('');
+  const [exceptionExpiry, setExceptionExpiry] = useState<'NEVER' | '7' | '30' | '90'>('30');
   const [isSubmittingException, setIsSubmittingException] = useState(false);
   const [exceptionError, setExceptionError] = useState<string | null>(null);
 
   const ruleInfo = getRuleInfo(group.rule_id, group.category);
   const categoryContext = getCategoryContext(group.category);
   const CategoryIcon = categoryContext.icon;
+  const openExceptionModal = useCallback(() => {
+    setExceptionError(null);
+    setExceptionJustification('');
+    setExceptionExpiry('30');
+    setExceptionOpen(true);
+  }, []);
 
   useEffect(() => {
     async function loadProject() {
@@ -469,14 +488,17 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
 
   useEffect(() => {
     if (searchParams.get('requestException') === '1' && plan !== 'free') {
-      setExceptionOpen(true);
+      openExceptionModal();
     }
-  }, [plan, searchParams]);
+  }, [openExceptionModal, plan, searchParams]);
 
   const lastSeenScanHref = group.last_seen_scan_id ? `/dashboard/scans/${group.last_seen_scan_id}` : null;
   const affectedFileCount = new Set(findings.map((finding) => finding.file_path)).size;
   const findingsByScan = findings;
   const latestException = exceptionRequests[0] || null;
+  const canRequestAnotherException =
+    !latestException ||
+    ['rejected', 'revoked', 'expired'].includes(latestException.effective_status);
 
   async function submitExceptionRequest() {
     const justification = exceptionJustification.trim();
@@ -485,13 +507,16 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
       return;
     }
 
+    const expires_at =
+      exceptionExpiry === 'NEVER' ? null : addDaysIso(parseInt(exceptionExpiry, 10));
+
     setIsSubmittingException(true);
     setExceptionError(null);
     try {
       const res = await fetch(`/api/issue-groups/${group.id}/exception-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ justification }),
+        body: JSON.stringify({ justification, expires_at }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -508,6 +533,7 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
       }
       setGroupStatus('pending_exception');
       setExceptionJustification('');
+      setExceptionExpiry('30');
       setExceptionOpen(false);
     } catch (error) {
       setExceptionError(error instanceof Error ? error.message : 'Failed to request exception');
@@ -736,7 +762,13 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
                   <>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest request</div>
-                      <div className="mt-2 text-sm font-semibold text-slate-900">{latestException.status}</div>
+                      <div className="mt-2 text-sm font-semibold text-slate-900">
+                        {getExceptionStatusLabel(latestException.effective_status)}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Requested {formatDate(latestException.requested_at)}
+                        {latestException.expires_at ? ` · Expires ${formatDate(latestException.expires_at)}` : ' · No expiry'}
+                      </div>
                       <p className="mt-1 text-sm text-slate-600 line-clamp-3">{latestException.justification}</p>
                     </div>
                     <Link
@@ -745,10 +777,10 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
                     >
                       Open decision trail
                     </Link>
-                    {latestException.status !== 'requested' && groupStatus !== 'suppressed' ? (
+                    {canRequestAnotherException ? (
                       <button
                         type="button"
-                        onClick={() => setExceptionOpen(true)}
+                        onClick={openExceptionModal}
                         className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                       >
                         Request another exception
@@ -762,7 +794,7 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
                     </p>
                     <button
                       type="button"
-                      onClick={() => setExceptionOpen(true)}
+                      onClick={openExceptionModal}
                       className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                     >
                       Request exception
@@ -890,6 +922,33 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
                     className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none"
                     placeholder="Why should this issue be allowed for now?"
                   />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-700">Expiry</label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {[
+                      ['7', '7 days'],
+                      ['30', '30 days'],
+                      ['90', '90 days'],
+                      ['NEVER', 'No expiry'],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setExceptionExpiry(value as 'NEVER' | '7' | '30' | '90')}
+                        className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                          exceptionExpiry === value
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Expiry is applied to the exception and to any suppressions materialized from approval.
+                  </p>
                 </div>
                 {exceptionError ? <div className="text-sm text-rose-600">{exceptionError}</div> : null}
                 <div className="flex gap-2 justify-end">

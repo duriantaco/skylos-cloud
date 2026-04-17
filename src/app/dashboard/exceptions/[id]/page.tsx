@@ -5,6 +5,7 @@ import { ensureWorkspace } from "@/lib/ensureWorkspace";
 import { getEffectivePlan, canUseSuppressionGovernance } from "@/lib/entitlements";
 import { loadExceptionRequestDetail } from "@/lib/exception-requests";
 import ExceptionDecisionActions from "@/components/exceptions/ExceptionDecisionActions";
+import { getExceptionStatusLabel } from "@/lib/exception-governance";
 
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -14,6 +15,8 @@ function formatDate(value: string | null) {
 function eventLabel(eventType: string) {
   if (eventType === "approved") return { icon: ShieldCheck, color: "text-emerald-600", label: "Approved" };
   if (eventType === "rejected") return { icon: ShieldX, color: "text-rose-600", label: "Rejected" };
+  if (eventType === "revoked") return { icon: ShieldX, color: "text-slate-600", label: "Revoked" };
+  if (eventType === "expired") return { icon: Clock3, color: "text-blue-600", label: "Expired" };
   return { icon: Clock3, color: "text-amber-600", label: "Requested" };
 }
 
@@ -87,6 +90,9 @@ export default async function ExceptionRequestDetailPage(
                 <div className="text-sm text-slate-600">
                   Requested at: <span className="font-medium text-slate-900">{formatDate(request.requested_at)}</span>
                 </div>
+                <div className="text-sm text-slate-600">
+                  Expiry: <span className="font-medium text-slate-900">{request.expires_at ? formatDate(request.expires_at) : "No expiry"}</span>
+                </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Justification</div>
                   <p className="mt-2 text-sm text-slate-800 whitespace-pre-wrap">{request.justification}</p>
@@ -117,8 +123,10 @@ export default async function ExceptionRequestDetailPage(
                         <div className="text-xs text-slate-500">
                           {event.actor_email || event.actor_id} · {formatDate(event.created_at)}
                         </div>
-                        {event.payload?.review_reason ? (
-                          <p className="mt-1 text-sm text-slate-600">{String(event.payload.review_reason)}</p>
+                        {event.payload?.review_reason || event.payload?.revoke_reason ? (
+                          <p className="mt-1 text-sm text-slate-600">
+                            {String(event.payload.review_reason || event.payload.revoke_reason)}
+                          </p>
                         ) : null}
                       </div>
                     </div>
@@ -131,19 +139,31 @@ export default async function ExceptionRequestDetailPage(
           <div className="space-y-6">
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current state</div>
-              <div className="mt-2 text-2xl font-bold text-slate-900">{request.status}</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">
+                {getExceptionStatusLabel(request.effective_status)}
+              </div>
               <p className="mt-2 text-sm text-slate-500">
-                Approving this request will materialize suppressions for the findings in this recurring issue group.
+                {request.effective_status === "requested"
+                  ? "Approving this request will materialize suppressions for the findings in this recurring issue group."
+                  : request.effective_status === "approved"
+                  ? "This exception is currently active and its linked suppressions are still in effect."
+                  : request.effective_status === "expired"
+                  ? "This exception reached its expiry and is no longer active."
+                  : request.effective_status === "revoked"
+                  ? "This exception was revoked and its linked suppressions were removed."
+                  : "This request has already been reviewed and recorded in the decision trail."}
               </p>
             </section>
 
-            {request.status === "requested" ? (
+            {request.effective_status === "requested" ? (
               <ExceptionDecisionActions requestId={request.id} />
+            ) : request.effective_status === "approved" ? (
+              <ExceptionDecisionActions requestId={request.id} mode="revoke" />
             ) : (
               <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="text-sm font-semibold text-slate-900">Decision recorded</div>
                 <p className="mt-1 text-sm text-slate-500">
-                  This request has already been {request.status}. Use the issue page and suppression audit for follow-up actions.
+                  This request is currently {getExceptionStatusLabel(request.effective_status).toLowerCase()}. Use the issue page and suppression audit for follow-up actions.
                 </p>
               </section>
             )}

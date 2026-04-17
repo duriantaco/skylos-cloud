@@ -7,6 +7,22 @@ export type ExceptionRequestStatus =
   | "revoked"
   | "expired";
 
+export function isExceptionExpired(expiresAt: string | null | undefined): boolean {
+  if (!expiresAt) return false;
+  const timestamp = new Date(expiresAt).getTime();
+  return Number.isFinite(timestamp) && timestamp <= Date.now();
+}
+
+export function getEffectiveExceptionStatus(
+  status: ExceptionRequestStatus,
+  expiresAt: string | null | undefined
+): ExceptionRequestStatus {
+  if (status === "approved" && isExceptionExpired(expiresAt)) {
+    return "expired";
+  }
+  return status;
+}
+
 export function isGovernedPlan(plan: string): boolean {
   return plan === "pro" || plan === "enterprise";
 }
@@ -21,6 +37,23 @@ export function getIssueGroupStatusLabel(status: string | null | undefined): str
       return "Resolved";
     default:
       return "Open";
+  }
+}
+
+export function getExceptionStatusLabel(status: ExceptionRequestStatus): string {
+  switch (status) {
+    case "requested":
+      return "Pending review";
+    case "approved":
+      return "Approved";
+    case "rejected":
+      return "Rejected";
+    case "revoked":
+      return "Revoked";
+    case "expired":
+      return "Expired";
+    default:
+      return status;
   }
 }
 

@@ -4,17 +4,23 @@ import { ClipboardList, Lock, ShieldAlert } from "lucide-react";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
 import { getEffectivePlan, canUseSuppressionGovernance } from "@/lib/entitlements";
 import { loadExceptionRequests } from "@/lib/exception-requests";
+import {
+  getExceptionStatusLabel,
+  type ExceptionRequestStatus,
+} from "@/lib/exception-governance";
 
 function formatDate(value: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleString();
 }
 
-function statusPill(status: string) {
+function statusPill(status: ExceptionRequestStatus) {
   const styles: Record<string, string> = {
     requested: "bg-amber-50 text-amber-700 border-amber-200",
     approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
     rejected: "bg-rose-50 text-rose-700 border-rose-200",
+    revoked: "bg-slate-100 text-slate-700 border-slate-200",
+    expired: "bg-blue-50 text-blue-700 border-blue-200",
   };
 
   return (
@@ -23,7 +29,7 @@ function statusPill(status: string) {
         styles[status] || "bg-slate-50 text-slate-700 border-slate-200"
       }`}
     >
-      {status}
+      {getExceptionStatusLabel(status)}
     </span>
   );
 }
@@ -67,8 +73,10 @@ export default async function ExceptionRequestsPage() {
   }
 
   const requests = await loadExceptionRequests(supabase, orgId, { limit: 100 });
-  const pending = requests.filter((request) => request.status === "requested");
-  const decided = requests.filter((request) => request.status !== "requested");
+  const pending = requests.filter((request) => request.effective_status === "requested");
+  const active = requests.filter((request) => request.effective_status === "approved");
+  const expired = requests.filter((request) => request.effective_status === "expired");
+  const revoked = requests.filter((request) => request.effective_status === "revoked");
 
   return (
     <main className="min-h-screen bg-slate-50 p-8">
@@ -88,22 +96,22 @@ export default async function ExceptionRequestsPage() {
           </Link>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pending review</div>
             <div className="mt-2 text-3xl font-bold text-slate-900">{pending.length}</div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Approved</div>
-            <div className="mt-2 text-3xl font-bold text-slate-900">
-              {decided.filter((request) => request.status === "approved").length}
-            </div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Active exceptions</div>
+            <div className="mt-2 text-3xl font-bold text-slate-900">{active.length}</div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rejected</div>
-            <div className="mt-2 text-3xl font-bold text-slate-900">
-              {decided.filter((request) => request.status === "rejected").length}
-            </div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Expired</div>
+            <div className="mt-2 text-3xl font-bold text-slate-900">{expired.length}</div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Revoked</div>
+            <div className="mt-2 text-3xl font-bold text-slate-900">{revoked.length}</div>
           </div>
         </div>
 
@@ -133,7 +141,12 @@ export default async function ExceptionRequestsPage() {
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        {statusPill(request.status)}
+                        {statusPill(request.effective_status)}
+                        {request.expires_at ? (
+                          <span className="text-[11px] text-slate-500">
+                            Expires {formatDate(request.expires_at)}
+                          </span>
+                        ) : null}
                         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                           {request.project?.name || "Unknown project"}
                         </span>
