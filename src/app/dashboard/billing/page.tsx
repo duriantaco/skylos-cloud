@@ -433,11 +433,17 @@ export default function BillingPage() {
 
         {/* Recent Transactions */}
         <div className="bg-white border border-slate-200 rounded-xl">
-          <div className="p-5 border-b border-slate-100">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between gap-4">
             <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
               <CreditCard className="w-5 h-5" />
               Recent Activity
             </h3>
+            <Link
+              href="/dashboard/billing/history"
+              className="text-sm font-semibold text-slate-600 hover:text-slate-900"
+            >
+              View full history
+            </Link>
           </div>
           {transactions.length === 0 ? (
             <div className="p-8 text-center text-sm text-slate-400">
