@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Shield, Calendar, Zap, BookOpen, CheckCircle } from "lucide-react";
+import { Shield, Calendar, Zap, BookOpen, CheckCircle, Download, ClipboardList } from "lucide-react";
 import dogImg from "../../../../public/assets/favicon-96x96.png";
 import ComplianceReportButton from "@/components/ComplianceReportButton";
 import { getEffectivePlan } from "@/lib/entitlements";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
+import { loadExceptionRequests } from "@/lib/exception-requests";
+import { buildExceptionEvidenceSummary } from "@/lib/exception-evidence";
 
 type ComplianceFramework = {
   id: string;
@@ -39,6 +41,10 @@ export default async function CompliancePage() {
   const proExpiresAt = organization?.pro_expires_at || null;
   const plan = getEffectivePlan({ plan: rawPlan, pro_expires_at: proExpiresAt });
   const canUseCompliance = ["pro", "enterprise"].includes(plan);
+  const exceptionRequests = canUseCompliance
+    ? await loadExceptionRequests(supabase, orgId, { limit: 1000 })
+    : [];
+  const exceptionEvidence = buildExceptionEvidenceSummary(exceptionRequests);
 
   const { data: enabledFrameworks } = await supabase
     .from("org_compliance_settings")
@@ -133,6 +139,59 @@ export default async function CompliancePage() {
         {/* Frameworks Grid */}
         {canUseCompliance && (
           <>
+            <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <ClipboardList className="h-4 w-4 text-slate-500" />
+                    Exception governance evidence
+                  </div>
+                  <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                    Export approved, expired, revoked, and pending exception records with approver, expiry, linked suppressions, and decision trail data for audit reviews.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/api/exception-requests/export"
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export exception CSV
+                  </a>
+                  <Link
+                    href="/dashboard/exceptions"
+                    className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                  >
+                    Open exception queue
+                  </Link>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-4">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Active</div>
+                  <div className="mt-2 text-2xl font-bold text-slate-900">{exceptionEvidence.active}</div>
+                  <div className="mt-1 text-xs text-slate-500">{exceptionEvidence.active_with_expiry} with explicit expiry</div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pending review</div>
+                  <div className="mt-2 text-2xl font-bold text-slate-900">{exceptionEvidence.pending}</div>
+                  <div className="mt-1 text-xs text-slate-500">Requests still waiting on a reviewer</div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Expiring soon</div>
+                  <div className="mt-2 text-2xl font-bold text-slate-900">{exceptionEvidence.expiring_soon}</div>
+                  <div className="mt-1 text-xs text-slate-500">Active exceptions due within 14 days</div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Revoked / expired</div>
+                  <div className="mt-2 text-2xl font-bold text-slate-900">
+                    {exceptionEvidence.revoked + exceptionEvidence.expired}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">Historical governance decisions retained for proof</div>
+                </div>
+              </div>
+            </div>
+
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-slate-900 mb-4">Your Frameworks</h2>
               
