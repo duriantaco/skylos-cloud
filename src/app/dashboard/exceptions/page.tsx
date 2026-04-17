@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ClipboardList, Lock, ShieldAlert } from "lucide-react";
+import { ClipboardList, Download, Lock, ShieldAlert } from "lucide-react";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
 import { getEffectivePlan, canUseSuppressionGovernance } from "@/lib/entitlements";
 import { loadExceptionRequests } from "@/lib/exception-requests";
@@ -88,12 +88,21 @@ export default async function ExceptionRequestsPage() {
               Review requests from live issue groups, approve or reject them, and keep the decision trail tied to the recurring issue.
             </p>
           </div>
-          <Link
-            href="/dashboard/issues"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Open issues
-          </Link>
+          <div className="flex items-center gap-2">
+            <a
+              href="/api/exception-requests/export"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </a>
+            <Link
+              href="/dashboard/issues"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Open issues
+            </Link>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">

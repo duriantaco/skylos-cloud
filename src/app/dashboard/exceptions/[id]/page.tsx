@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Clock3, ShieldCheck, ShieldX } from "lucide-react";
+import { ArrowLeft, Clock3, Download, ShieldCheck, ShieldX } from "lucide-react";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
 import { getEffectivePlan, canUseSuppressionGovernance } from "@/lib/entitlements";
 import { loadExceptionRequestDetail } from "@/lib/exception-requests";
@@ -65,12 +65,21 @@ export default async function ExceptionRequestDetailPage(
               Review the request, understand what enforcement will change, and keep the approval record tied to the recurring issue.
             </p>
           </div>
-          <Link
-            href={`/dashboard/issues/${request.issue_group_id}`}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Open issue
-          </Link>
+          <div className="flex items-center gap-2">
+            <a
+              href={`/api/exceptions/${request.id}/export`}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </a>
+            <Link
+              href={`/dashboard/issues/${request.issue_group_id}`}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Open issue
+            </Link>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.8fr_1fr]">

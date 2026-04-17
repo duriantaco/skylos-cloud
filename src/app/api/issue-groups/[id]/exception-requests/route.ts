@@ -7,6 +7,7 @@ import { requirePlan } from "@/lib/require-credits";
 import {
   getEffectiveExceptionStatus,
   logIssueGroupActivity,
+  syncExpiredExceptionRequests,
 } from "@/lib/exception-governance";
 
 type IssueGroupProjectRelation =
@@ -83,6 +84,11 @@ export async function POST(
   });
   const planCheck = requirePlan(effectivePlan, "pro", "Exception Governance");
   if (!planCheck.ok) return planCheck.response;
+
+  await syncExpiredExceptionRequests(supabase, {
+    orgId,
+    issueGroupId: group.id,
+  });
 
   const { data: existingRequests, error: existingError } = await supabase
     .from("policy_exception_requests")

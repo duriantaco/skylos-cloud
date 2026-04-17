@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ShieldAlert, Search } from "lucide-react";
 import { ensureWorkspace } from "@/lib/ensureWorkspace";
+import { syncExpiredExceptionRequests } from "@/lib/exception-governance";
 
 type IssueGroupRow = {
   id: string;
@@ -96,6 +97,22 @@ export default async function IssuesInboxPage() {
   if (!orgId) 
     return redirect("/dashboard/projects");
 
+  let needsSuppressedFallback = false;
+
+  try {
+    const syncResult = await syncExpiredExceptionRequests(supabase, { orgId });
+    if (!syncResult.ok) {
+      needsSuppressedFallback = true;
+      console.error(
+        "Expiry sync returned a non-ok result before loading issue inbox:",
+        syncResult.error_code
+      );
+    }
+  } catch (error) {
+    needsSuppressedFallback = true;
+    console.error("Failed to sync expired exceptions before loading issue inbox:", error);
+  }
+
   const { data: groups } = await supabase
     .from("issue_groups")
     .select(`
@@ -107,11 +124,67 @@ export default async function IssuesInboxPage() {
       projects!inner(name, repo_url)
     `)
     .eq("org_id", orgId)
-    .in("status", ["open", "pending_exception"])
+    .in("status", needsSuppressedFallback ? ["open", "pending_exception", "suppressed"] : ["open", "pending_exception"])
     .order("last_seen_at", { ascending: false })
     .limit(200);
 
-  const sorted = ((groups || []) as unknown as IssueGroupRow[]).slice().sort((a, b) => {
+  const normalizedGroups = ((groups || []) as unknown as IssueGroupRow[]).slice();
+  const suppressedFallbackIds = new Set<string>();
+
+  if (needsSuppressedFallback) {
+    const suppressedGroupIds = normalizedGroups
+      .filter((group) => group.status === "suppressed")
+      .map((group) => group.id);
+
+    if (suppressedGroupIds.length > 0) {
+      const { data: requestRows } = await supabase
+        .from("policy_exception_requests")
+        .select("issue_group_id, status, expires_at, requested_at")
+        .eq("org_id", orgId)
+        .in("issue_group_id", suppressedGroupIds)
+        .order("requested_at", { ascending: false });
+
+      const latestRequestByGroup = new Map<
+        string,
+        { status: string | null; expires_at: string | null }
+      >();
+
+      for (const row of requestRows || []) {
+        if (!row.issue_group_id || latestRequestByGroup.has(row.issue_group_id)) continue;
+        latestRequestByGroup.set(row.issue_group_id, {
+          status: row.status,
+          expires_at: row.expires_at,
+        });
+      }
+
+      for (const [groupId, request] of latestRequestByGroup.entries()) {
+        // If expiry sync failed, prefer showing time-bounded approved exceptions
+        // instead of risking hidden expired issues in a stale suppressed state.
+        const timeBoundApproved =
+          request.status === "approved" && !!request.expires_at;
+
+        if (
+          request.status === "revoked" ||
+          request.status === "expired" ||
+          timeBoundApproved
+        ) {
+          suppressedFallbackIds.add(groupId);
+        }
+      }
+    }
+  }
+
+  const visibleGroups = normalizedGroups
+    .filter(
+      (group) => group.status !== "suppressed" || suppressedFallbackIds.has(group.id)
+    )
+    .map((group) =>
+      group.status === "suppressed" && suppressedFallbackIds.has(group.id)
+        ? { ...group, status: "open" }
+        : group
+    );
+
+  const sorted = visibleGroups.slice().sort((a, b) => {
     const d = sevRank(b.severity) - sevRank(a.severity);
     if (d !== 0) 
       return d;
