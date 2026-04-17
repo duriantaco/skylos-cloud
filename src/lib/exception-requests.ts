@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   getEffectiveExceptionStatus,
+  syncExpiredExceptionRequests,
   type ExceptionRequestStatus,
 } from "@/lib/exception-governance";
 
@@ -70,8 +71,11 @@ export async function loadExceptionRequests(
     limit?: number;
   }
 ): Promise<EnrichedExceptionRequest[]> {
-  const usesDerivedStatusFilter =
-    opts?.status === "approved" || opts?.status === "expired";
+  await syncExpiredExceptionRequests(supabase, {
+    orgId,
+    requestId: opts?.requestId ?? null,
+    issueGroupId: opts?.issueGroupId ?? null,
+  });
 
   let query = supabase
     .from("policy_exception_requests")
@@ -83,14 +87,10 @@ export async function loadExceptionRequests(
 
   if (opts?.requestId) query = query.eq("id", opts.requestId);
   if (opts?.status) {
-    if (usesDerivedStatusFilter) {
-      query = query.eq("status", "approved");
-    } else {
-      query = query.eq("status", opts.status);
-    }
+    query = query.eq("status", opts.status);
   }
   if (opts?.issueGroupId) query = query.eq("issue_group_id", opts.issueGroupId);
-  if (opts?.limit && !usesDerivedStatusFilter) query = query.limit(opts.limit);
+  if (opts?.limit) query = query.limit(opts.limit);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -153,12 +153,7 @@ export async function loadExceptionRequests(
       : null,
   }));
 
-  if (!opts?.status) {
-    return enriched;
-  }
-
-  const filtered = enriched.filter((request) => request.effective_status === opts.status);
-  return opts.limit ? filtered.slice(0, opts.limit) : filtered;
+  return enriched;
 }
 
 export async function loadExceptionRequestDetail(

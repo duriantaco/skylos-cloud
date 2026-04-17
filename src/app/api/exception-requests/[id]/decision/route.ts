@@ -4,7 +4,10 @@ import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
 import { getEffectivePlan } from "@/lib/entitlements";
 import { requirePlan } from "@/lib/require-credits";
-import { logIssueGroupActivity } from "@/lib/exception-governance";
+import {
+  logIssueGroupActivity,
+  reviewExceptionRequest,
+} from "@/lib/exception-governance";
 
 type Decision = "approve" | "reject";
 
@@ -26,7 +29,7 @@ export async function POST(
   const { data: requestRow, error: requestError } = await supabase
     .from("policy_exception_requests")
     .select(
-      "id, org_id, project_id, issue_group_id, requested_by, status, justification, snapshot, expires_at"
+      "id, org_id, issue_group_id, requested_by"
     )
     .eq("id", id)
     .single();
@@ -57,145 +60,60 @@ export async function POST(
     );
   }
 
-  if (requestRow.status !== "requested") {
-    return NextResponse.json(
-      { error: "Only pending exception requests can be reviewed." },
-      { status: 409 }
-    );
-  }
-
-  if (
-    decision === "approve" &&
-    requestRow.expires_at &&
-    new Date(requestRow.expires_at).getTime() <= Date.now()
-  ) {
-    return NextResponse.json(
-      { error: "This exception request already passed its expiry and can no longer be approved." },
-      { status: 409 }
-    );
-  }
-
-  const nextStatus = decision === "approve" ? "approved" : "rejected";
-  const decidedAt = new Date().toISOString();
-
-  const { error: updateError } = await supabase
-    .from("policy_exception_requests")
-    .update({
-      status: nextStatus,
-      reviewed_by: auth.user.id,
-      review_reason: reviewReason,
-      decided_at: decidedAt,
-    })
-    .eq("id", requestRow.id)
-    .eq("status", "requested");
-
-  if (updateError) {
-    return serverError(updateError, "Update exception request");
-  }
-
-  const { error: eventError } = await supabase.from("exception_events").insert({
-    exception_request_id: requestRow.id,
-    org_id: requestRow.org_id,
-    issue_group_id: requestRow.issue_group_id,
-    actor_id: auth.user.id,
-    event_type: nextStatus,
-    payload: {
-      review_reason: reviewReason,
-      expires_at: requestRow.expires_at,
-    },
+  const result = await reviewExceptionRequest(supabase, {
+    requestId: requestRow.id,
+    reviewerId: auth.user.id,
+    decision,
+    reviewReason,
   });
 
-  if (eventError) {
-    return serverError(eventError, "Create exception decision event");
+  if (!result.ok) {
+    if (result.error_code === "not_found") {
+      return NextResponse.json({ error: "Exception request not found." }, { status: 404 });
+    }
+    if (result.error_code === "self_review") {
+      return NextResponse.json(
+        { error: "Requesters cannot approve or reject their own exception requests." },
+        { status: 403 }
+      );
+    }
+    if (result.error_code === "expired") {
+      return NextResponse.json(
+        {
+          error:
+            "This exception request already passed its expiry and can no longer be reviewed.",
+        },
+        { status: 409 }
+      );
+    }
+    if (result.error_code === "invalid_state") {
+      return NextResponse.json(
+        { error: "Only pending exception requests can be reviewed." },
+        { status: 409 }
+      );
+    }
+    if (result.error_code === "forbidden") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return serverError(new Error("Unexpected exception review response"), "Review exception");
   }
 
-  if (decision === "approve") {
-    const { data: findings, error: findingsError } = await supabase
-      .from("findings")
-      .select("id, rule_id, file_path, line_number")
-      .eq("group_id", requestRow.issue_group_id)
-      .limit(5000);
+  const nextStatus = result.status ?? (decision === "approve" ? "approved" : "rejected");
+  const nextIssueStatus =
+    result.issue_group_status ?? (decision === "approve" ? "suppressed" : "open");
 
-    if (findingsError) {
-      return serverError(findingsError, "Load findings for suppression materialization");
-    }
-
-    const suppressionRows =
-      (findings || []).map((finding) => ({
-        project_id: requestRow.project_id,
-        rule_id: finding.rule_id,
-        file_path: finding.file_path,
-        line_number: Number(finding.line_number || 0),
-        exception_request_id: requestRow.id,
-        reason: requestRow.justification,
-        created_by: requestRow.requested_by,
-        expires_at: requestRow.expires_at,
-      })) || [];
-
-    if (suppressionRows.length > 0) {
-      const { error: suppressionsError } = await supabase
-        .from("finding_suppressions")
-        .upsert(suppressionRows, { onConflict: "project_id,rule_id,line_number,file_path" });
-
-      if (suppressionsError) {
-        return serverError(suppressionsError, "Materialize approved suppressions");
-      }
-
-      const findingIds = findings!.map((finding) => finding.id);
-      const { error: updateFindingsError } = await supabase
-        .from("findings")
-        .update({ is_suppressed: true })
-        .in("id", findingIds);
-
-      if (updateFindingsError) {
-        return serverError(updateFindingsError, "Mark findings as suppressed");
-      }
-    }
-
-    const { error: issueStatusError } = await supabase
-      .from("issue_groups")
-      .update({ status: "suppressed" })
-      .eq("id", requestRow.issue_group_id);
-
-    if (issueStatusError) {
-      return serverError(issueStatusError, "Update issue group status to suppressed");
-    }
-
-    await logIssueGroupActivity(supabase, {
-      orgId: requestRow.org_id,
-      userId: auth.user.id,
-      issueGroupId: requestRow.issue_group_id,
-      activityType: "suppression",
-      metadata: {
-        action: "exception_approved",
-        exception_request_id: requestRow.id,
-        status: "suppressed",
-        review_reason: reviewReason,
-      },
-    });
-  } else {
-    const { error: issueStatusError } = await supabase
-      .from("issue_groups")
-      .update({ status: "open" })
-      .eq("id", requestRow.issue_group_id);
-
-    if (issueStatusError) {
-      return serverError(issueStatusError, "Update issue group status to open");
-    }
-
-    await logIssueGroupActivity(supabase, {
-      orgId: requestRow.org_id,
-      userId: auth.user.id,
-      issueGroupId: requestRow.issue_group_id,
-      activityType: "status_change",
-      metadata: {
-        action: "exception_rejected",
-        exception_request_id: requestRow.id,
-        status: "open",
-        review_reason: reviewReason,
-      },
-    });
-  }
+  await logIssueGroupActivity(supabase, {
+    orgId: requestRow.org_id,
+    userId: auth.user.id,
+    issueGroupId: requestRow.issue_group_id,
+    activityType: decision === "approve" ? "suppression" : "status_change",
+    metadata: {
+      action: decision === "approve" ? "exception_approved" : "exception_rejected",
+      exception_request_id: requestRow.id,
+      status: nextIssueStatus,
+      review_reason: reviewReason,
+    },
+  });
 
   return NextResponse.json({ success: true, status: nextStatus });
 }

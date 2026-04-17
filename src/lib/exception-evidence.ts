@@ -23,9 +23,9 @@ type ExceptionEventRow = {
 };
 
 type LinkedSuppressionRow = {
-  exception_request_id: string | null;
-  revoked_at: string | null;
-  expires_at: string | null;
+  exception_request_id: string;
+  state: "active" | "revoked" | "expired";
+  terminal_at: string | null;
 };
 
 export type ExceptionEvidenceRow = {
@@ -47,8 +47,14 @@ export type ExceptionEvidenceRow = {
   requested_at: string;
   decided_at: string;
   expires_at: string;
+  terminal_event_type: string;
+  terminal_actor_email: string;
+  terminal_reason: string;
+  terminal_at: string;
   linked_suppressions: number;
   active_linked_suppressions: number;
+  revoked_linked_suppressions: number;
+  expired_linked_suppressions: number;
   decision_trail: string;
 };
 
@@ -73,7 +79,11 @@ function normalizeText(value: unknown): string {
 }
 
 function escapeCsv(value: unknown): string {
-  const stringValue = String(value ?? "");
+  const rawValue = String(value ?? "");
+  const stringValue =
+    /^[\t\r ]*[=+\-@]/.test(rawValue) || rawValue.startsWith("\uFEFF")
+      ? `'${rawValue}`
+      : rawValue;
   if (/[",\n]/.test(stringValue)) {
     return `"${stringValue.replace(/"/g, '""')}"`;
   }
@@ -82,14 +92,29 @@ function escapeCsv(value: unknown): string {
 
 function eventReason(payload: Record<string, unknown> | null): string {
   if (!payload) return "";
-  return normalizeText(payload.review_reason) || normalizeText(payload.revoke_reason);
+  return (
+    normalizeText(payload.review_reason) ||
+    normalizeText(payload.revoke_reason) ||
+    normalizeText(payload.expiry_reason) ||
+    (payload.automation === "expiry_enforcement" ? "Automatic expiry" : "")
+  );
+}
+
+function eventActor(
+  event: ExceptionEventRow,
+  actorEmails: Map<string, string | null>
+): string {
+  if (event.event_type === "expired" && event.payload?.automation === "expiry_enforcement") {
+    return "system";
+  }
+  return actorEmails.get(event.actor_id) || event.actor_id;
 }
 
 function eventSummary(
   event: ExceptionEventRow,
   actorEmails: Map<string, string | null>
 ): string {
-  const actor = actorEmails.get(event.actor_id) || event.actor_id;
+  const actor = eventActor(event, actorEmails);
   const label =
     event.event_type === "requested"
       ? "Requested"
@@ -97,6 +122,20 @@ function eventSummary(
   const reason = eventReason(event.payload);
   const suffix = reason ? ` (${reason})` : "";
   return `${label} by ${actor} at ${fmtDate(event.created_at)}${suffix}`;
+}
+
+function latestTerminalAt(rows: LinkedSuppressionRow[]): string {
+  const timestamps = rows
+    .map((row) => row.terminal_at)
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
+
+  if (timestamps.length === 0) {
+    return "";
+  }
+
+  return new Date(Math.max(...timestamps)).toISOString();
 }
 
 export async function loadExceptionEvidenceRows(
@@ -135,8 +174,8 @@ export async function loadExceptionEvidenceRows(
         .in("exception_request_id", requestIds)
         .order("created_at", { ascending: true }),
       supabase
-        .from("finding_suppressions")
-        .select("exception_request_id, revoked_at, expires_at")
+        .from("exception_request_suppression_links")
+        .select("exception_request_id, state, terminal_at")
         .in("exception_request_id", requestIds),
     ]);
 
@@ -170,23 +209,33 @@ export async function loadExceptionEvidenceRows(
 
   const suppressionsByRequest = new Map<string, LinkedSuppressionRow[]>();
   for (const row of suppressions) {
-    if (!row.exception_request_id) continue;
     const bucket = suppressionsByRequest.get(row.exception_request_id) || [];
     bucket.push(row);
     suppressionsByRequest.set(row.exception_request_id, bucket);
   }
 
-  const now = Date.now();
-
   return filteredRequests.map((request) => {
     const requestEvents = eventsByRequest.get(request.id) || [];
     const requestSuppressions = suppressionsByRequest.get(request.id) || [];
-    const activeLinkedSuppressions = requestSuppressions.filter((row) => {
-      if (row.revoked_at) return false;
-      if (!row.expires_at) return true;
-      const timestamp = new Date(row.expires_at).getTime();
-      return Number.isFinite(timestamp) && timestamp > now;
-    }).length;
+    const activeLinkedSuppressions = requestSuppressions.filter((row) => row.state === "active").length;
+    const revokedLinkedSuppressions = requestSuppressions.filter(
+      (row) => row.state === "revoked"
+    ).length;
+    const expiredLinkedSuppressions = requestSuppressions.filter(
+      (row) => row.state === "expired"
+    ).length;
+    const terminalEvent = [...requestEvents]
+      .reverse()
+      .find(
+        (event) =>
+          event.event_type === "revoked" ||
+          event.event_type === "expired" ||
+          event.event_type === "rejected"
+      );
+    const terminalAt =
+      latestTerminalAt(requestSuppressions) ||
+      fmtDate(normalizeText(terminalEvent?.payload?.effective_at)) ||
+      fmtDate(terminalEvent?.created_at);
 
     return {
       request_id: request.id,
@@ -207,8 +256,14 @@ export async function loadExceptionEvidenceRows(
       requested_at: fmtDate(request.requested_at),
       decided_at: fmtDate(request.decided_at),
       expires_at: fmtDate(request.expires_at),
+      terminal_event_type: terminalEvent?.event_type || "",
+      terminal_actor_email: terminalEvent ? eventActor(terminalEvent, actorEmails) : "",
+      terminal_reason: terminalEvent ? eventReason(terminalEvent.payload) : "",
+      terminal_at: terminalAt,
       linked_suppressions: requestSuppressions.length,
       active_linked_suppressions: activeLinkedSuppressions,
+      revoked_linked_suppressions: revokedLinkedSuppressions,
+      expired_linked_suppressions: expiredLinkedSuppressions,
       decision_trail: requestEvents
         .map((event) => eventSummary(event, actorEmails))
         .join(" | "),
@@ -287,8 +342,14 @@ export function generateExceptionEvidenceCsv(rows: ExceptionEvidenceRow[]): stri
     "requested_at",
     "decided_at",
     "expires_at",
+    "terminal_event_type",
+    "terminal_actor_email",
+    "terminal_reason",
+    "terminal_at",
     "linked_suppressions",
     "active_linked_suppressions",
+    "revoked_linked_suppressions",
+    "expired_linked_suppressions",
     "decision_trail",
   ];
 
