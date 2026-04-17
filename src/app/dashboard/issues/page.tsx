@@ -16,6 +16,7 @@ type IssueGroupRow = {
   last_seen_at: string;
   last_seen_scan_id: string | null;
   author_email: string | null;
+  status: string;
   projects?: { name: string | null; repo_url: string | null } | null;
 };
 
@@ -64,6 +65,29 @@ function SeverityPill({ severity }: { severity: string }) {
   );
 }
 
+function StatusPill({ status }: { status: string }) {
+  const normalized = String(status || "open").toLowerCase();
+  const cls =
+    normalized === "pending_exception"
+      ? "bg-amber-50 text-amber-700 border-amber-200"
+      : normalized === "suppressed"
+      ? "bg-slate-100 text-slate-700 border-slate-200"
+      : "bg-emerald-50 text-emerald-700 border-emerald-200";
+
+  const label =
+    normalized === "pending_exception"
+      ? "Pending Exception"
+      : normalized === "suppressed"
+      ? "Suppressed"
+      : "Open";
+
+  return (
+    <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
 export default async function IssuesInboxPage() {
   const { user, orgId, supabase } = await ensureWorkspace();
   if (!user) {
@@ -75,7 +99,7 @@ export default async function IssuesInboxPage() {
   const { data: groups } = await supabase
     .from("issue_groups")
     .select(`
-      id, rule_id, severity, category, source,
+      id, rule_id, severity, category, source, status,
       canonical_file, canonical_line,
       occurrence_count, verification_status,
       last_seen_at, last_seen_scan_id,
@@ -83,7 +107,7 @@ export default async function IssuesInboxPage() {
       projects!inner(name, repo_url)
     `)
     .eq("org_id", orgId)
-    .eq("status", "open")
+    .in("status", ["open", "pending_exception"])
     .order("last_seen_at", { ascending: false })
     .limit(200);
 
@@ -101,16 +125,23 @@ export default async function IssuesInboxPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Recurring Issues</h1>
             <p className="text-slate-500 mt-1">
-              Deduped root causes across scans. Use this backlog after scan review for recurrence history, ownership, and follow-up.
+              Persistent root causes across scans. Open one for recurrence history, ownership, and governed exception requests.
             </p>
           </div>
-
-          <Link
-            href="/dashboard"
-            className="text-sm font-semibold text-gray-700 hover:text-indigo-700"
-          >
-            ← Back to Dashboard
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/exceptions"
+              className="text-sm font-semibold text-slate-700 hover:text-indigo-700"
+            >
+              Exception Queue
+            </Link>
+            <Link
+              href="/dashboard"
+              className="text-sm font-semibold text-gray-700 hover:text-indigo-700"
+            >
+              ← Back to Dashboard
+            </Link>
+          </div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-3">
@@ -147,6 +178,7 @@ export default async function IssuesInboxPage() {
                         {g.verification_status === "VERIFIED" ? " • VERIFIED" : ""}
                         {g.author_email ? ` • ${g.author_email}` : ""}
                       </span>
+                      <StatusPill status={g.status} />
                       <SourceBadge source={g.source} />
                     </div>
                     <div className="mt-1 text-sm font-bold text-slate-900 truncate">

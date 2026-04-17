@@ -235,6 +235,12 @@ export default async function DashboardLayout({
                   Issues
                 </Link>
                 <Link
+                  href="/dashboard/exceptions"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600"
+                >
+                  Exceptions
+                </Link>
+                <Link
                   href="/dashboard/rules"
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600"
                 >

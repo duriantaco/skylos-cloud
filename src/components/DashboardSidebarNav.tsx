@@ -10,6 +10,7 @@ import {
   ScanSearch,
   Sparkles,
   Shield,
+  ShieldCheck,
 } from "lucide-react";
 
 type NavItem = {
@@ -24,6 +25,7 @@ const PRIMARY_ITEMS: NavItem[] = [
   { href: "/dashboard/projects", label: "Projects", icon: FolderOpen, startsWith: "/dashboard/projects" },
   { href: "/dashboard/scans", label: "Scans", icon: ScanSearch, startsWith: "/dashboard/scans" },
   { href: "/dashboard/issues", label: "Issues", icon: Layers3, startsWith: "/dashboard/issues" },
+  { href: "/dashboard/exceptions", label: "Exceptions", icon: ShieldCheck, startsWith: "/dashboard/exceptions" },
   { href: "/dashboard/rules", label: "Rules", icon: Shield, startsWith: "/dashboard/rules" },
   { href: "/dashboard/trends", label: "Trends", icon: Sparkles, startsWith: "/dashboard/trends" },
 ];

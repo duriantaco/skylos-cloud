@@ -23,7 +23,9 @@ export type Permission =
   | "manage:members"
   | "bulk:delete"
   | "manage:billing"
-  | "manage:org";
+  | "manage:org"
+  | "request:exceptions"
+  | "review:exceptions";
 
 export const VIEWER_PERMISSIONS: Permission[] = [
   "view:scans",
@@ -40,6 +42,7 @@ export const MEMBER_PERMISSIONS: Permission[] = [
   "create:projects",
   "edit:projects",
   "suppress:findings",
+  "request:exceptions",
   "assign:issues",
   "comment:issues",
   "create:scans",
@@ -55,6 +58,7 @@ export const ADMIN_PERMISSIONS: Permission[] = [
   "manage:rules",
   "manage:members",
   "bulk:delete",
+  "review:exceptions",
 ];
 
 export const OWNER_PERMISSIONS: Permission[] = [

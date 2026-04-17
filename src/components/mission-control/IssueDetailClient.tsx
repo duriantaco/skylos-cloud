@@ -3,15 +3,17 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, ExternalLink, CheckCircle, XCircle,
   GitCommit, FileCode, Shield, Eye, History,
   ChevronRight, Layers, ArrowUpRight, Trash2, Bug,
-  Key, Zap
+  Key, Zap, X
 } from 'lucide-react';
 import IssueComments from '@/components/IssueComments';
 import AssignIssue from '@/components/AssignIssue';
 import ProFeatureLock from '@/components/ProFeatureLock';
+import { getIssueGroupStatusLabel } from '@/lib/exception-governance';
 
 
 type IssueGroup = {
@@ -53,6 +55,16 @@ type Finding = {
 type Project = {
   name: string;
   repo_url: string | null;
+};
+
+type ExceptionRequestSummary = {
+  id: string;
+  status: string;
+  justification: string;
+  requested_at: string;
+  decided_at: string | null;
+  requester_email: string | null;
+  reviewer_email: string | null;
 };
 
 const CATEGORY_CONTEXT: Record<string, {
@@ -378,10 +390,17 @@ function StatCard({ icon, label, value, subtext }: { icon: React.ReactNode; labe
 }
 
 export default function IssueDetailClient({ group, plan = 'free' }: { group: IssueGroup; plan?: string }) {
+  const searchParams = useSearchParams();
+  const [groupStatus, setGroupStatus] = useState(group.status);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [exceptionRequests, setExceptionRequests] = useState<ExceptionRequestSummary[]>([]);
+  const [exceptionOpen, setExceptionOpen] = useState(false);
+  const [exceptionJustification, setExceptionJustification] = useState('');
+  const [isSubmittingException, setIsSubmittingException] = useState(false);
+  const [exceptionError, setExceptionError] = useState<string | null>(null);
 
   const ruleInfo = getRuleInfo(group.rule_id, group.category);
   const categoryContext = getCategoryContext(group.category);
@@ -431,9 +450,71 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
     }
     loadFindings();
   }, [group.id]);
+
+  useEffect(() => {
+    async function loadExceptionRequests() {
+      if (plan === 'free') return;
+      try {
+        const res = await fetch(`/api/exception-requests?issueGroupId=${group.id}&limit=5`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setExceptionRequests(Array.isArray(data.requests) ? data.requests : []);
+      } catch (error) {
+        console.error('Failed to load exception requests:', error);
+      }
+    }
+
+    loadExceptionRequests();
+  }, [group.id, plan]);
+
+  useEffect(() => {
+    if (searchParams.get('requestException') === '1' && plan !== 'free') {
+      setExceptionOpen(true);
+    }
+  }, [plan, searchParams]);
+
   const lastSeenScanHref = group.last_seen_scan_id ? `/dashboard/scans/${group.last_seen_scan_id}` : null;
   const affectedFileCount = new Set(findings.map((finding) => finding.file_path)).size;
   const findingsByScan = findings;
+  const latestException = exceptionRequests[0] || null;
+
+  async function submitExceptionRequest() {
+    const justification = exceptionJustification.trim();
+    if (justification.length < 8) {
+      setExceptionError('Add a clear justification before requesting an exception.');
+      return;
+    }
+
+    setIsSubmittingException(true);
+    setExceptionError(null);
+    try {
+      const res = await fetch(`/api/issue-groups/${group.id}/exception-requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ justification }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to request exception');
+      }
+
+      const refreshRes = await fetch(`/api/exception-requests?issueGroupId=${group.id}&limit=5`);
+      if (refreshRes.ok) {
+        const refreshData = await refreshRes.json();
+        setExceptionRequests(Array.isArray(refreshData.requests) ? refreshData.requests : []);
+      } else {
+        setExceptionRequests((prev) => [data.request, ...prev]);
+      }
+      setGroupStatus('pending_exception');
+      setExceptionJustification('');
+      setExceptionOpen(false);
+    } catch (error) {
+      setExceptionError(error instanceof Error ? error.message : 'Failed to request exception');
+    } finally {
+      setIsSubmittingException(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-slate-900 font-sans">
@@ -488,14 +569,31 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
               <div className="text-xs font-bold uppercase tracking-wide text-sky-700">Recurring Issue Record</div>
               <p className="mt-1 text-sm text-sky-900">
                 This page tracks the same root cause across scans. Use it for recurrence history, ownership, comments,
-                and verification context. Use the scan view when you need to suppress, fix, verify, inspect flow,
-                or clear blockers from one specific upload.
+                and verification context. Use the scan view when you need to clear blockers from one specific upload.
               </p>
               {group.last_seen_at ? (
                 <p className="mt-2 text-xs text-sky-800">
                   Last seen {timeAgo(group.last_seen_at)} in this project. Open the latest scan occurrence when you need the live upload context.
                 </p>
               ) : null}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {lastSeenScanHref ? (
+                <Link
+                  href={lastSeenScanHref}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+                >
+                  <History className="w-3.5 h-3.5" />
+                  Open scan occurrence
+                </Link>
+              ) : null}
+              <Link
+                href="/dashboard/exceptions"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                Exception queue
+              </Link>
             </div>
           </div>
         </div>
@@ -621,8 +719,58 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
               <StatCard icon={<Eye className="w-4 h-4" />} label="Occurrences" value={group.occurrence_count}
                 subtext={`${affectedFileCount || group.affected_files?.length || 0} files`} />
               <StatCard icon={<Zap className="w-4 h-4" />} label="Status"
-                value={group.status === 'open' ? 'Open' : 'Resolved'} />
+                value={getIssueGroupStatusLabel(groupStatus)} />
             </div>
+
+            <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-slate-400" />
+                  Exception governance
+                </h3>
+              </div>
+              <div className="p-4 space-y-3">
+                {plan === 'free' ? (
+                  <ProFeatureLock feature="Exception Governance" description="Route recurring issue suppressions through reviewer approval and keep a decision trail." />
+                ) : latestException ? (
+                  <>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest request</div>
+                      <div className="mt-2 text-sm font-semibold text-slate-900">{latestException.status}</div>
+                      <p className="mt-1 text-sm text-slate-600 line-clamp-3">{latestException.justification}</p>
+                    </div>
+                    <Link
+                      href={`/dashboard/exceptions/${latestException.id}`}
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Open decision trail
+                    </Link>
+                    {latestException.status !== 'requested' && groupStatus !== 'suppressed' ? (
+                      <button
+                        type="button"
+                        onClick={() => setExceptionOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Request another exception
+                      </button>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-slate-600">
+                      Request a human-reviewed exception for this recurring issue. Approved requests materialize into suppressions and keep a decision trail for audits.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setExceptionOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                    >
+                      Request exception
+                    </button>
+                  </>
+                )}
+              </div>
+            </section>
 
             <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
@@ -712,6 +860,49 @@ export default function IssueDetailClient({ group, plan = 'free' }: { group: Iss
           </div>
         </div>
       </main>
+
+      {exceptionOpen && (
+        <div className="fixed inset-0 z-[95]">
+          <div className="absolute inset-0 bg-black/40" onClick={() => !isSubmittingException && setExceptionOpen(false)} />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="w-full max-w-xl rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 flex items-start gap-4">
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-slate-900">Request exception</div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    Send this recurring issue to a reviewer instead of suppressing it immediately.
+                  </div>
+                </div>
+                <button onClick={() => setExceptionOpen(false)} className="ml-auto p-2 rounded-lg hover:bg-slate-50">
+                  <X className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 font-mono">
+                  {group.rule_id} :: {group.canonical_file}:{group.canonical_line}
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-700">Justification</label>
+                  <textarea
+                    value={exceptionJustification}
+                    onChange={(e) => setExceptionJustification(e.target.value)}
+                    rows={4}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none"
+                    placeholder="Why should this issue be allowed for now?"
+                  />
+                </div>
+                {exceptionError ? <div className="text-sm text-rose-600">{exceptionError}</div> : null}
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setExceptionOpen(false)} disabled={isSubmittingException} className="px-3 py-2 rounded-lg text-sm border border-slate-200 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+                  <button onClick={submitExceptionRequest} disabled={isSubmittingException || exceptionJustification.trim().length < 8} className="px-3 py-2 rounded-lg text-sm bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50">
+                    {isSubmittingException ? "Submitting..." : "Send for review"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

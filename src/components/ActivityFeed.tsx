@@ -1,14 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MessageCircle, UserPlus, CheckCircle, Shield, Clock, User } from 'lucide-react';
+import { MessageCircle, UserPlus, CheckCircle, Shield, Clock } from 'lucide-react';
 
 type Activity = {
   id: string;
   activity_type: 'comment' | 'assignment' | 'resolution' | 'suppression' | 'false_positive' | 'status_change';
   entity_type: string;
   entity_id: string;
-  metadata: any;
+  metadata: {
+    action?: string;
+    assigned_to?: string | null;
+    comment_preview?: string | null;
+    status?: string | null;
+  } | null;
   created_at: string;
   user: {
     id: string;
@@ -61,21 +66,21 @@ export default function ActivityFeed() {
   const [limit] = useState(50);
 
   useEffect(() => {
-    fetchActivities();
-  }, []);
-
-  async function fetchActivities() {
-    try {
-      const response = await fetch(`/api/team/activity?limit=${limit}`);
-      if (!response.ok) throw new Error('Failed to fetch activities');
-      const data = await response.json();
-      setActivities(data.activities || []);
-    } catch (error: any) {
-      console.error('Error fetching activities:', error);
-    } finally {
-      setLoading(false);
+    async function fetchActivities() {
+      try {
+        const response = await fetch(`/api/team/activity?limit=${limit}`);
+        if (!response.ok) throw new Error('Failed to fetch activities');
+        const data = await response.json();
+        setActivities(data.activities || []);
+      } catch (error) {
+        console.error('Error fetching activities:', error);
+      } finally {
+        setLoading(false);
+      }
     }
-  }
+
+    fetchActivities();
+  }, [limit]);
 
   function formatTimeAgo(dateString: string): string {
     const date = new Date(dateString);
@@ -92,6 +97,16 @@ export default function ActivityFeed() {
   function getActivityMessage(activity: Activity): string {
     const config = ACTIVITY_CONFIG[activity.activity_type];
     const metadata = activity.metadata || {};
+
+    if (metadata.action === 'exception_requested') {
+      return 'requested an exception review';
+    }
+    if (metadata.action === 'exception_approved') {
+      return 'approved an exception and suppressed the issue';
+    }
+    if (metadata.action === 'exception_rejected') {
+      return 'rejected an exception request';
+    }
 
     switch (activity.activity_type) {
       case 'comment':
@@ -164,7 +179,7 @@ export default function ActivityFeed() {
                       {/* Activity metadata */}
                       {activity.metadata?.comment_preview && (
                         <p className="text-sm text-slate-600 italic line-clamp-2 mt-1">
-                          "{activity.metadata.comment_preview}"
+                          &quot;{activity.metadata.comment_preview}&quot;
                         </p>
                       )}
 
