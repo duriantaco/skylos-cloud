@@ -144,11 +144,18 @@ export default async function DashboardPage() {
   }
 
   // Fetch org data for workspace access status
-  const { data: orgData } = await supabase
-    .from("organizations")
-    .select("plan, pro_expires_at, credits")
-    .eq("id", orgId)
-    .single();
+  const [{ data: orgData }, { count: completedPurchases }] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("plan, pro_expires_at, credits")
+      .eq("id", orgId)
+      .single(),
+    supabase
+      .from("credit_purchases")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "completed"),
+  ]);
 
   const now = new Date();
   const trialExpiresAt = orgData?.pro_expires_at ? new Date(orgData.pro_expires_at) : null;
@@ -156,9 +163,10 @@ export default async function DashboardPage() {
     plan: orgData?.plan || "free",
     pro_expires_at: orgData?.pro_expires_at || null,
   };
-  const permanentWorkspaceAccess = hasPermanentWorkspaceAccess(workspaceAccess);
-  const activeWorkspaceTrial = hasActiveWorkspaceTrial(workspaceAccess);
-  const expiredWorkspaceTrial = hasExpiredWorkspaceTrial(workspaceAccess);
+  const permanentWorkspaceAccess = Boolean((completedPurchases || 0) > 0)
+    || hasPermanentWorkspaceAccess(workspaceAccess);
+  const activeWorkspaceTrial = !permanentWorkspaceAccess && hasActiveWorkspaceTrial(workspaceAccess);
+  const expiredWorkspaceTrial = !permanentWorkspaceAccess && hasExpiredWorkspaceTrial(workspaceAccess);
   const trialEndingSoon = activeWorkspaceTrial
     && Boolean(trialExpiresAt)
     && (trialExpiresAt!.getTime() - now.getTime()) < 7 * 24 * 60 * 60 * 1000;

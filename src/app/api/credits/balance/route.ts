@@ -62,12 +62,19 @@ export async function GET(req: Request) {
 
     const effectivePlan = getEffectivePlan({ plan: org.plan || 'free', pro_expires_at: org.pro_expires_at });
 
-    const { data: transactions } = await admin
-      .from('credit_transactions')
-      .select('*')
-      .eq('org_id', org.id)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    const [{ data: transactions }, { count: completedPurchases }] = await Promise.all([
+      admin
+        .from('credit_transactions')
+        .select('*')
+        .eq('org_id', org.id)
+        .order('created_at', { ascending: false })
+        .limit(10),
+      admin
+        .from('credit_purchases')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', org.id)
+        .eq('status', 'completed'),
+    ]);
 
     return NextResponse.json({
       balance: org.credits || 0,
@@ -75,6 +82,7 @@ export async function GET(req: Request) {
       org_name: org.name,
       plan: effectivePlan,
       pro_expires_at: org.pro_expires_at || null,
+      has_completed_purchase: Boolean((completedPurchases || 0) > 0),
       last_updated: org.credits_updated_at,
       recent_transactions: transactions || [],
     });
@@ -98,15 +106,26 @@ export async function GET(req: Request) {
 
   const effectivePlan = getEffectivePlan({ plan: org.plan || 'free', pro_expires_at: org.pro_expires_at });
 
-  const { data: transactions, error: txError } = await supabase
-    .from('credit_transactions')
-    .select('*')
-    .eq('org_id', org.id)
-    .order('created_at', { ascending: false })
-    .limit(10);
+  const [{ data: transactions, error: txError }, { count: completedPurchases, error: purchaseError }] =
+    await Promise.all([
+      supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('org_id', org.id)
+        .order('created_at', { ascending: false })
+        .limit(10),
+      supabase
+        .from('credit_purchases')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', org.id)
+        .eq('status', 'completed'),
+    ]);
 
   if (txError) {
     console.error('Error fetching transactions:', txError);
+  }
+  if (purchaseError) {
+    console.error('Error fetching completed purchases:', purchaseError);
   }
 
   return NextResponse.json({
@@ -115,6 +134,7 @@ export async function GET(req: Request) {
     org_name: org.name,
     plan: effectivePlan,
     pro_expires_at: org.pro_expires_at || null,
+    has_completed_purchase: Boolean((completedPurchases || 0) > 0),
     last_updated: org.credits_updated_at,
     recent_transactions: transactions || []
   });
