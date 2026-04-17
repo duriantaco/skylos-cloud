@@ -107,6 +107,9 @@ export default function ActivityFeed() {
     if (metadata.action === 'exception_rejected') {
       return 'rejected an exception request';
     }
+    if (metadata.action === 'exception_revoked') {
+      return 'revoked an exception';
+    }
 
     switch (activity.activity_type) {
       case 'comment':

@@ -26,7 +26,7 @@ export async function POST(
   const { data: requestRow, error: requestError } = await supabase
     .from("policy_exception_requests")
     .select(
-      "id, org_id, project_id, issue_group_id, requested_by, status, justification, snapshot"
+      "id, org_id, project_id, issue_group_id, requested_by, status, justification, snapshot, expires_at"
     )
     .eq("id", id)
     .single();
@@ -64,6 +64,17 @@ export async function POST(
     );
   }
 
+  if (
+    decision === "approve" &&
+    requestRow.expires_at &&
+    new Date(requestRow.expires_at).getTime() <= Date.now()
+  ) {
+    return NextResponse.json(
+      { error: "This exception request already passed its expiry and can no longer be approved." },
+      { status: 409 }
+    );
+  }
+
   const nextStatus = decision === "approve" ? "approved" : "rejected";
   const decidedAt = new Date().toISOString();
 
@@ -90,6 +101,7 @@ export async function POST(
     event_type: nextStatus,
     payload: {
       review_reason: reviewReason,
+      expires_at: requestRow.expires_at,
     },
   });
 
@@ -114,8 +126,10 @@ export async function POST(
         rule_id: finding.rule_id,
         file_path: finding.file_path,
         line_number: Number(finding.line_number || 0),
+        exception_request_id: requestRow.id,
         reason: requestRow.justification,
         created_by: requestRow.requested_by,
+        expires_at: requestRow.expires_at,
       })) || [];
 
     if (suppressionRows.length > 0) {

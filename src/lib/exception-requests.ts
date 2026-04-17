@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ExceptionRequestStatus } from "@/lib/exception-governance";
+import {
+  getEffectiveExceptionStatus,
+  type ExceptionRequestStatus,
+} from "@/lib/exception-governance";
 
 export type ExceptionRequestRecord = {
   id: string;
@@ -14,6 +17,7 @@ export type ExceptionRequestRecord = {
   review_reason: string | null;
   scope_summary: string | null;
   snapshot: Record<string, unknown> | null;
+  expires_at: string | null;
   requested_at: string;
   decided_at: string | null;
 };
@@ -49,6 +53,7 @@ type ProfileSummary = {
 };
 
 export type EnrichedExceptionRequest = ExceptionRequestRecord & {
+  effective_status: ExceptionRequestStatus;
   issue_group: IssueGroupSummary | null;
   project: ProjectSummary | null;
   requester_email: string | null;
@@ -65,18 +70,27 @@ export async function loadExceptionRequests(
     limit?: number;
   }
 ): Promise<EnrichedExceptionRequest[]> {
+  const usesDerivedStatusFilter =
+    opts?.status === "approved" || opts?.status === "expired";
+
   let query = supabase
     .from("policy_exception_requests")
     .select(
-      "id, org_id, project_id, issue_group_id, target_type, requested_by, reviewed_by, status, justification, review_reason, scope_summary, snapshot, requested_at, decided_at"
+      "id, org_id, project_id, issue_group_id, target_type, requested_by, reviewed_by, status, justification, review_reason, scope_summary, snapshot, expires_at, requested_at, decided_at"
     )
     .eq("org_id", orgId)
     .order("requested_at", { ascending: false });
 
   if (opts?.requestId) query = query.eq("id", opts.requestId);
-  if (opts?.status) query = query.eq("status", opts.status);
+  if (opts?.status) {
+    if (usesDerivedStatusFilter) {
+      query = query.eq("status", "approved");
+    } else {
+      query = query.eq("status", opts.status);
+    }
+  }
   if (opts?.issueGroupId) query = query.eq("issue_group_id", opts.issueGroupId);
-  if (opts?.limit) query = query.limit(opts.limit);
+  if (opts?.limit && !usesDerivedStatusFilter) query = query.limit(opts.limit);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -128,8 +142,9 @@ export async function loadExceptionRequests(
     ((profilesRes.data || []) as ProfileSummary[]).map((row) => [row.id, row])
   );
 
-  return requests.map((request) => ({
+  const enriched = requests.map((request) => ({
     ...request,
+    effective_status: getEffectiveExceptionStatus(request.status, request.expires_at),
     issue_group: issueGroups.get(request.issue_group_id) || null,
     project: projects.get(request.project_id) || null,
     requester_email: profiles.get(request.requested_by)?.email || null,
@@ -137,6 +152,13 @@ export async function loadExceptionRequests(
       ? profiles.get(request.reviewed_by)?.email || null
       : null,
   }));
+
+  if (!opts?.status) {
+    return enriched;
+  }
+
+  const filtered = enriched.filter((request) => request.effective_status === opts.status);
+  return opts.limit ? filtered.slice(0, opts.limit) : filtered;
 }
 
 export async function loadExceptionRequestDetail(

@@ -4,7 +4,10 @@ import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
 import { getEffectivePlan } from "@/lib/entitlements";
 import { requirePlan } from "@/lib/require-credits";
-import { logIssueGroupActivity } from "@/lib/exception-governance";
+import {
+  getEffectiveExceptionStatus,
+  logIssueGroupActivity,
+} from "@/lib/exception-governance";
 
 type IssueGroupProjectRelation =
   | { org_id?: string | null }
@@ -20,12 +23,26 @@ export async function POST(
   const body = await request.json().catch(() => ({}));
   const justification =
     typeof body.justification === "string" ? body.justification.trim() : "";
+  const expiresAt =
+    typeof body.expires_at === "string" && body.expires_at.trim().length > 0
+      ? body.expires_at.trim()
+      : null;
 
   if (justification.length < 8) {
     return NextResponse.json(
       { error: "Add a clear justification before requesting an exception." },
       { status: 400 }
     );
+  }
+
+  if (expiresAt) {
+    const timestamp = new Date(expiresAt).getTime();
+    if (!Number.isFinite(timestamp) || timestamp <= Date.now()) {
+      return NextResponse.json(
+        { error: "Expiry must be a valid future date." },
+        { status: 400 }
+      );
+    }
   }
 
   const { data: group, error: groupError } = await supabase
@@ -67,30 +84,34 @@ export async function POST(
   const planCheck = requirePlan(effectivePlan, "pro", "Exception Governance");
   if (!planCheck.ok) return planCheck.response;
 
-  if (group.status === "suppressed") {
-    return NextResponse.json(
-      { error: "This issue already has an approved suppression." },
-      { status: 409 }
-    );
-  }
-
-  const { data: pendingExisting, error: pendingError } = await supabase
+  const { data: existingRequests, error: existingError } = await supabase
     .from("policy_exception_requests")
-    .select("id")
+    .select("id, status, expires_at")
     .eq("issue_group_id", group.id)
-    .eq("status", "requested")
-    .maybeSingle();
+    .in("status", ["requested", "approved"]);
 
-  if (pendingError) {
-    return serverError(pendingError, "Check pending exception requests");
+  if (existingError) {
+    return serverError(existingError, "Check existing exception requests");
   }
 
+  const pendingExisting = (existingRequests || []).find((row) => row.status === "requested");
   if (pendingExisting) {
     return NextResponse.json(
       {
         error: "There is already a pending exception request for this issue.",
         request_id: pendingExisting.id,
       },
+      { status: 409 }
+    );
+  }
+
+  const hasActiveApprovedException = (existingRequests || []).some(
+    (row) => getEffectiveExceptionStatus(row.status, row.expires_at) === "approved"
+  );
+
+  if (hasActiveApprovedException) {
+    return NextResponse.json(
+      { error: "This issue already has an active approved exception." },
       { status: 409 }
     );
   }
@@ -115,9 +136,10 @@ export async function POST(
       justification,
       scope_summary: "Suppress this recurring issue group across future scans.",
       snapshot,
+      expires_at: expiresAt,
     })
     .select(
-      "id, org_id, project_id, issue_group_id, target_type, requested_by, reviewed_by, status, justification, review_reason, scope_summary, snapshot, requested_at, decided_at"
+      "id, org_id, project_id, issue_group_id, target_type, requested_by, reviewed_by, status, justification, review_reason, scope_summary, snapshot, expires_at, requested_at, decided_at"
     )
     .single();
 
@@ -134,6 +156,7 @@ export async function POST(
     payload: {
       justification,
       scope_summary: inserted.scope_summary,
+      expires_at: inserted.expires_at,
     },
   });
 
