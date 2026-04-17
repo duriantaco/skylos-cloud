@@ -91,6 +91,7 @@ export default function BillingPage() {
   const [balance, setBalance] = useState<number>(0);
   const [plan, setPlan] = useState<string>("free");
   const [proExpiresAt, setProExpiresAt] = useState<string | null>(null);
+  const [hasCompletedPurchase, setHasCompletedPurchase] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
@@ -124,6 +125,7 @@ export default function BillingPage() {
           setBalance(data.balance);
           setPlan(data.plan);
           setProExpiresAt(data.pro_expires_at || null);
+          setHasCompletedPurchase(Boolean(data.has_completed_purchase));
           setTransactions(data.recent_transactions || []);
         }
       } catch (err) {
@@ -177,7 +179,7 @@ export default function BillingPage() {
   const isEnterprise = plan === "enterprise";
   const trialExpiry = proExpiresAt ? new Date(proExpiresAt) : null;
   const now = new Date();
-  const hasPermanentWorkspaceAccess = plan === "pro" && !proExpiresAt;
+  const hasPermanentWorkspaceAccess = hasCompletedPurchase || (plan === "pro" && !proExpiresAt);
   const hasActiveWorkspaceTrial = plan === "pro" && trialExpiry !== null && trialExpiry > now;
   const hasExpiredWorkspaceTrial = plan === "free" && trialExpiry !== null && trialExpiry <= now;
   const daysUntilTrialEnds = trialExpiry && trialExpiry > now
