@@ -1190,10 +1190,10 @@ export default async function Home() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
-              Credits for cloud workflows
+              Free local scans. Paid workspace governance.
             </h2>
             <p className="mt-4 text-lg text-slate-600">
-              Local CLI scans stay free. Buy credits when you want uploads, history, PR automation, or AI-assisted actions. Any completed purchase unlocks permanent workspace access. No seat-based pricing.
+              Run Skylos locally for free. When multiple repos or contributors need one standard, unlock Workspace Governance. Credits stay in the background as billing mechanics for compute-heavy cloud actions like uploads, compare, and AI-assisted analysis.
             </p>
           </div>
 
@@ -1205,8 +1205,8 @@ export default async function Home() {
                   <Zap className="w-3 h-3" /> Most Popular
                 </span>
               </div>
-              <h3 className="text-xl font-semibold text-slate-900">Cloud workflow</h3>
-              <p className="mt-2 text-slate-600 text-sm">Buy credits when you need shared history, automation, and workspace access</p>
+              <h3 className="text-xl font-semibold text-slate-900">Workspace Governance</h3>
+              <p className="mt-2 text-slate-600 text-sm">Unlock the shared control layer for multi-repo teams. Credit packs turn governance on, then only meter compute-heavy web actions.</p>
               <div className="mt-6">
                 <span className="text-5xl font-bold text-slate-900">$9</span>
                 <span className="text-slate-500 text-sm ml-1">/ 50 credits</span>
@@ -1216,46 +1216,52 @@ export default async function Home() {
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Local CLI stays free and unlimited
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Upload scans to the dashboard
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> One baseline across every repo
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Scan compare, trends, and finding history
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Controlled project overrides with explicit inheritance
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Inline PR comments and team collaboration
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Exception trail and evidence export in one place
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Slack and Discord notifications
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Shared history, compare, trends, and team review
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> AI triage and PR auto-fix <span className="text-slate-400">(coming soon)</span>
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Slack, Discord, and web collaboration workflows
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Credits never expire
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Credits are only spent on uploads, compare, and AI-assisted actions
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Workspace access stays unlocked after purchase
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Governance stays unlocked after your first purchase
                 </li>
               </ul>
               <Link
                 href="/login"
                 className="mt-8 block w-full text-center rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white hover:bg-slate-800 transition"
               >
-                Connect GitHub
+                Unlock Workspace Governance
               </Link>
-              <p className="mt-3 text-center text-xs text-slate-500">Starts with credits, then grows with usage.</p>
+              <Link
+                href="/workspace-governance"
+                className="mt-3 inline-flex items-center justify-center gap-2 text-center text-xs font-semibold text-slate-600 hover:text-slate-900"
+              >
+                See what Workspace Governance includes
+                <ArrowRight className="w-3 h-3" />
+              </Link>
             </div>
 
             {/* Enterprise */}
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-8 flex flex-col">
-              <h3 className="text-xl font-semibold text-slate-900">Team and enterprise</h3>
-              <p className="mt-2 text-slate-600 text-sm">For higher limits, rollout help, and procurement</p>
+              <h3 className="text-xl font-semibold text-slate-900">Governance rollout</h3>
+              <p className="mt-2 text-slate-600 text-sm">For larger orgs that need more limits, rollout help, and procurement support</p>
               <div className="mt-6">
                 <span className="text-3xl font-bold text-slate-900">Custom</span>
               </div>
               <ul className="mt-8 space-y-3 text-sm text-slate-600 flex-1">
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Everything in Cloud workflow
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Everything in Workspace Governance
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Unlimited credits
@@ -1264,10 +1270,10 @@ export default async function Home() {
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> More projects, scans, and longer history
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Advanced gates and exports <span className="text-slate-400">(coming soon)</span>
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Rollout help for shared policies and governance adoption
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Shared workspace, integrations, and governance
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Shared workspace, integrations, and governance workflows
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-500 shrink-0" /> Contact for rollout support and procurement
@@ -1303,10 +1309,10 @@ export default async function Home() {
             </Link>
 
             <Link
-              href="/blog/3-merged-prs-dead-code-in-black-flagsmith-pypdf"
+              href="/workspace-governance"
               className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-8 py-4 text-base font-semibold text-slate-900 hover:bg-slate-50 transition-all"
             >
-              See maintainer proof
+              See Workspace Governance
               <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>

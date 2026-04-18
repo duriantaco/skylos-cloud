@@ -115,7 +115,7 @@ async function setProjectPolicyInheritance(formData: FormData) {
     );
     if (!planCheck.ok) {
       return errorRedirect(
-        "Workspace policy governance requires paid workspace access."
+        "Workspace Governance requires paid workspace access."
       );
     }
 
@@ -169,7 +169,7 @@ async function setProjectPolicyInheritance(formData: FormData) {
     );
     if (!planCheck.ok) {
       return errorRedirect(
-        "Workspace policy governance requires paid workspace access."
+        "Workspace Governance requires paid workspace access."
       );
     }
 
@@ -503,8 +503,14 @@ function WorkspacePolicySection({
           />
           {canManageSettings && (
             <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
-              Buy any credit pack to unlock workspace governance controls, including the shared baseline and project inheritance workflow.
-              <div className="mt-3">
+              Workspace Governance gives you one baseline across repos, controlled project overrides, and a shared exception trail in the web app.
+              <div className="mt-3 flex flex-wrap gap-2">
+                <a
+                  href="/workspace-governance"
+                  className="inline-flex rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                >
+                  See Workspace Governance
+                </a>
                 <a
                   href="/dashboard/billing"
                   className="inline-flex rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
@@ -974,7 +980,7 @@ export default async function SettingsPage({
                       ? "Effective policy from workspace baseline"
                       : "Current project override"
                   }
-                  description="Project inheritance and overrides are part of the paid workspace governance surface."
+                  description="Project inheritance and controlled overrides are part of Workspace Governance."
                   config={
                     inheritanceMode === "inherit" ? effectivePolicy : projectCustomPolicy
                   }
@@ -985,7 +991,7 @@ export default async function SettingsPage({
                   }
                 />
                 <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
-                  Upgrade this workspace to manage the shared baseline, switch inheritance modes, and maintain project-specific overrides.
+                  Unlock Workspace Governance to manage one baseline across repos, switch inheritance modes, and keep project-specific overrides visible.
                 </div>
               </div>
             ) : inheritanceMode === "inherit" ? (
@@ -1073,7 +1079,7 @@ export default async function SettingsPage({
                         href="/dashboard/billing"
                         className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm"
                       >
-                        Buy any credit pack to unlock Workspace
+                        Unlock paid workspace
                       </a>
                     </div>
                   </div>
@@ -1108,7 +1114,7 @@ export default async function SettingsPage({
                         href="/dashboard/billing"
                         className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm"
                       >
-                        Buy any credit pack to unlock Workspace
+                        Unlock paid workspace
                       </a>
                     </div>
                   </div>

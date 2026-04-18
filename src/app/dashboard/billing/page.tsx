@@ -34,16 +34,16 @@ type Transaction = {
 };
 
 const WORKSPACE_FEATURES = [
-  "Advanced gate modes (category, severity, both)",
-  "Full trend analytics and history",
+  "One shared baseline across repos",
+  "Controlled project inheritance and overrides",
+  "Exception queue, decision trail, and evidence export",
+  "Full trend analytics, compare, and history",
   "Team collaboration (comments, assignments)",
   "Slack and Discord integrations",
-  "Suppression governance (unlimited, audit)",
-  "PR auto-fix with LLM (3 cr)",
-  "Compliance reports (500 cr)",
-  "Up to 50 custom rules",
+  "Advanced gate modes and up to 50 custom rules",
   "90-day history retention",
   "Findings export (CSV/JSON)",
+  "Credits never expire",
 ];
 
 const CREDIT_COSTS = [
@@ -58,23 +58,23 @@ const CREDIT_COSTS = [
 const PACK_PRESENTATION: Record<string, { eyebrow: string; description: string; bestFor: string }> = {
   starter: {
     eyebrow: "Quick start",
-    description: "Unlock workspace access and cover first shared uploads.",
-    bestFor: "Best for smoke tests and first cloud runs.",
+    description: "Unlock Workspace Governance and cover the first shared uploads and compares.",
+    bestFor: "Best for the first repo, first baseline, and first shared history runs.",
   },
   builder: {
-    eyebrow: "Solo flow",
-    description: "Enough credits for regular uploads, compare, and occasional AI help.",
-    bestFor: "Best for one repo with steady weekly usage.",
+    eyebrow: "Small team",
+    description: "Enough credits for a small team testing shared history, compare, and governance workflows.",
+    bestFor: "Best for one or two repos with steady weekly usage.",
   },
   team: {
     eyebrow: "Daily workflow",
-    description: "Balanced pack for shared cloud scans, compare, and AI actions.",
-    bestFor: "Best for teams using Skylos every week.",
+    description: "Balanced pack for teams using the web control layer every week.",
+    bestFor: "Best for teams managing multiple repos with shared standards.",
   },
   scale: {
     eyebrow: "Heavy automation",
-    description: "For frequent uploads, automated review loops, and compliance work.",
-    bestFor: "Best for multi-repo automation and high-volume usage.",
+    description: "For frequent uploads, governance evidence, and AI-assisted actions across multiple repos.",
+    bestFor: "Best for multi-repo automation and higher-volume review loops.",
   },
 };
 
@@ -194,26 +194,26 @@ export default function BillingPage() {
   const accessState = isEnterprise
     ? {
         title: "Enterprise",
-        body: "Unlimited credits and full workspace access are already active.",
+        body: "Unlimited credits and full governance access are already active.",
       }
     : hasPermanentWorkspaceAccess
     ? {
-        title: "Workspace access active",
-        body: "Paid workspace access is permanent. Future purchases add credits only.",
+        title: "Workspace Governance active",
+        body: "The shared control layer is unlocked permanently. Future purchases add credits only.",
       }
     : hasActiveWorkspaceTrial
     ? {
-        title: `Trial active · ${daysUntilTrialEnds} day${daysUntilTrialEnds === 1 ? "" : "s"} left`,
-        body: `Trial ends ${trialExpiry?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}. Your first completed purchase unlocks permanent workspace access.`,
+        title: `Governance trial active · ${daysUntilTrialEnds} day${daysUntilTrialEnds === 1 ? "" : "s"} left`,
+        body: `Trial ends ${trialExpiry?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}. Your first completed purchase unlocks permanent Workspace Governance.`,
       }
     : hasExpiredWorkspaceTrial
     ? {
-        title: `Trial ended ${daysSinceTrialEnded > 0 ? `${daysSinceTrialEnded} day${daysSinceTrialEnded === 1 ? "" : "s"} ago` : "today"}`,
-        body: "Your data is safe. Buy any pack to unlock permanent workspace access.",
+        title: `Governance trial ended ${daysSinceTrialEnded > 0 ? `${daysSinceTrialEnded} day${daysSinceTrialEnded === 1 ? "" : "s"} ago` : "today"}`,
+        body: "Your data is safe. Buy any pack to unlock permanent Workspace Governance.",
       }
     : {
-        title: "Free access",
-        body: "Local CLI is free. Buy any pack when you want shared cloud workflows and Workspace access.",
+        title: "Local CLI only",
+        body: "Local CLI scanning stays free. Buy any pack when you want shared web governance and cloud workflows.",
       };
 
   if (loading) {
@@ -237,11 +237,19 @@ export default function BillingPage() {
         </Link>
 
         <div className="mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Credits & Workspace</h1>
-            <p className="text-slate-500 mt-1">
-              One-time purchases. No seat-based pricing. Your first completed purchase unlocks permanent workspace access. Credits never expire.
-            </p>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Workspace Governance & Credits</h1>
+              <p className="text-slate-500 mt-1">
+                Local CLI stays free. One-time packs unlock Workspace Governance for the web app and fund compute-heavy actions. No seat-based pricing. Credits never expire.
+              </p>
+            </div>
+            <Link
+              href="/workspace-governance"
+              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              See what governance includes
+            </Link>
           </div>
         </div>
 
@@ -250,8 +258,8 @@ export default function BillingPage() {
             <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
             <p className="text-sm font-medium text-emerald-900">
               {resolvedSuccessPack
-                ? `${resolvedSuccessPack.name} added ${resolvedSuccessPack.credits.toLocaleString()} credits and workspace access is active.`
-                : "Credits added and workspace access is active."}
+                ? `${resolvedSuccessPack.name} added ${resolvedSuccessPack.credits.toLocaleString()} credits and Workspace Governance is active.`
+                : "Credits added and Workspace Governance is active."}
             </p>
             <button
               onClick={() => setSuccessPack(null)}
@@ -289,7 +297,7 @@ export default function BillingPage() {
           }`}>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <Shield className="w-4 h-4 text-indigo-500" />
-              Workspace access
+            Workspace Governance
             </div>
             <div className="mt-3 text-lg font-bold text-slate-900">{accessState.title}</div>
             <p className="mt-2 text-sm text-slate-600">{accessState.body}</p>
@@ -301,10 +309,10 @@ export default function BillingPage() {
         <div className="mb-10">
           <h2 className="text-lg font-semibold text-slate-900 mb-1 flex items-center gap-2">
             <Package className="w-5 h-5" />
-            Credit Packs
+            Choose a pack
           </h2>
           <p className="text-sm text-slate-500 mb-4">
-            Each pack adds credits. Your first completed purchase also unlocks permanent workspace access.
+            Each pack permanently unlocks Workspace Governance for this workspace. Credits remain for uploads, compare, and AI-assisted actions.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -334,9 +342,9 @@ export default function BillingPage() {
                   <h3 className="text-lg font-semibold text-slate-900">{pack.name}</h3>
                   <p className="mt-1 text-sm text-slate-500">{presentation?.description}</p>
 
-                  <div className="mt-5">
-                    <div className="text-3xl font-bold text-slate-900">{pack.price}</div>
-                    <div className="mt-1 text-sm text-slate-500">
+                <div className="mt-5">
+                  <div className="text-3xl font-bold text-slate-900">{pack.price}</div>
+                  <div className="mt-1 text-sm text-slate-500">
                       {pack.credits.toLocaleString()} credits · {pack.perCreditCost} / credit
                     </div>
                   </div>
@@ -386,10 +394,10 @@ export default function BillingPage() {
             <div className="p-5 border-b border-slate-100">
               <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
                 <Shield className="w-5 h-5" />
-                Workspace access includes
+                Workspace Governance includes
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Shared cloud workflows and governance stay unlocked after your first completed purchase.
+                Your first purchase unlocks the shared control layer. Credits are only a usage meter for compute-heavy actions.
               </p>
             </div>
             <div className="grid gap-2 p-5 sm:grid-cols-2">
