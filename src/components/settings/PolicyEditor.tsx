@@ -1,8 +1,10 @@
 'use client'
 import {
+  useEffect,
   useState,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Trash2, Save, Loader2, ChevronDown, ChevronRight, Lock, Check, CheckCircle2, Copy, Terminal, XCircle } from "lucide-react";
 
 type GateMode = "zero-new" | "category" | "severity" | "both";
@@ -30,6 +32,8 @@ type PolicyConfig = {
     by_severity?: GateThresholds;
   };
 };
+
+const EMPTY_POLICY_CONFIG: PolicyConfig = {};
 
 type SectionProps = {
   title: string;
@@ -135,15 +139,22 @@ export default function PolicyEditor({
   initialConfig,
   initialExcludePaths,
   projectId,
+  organizationId,
+  scope = "project",
   plan = "free",
+  saveLabel = "Save Changes",
 }: {
   initialConfig: PolicyConfig,
   initialExcludePaths?: string[],
-  projectId: string,
+  projectId?: string,
+  organizationId?: string,
+  scope?: "organization" | "project",
   plan?: string,
+  saveLabel?: string,
 }) {
   const canUseAdvancedGates = plan === "pro" || plan === "enterprise";
-  const pc = initialConfig || {};
+  const pc = initialConfig ?? EMPTY_POLICY_CONFIG;
+  const router = useRouter();
   
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -180,6 +191,42 @@ export default function PolicyEditor({
     CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0
   });
 
+  useEffect(() => {
+    setRules(pc.custom_rules || []);
+    setComplexityEnabled(pc.complexity_enabled ?? true);
+    setComplexityThreshold(pc.complexity_threshold ?? 10);
+    setNestingEnabled(pc.nesting_enabled ?? true);
+    setNestingThreshold(pc.nesting_threshold ?? 4);
+    setFunctionLengthEnabled(pc.function_length_enabled ?? true);
+    setFunctionLengthThreshold(pc.function_length_threshold ?? 50);
+    setArgCountEnabled(pc.arg_count_enabled ?? true);
+    setArgCountThreshold(pc.arg_count_threshold ?? 5);
+    setSecurityEnabled(pc.security_enabled ?? true);
+    setSecretsEnabled(pc.secrets_enabled ?? true);
+    setQualityEnabled(pc.quality_enabled ?? true);
+    setDeadCodeEnabled(pc.dead_code_enabled ?? true);
+    setExcludePaths(initialExcludePaths || []);
+    setAiAssuranceEnabled(pc.ai_assurance_enabled ?? false);
+    setGateEnabled(pc.gate?.enabled ?? true);
+    setGateMode(pc.gate?.mode ?? "zero-new");
+    setByCat(
+      pc.gate?.by_category || {
+        SECURITY: 0,
+        SECRET: 0,
+        QUALITY: 0,
+        DEAD_CODE: 0,
+      }
+    );
+    setBySev(
+      pc.gate?.by_severity || {
+        CRITICAL: 0,
+        HIGH: 0,
+        MEDIUM: 0,
+        LOW: 0,
+      }
+    );
+  }, [pc, initialExcludePaths]); // Refresh local form state from the canonical server payload.
+
   const addRule = () => setRules([...rules, ""]);
   const updateRule = (i: number, v: string) => {
     const newRules = [...rules];
@@ -205,7 +252,10 @@ export default function PolicyEditor({
         method: 'POST',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          projectId,
+          scope,
+          ...(scope === "organization"
+            ? { organizationId }
+            : { projectId }),
           custom_rules: rules.filter(r => r.trim()),
           exclude_paths: excludePaths.filter(p => p.trim()),
           complexity_enabled: complexityEnabled,
@@ -238,6 +288,7 @@ export default function PolicyEditor({
       setSaved(true);
       setShowSyncNotice(true);
       setCopiedSyncCommand(false);
+      router.refresh();
       setTimeout(() => setSaved(false), 2000);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Failed to save policy");
@@ -354,7 +405,12 @@ export default function PolicyEditor({
                     type="number"
                     min={0}
                     value={byCat[cat] ?? 0}
-                    onChange={(e) => setByCat({ ...byCat, [cat]: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setByCat({
+                        ...byCat,
+                        [cat]: Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                      })
+                    }
                     className="w-16 text-center bg-white border border-slate-200 rounded px-2 py-1 text-sm"
                   />
                 </div>
@@ -374,7 +430,12 @@ export default function PolicyEditor({
                     type="number"
                     min={0}
                     value={bySev[sev] ?? 0}
-                    onChange={(e) => setBySev({ ...bySev, [sev]: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setBySev({
+                        ...bySev,
+                        [sev]: Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                      })
+                    }
                     className="w-16 text-center bg-white border border-slate-200 rounded px-2 py-1 text-sm"
                   />
                 </div>
@@ -504,7 +565,7 @@ export default function PolicyEditor({
             <div className="min-w-0 flex-1">
               <div className="text-sm font-semibold text-emerald-900">Policy saved</div>
               <p className="mt-1 text-sm text-emerald-800">
-                If you use the CLI for local quality gates or uploads, run <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-800">skylos sync pull</code> before your next scan so the CLI picks up the new policy.
+                If you use the CLI for local quality gates or uploads, run <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-800">skylos sync pull</code> before your next scan so the CLI picks up the new {scope === "organization" ? "workspace baseline" : "project"} policy.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button
@@ -548,7 +609,7 @@ export default function PolicyEditor({
           className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition disabled:opacity-60"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          {saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}
+          {saving ? "Saving..." : saved ? "Saved!" : saveLabel}
         </button>
       </div>
     </div>

@@ -24,22 +24,24 @@ export async function ensureWorkspace(): Promise<EnsureWorkspaceResult> {
 }
 
 export async function getUserProjects(supabase: SupabaseClient, orgId: string) {
-  const { data: projects } = await supabase
+  const { data: projects, error } = await supabase
     .from("projects")
-    .select("id, name, repo_url, policy_config, created_at")
+    .select("id, name, repo_url, policy_config, policy_inheritance_mode, ai_assurance_enabled, created_at")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false });
 
+  if (error) throw error;
   return projects || [];
 }
 
 export async function getProject(supabase: SupabaseClient, projectId: string, orgId: string) {
-  const { data: project } = await supabase
+  const { data: project, error } = await supabase
     .from("projects")
-    .select("id, name, repo_url, policy_config, created_at, strict_mode, github_installation_id")
+    .select("id, name, repo_url, policy_config, policy_inheritance_mode, ai_assurance_enabled, created_at, strict_mode, github_installation_id")
     .eq("id", projectId)
     .eq("org_id", orgId)
-    .single();
+    .maybeSingle();
 
+  if (error) throw error;
   return project;
 }

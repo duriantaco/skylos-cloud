@@ -18,6 +18,10 @@ import { resolveOidcProject } from "@/lib/oidc-project";
 import { resolveGitHubDefaultBranch } from "@/lib/github-repo";
 import { resolveProjectFromToken } from "@/lib/project-api-keys";
 import {
+  resolveEffectiveAiAssuranceEnabled,
+  resolveEffectiveAnalysisPolicy,
+} from "@/lib/policy-config";
+import {
   buildActiveSuppressionKeys,
   buildSuppressionKey,
 } from "@/lib/report-suppressions-core";
@@ -425,6 +429,7 @@ export async function POST(req: Request) {
         strict_mode: boolean | null;
         repo_url: string | null;
         policy_config: Record<string, unknown> | null;
+        policy_inheritance_mode: string | null;
         ai_assurance_enabled: boolean | null;
         github_installation_id: number | null;
         slack_webhook_url: string | null;
@@ -438,10 +443,10 @@ export async function POST(req: Request) {
         supabase,
         claims.repository,
         `
-          id, name, org_id, strict_mode, repo_url, policy_config, ai_assurance_enabled,
+          id, name, org_id, strict_mode, repo_url, policy_config, policy_inheritance_mode, ai_assurance_enabled,
           github_installation_id, slack_webhook_url, slack_notifications_enabled,
           slack_notify_on, discord_webhook_url, discord_notifications_enabled,
-          discord_notify_on, organizations(plan, pro_expires_at)`
+          discord_notify_on, organizations(plan, pro_expires_at, policy_config, ai_assurance_enabled)`
       )
 
       if (resolution.kind === "not_found") {
@@ -467,6 +472,7 @@ export async function POST(req: Request) {
         strict_mode: boolean | null;
         repo_url: string | null;
         policy_config: Record<string, unknown> | null;
+        policy_inheritance_mode: string | null;
         ai_assurance_enabled: boolean | null;
         github_installation_id: number | null;
         slack_webhook_url: string | null;
@@ -480,10 +486,10 @@ export async function POST(req: Request) {
         supabase,
         token,
         `
-          id, name, org_id, strict_mode, repo_url, policy_config, ai_assurance_enabled,
+          id, name, org_id, strict_mode, repo_url, policy_config, policy_inheritance_mode, ai_assurance_enabled,
           github_installation_id, slack_webhook_url, slack_notifications_enabled,
           slack_notify_on, discord_webhook_url, discord_notifications_enabled,
-          discord_notify_on, organizations(plan, pro_expires_at)`
+          discord_notify_on, organizations(plan, pro_expires_at, policy_config, ai_assurance_enabled)`
       );
 
       const apiKeyProject = resolved?.project;
@@ -809,9 +815,15 @@ export async function POST(req: Request) {
     const totalNewCount = unsuppressedNewCount + suppressedNewCount
     const legacyCount = finalFindings.length - totalNewCount
 
-    const policy: any = (project as any).policy_config || {};
-    const gate: any = policy.gate || {};
-    const gateEnabled = gate.enabled !== false;
+    const effectivePolicy = resolveEffectiveAnalysisPolicy({
+      organizationPolicyConfig: Array.isArray(orgRef)
+        ? orgRef?.[0]?.policy_config ?? null
+        : orgRef?.policy_config ?? null,
+      projectPolicyConfig: (project as any).policy_config ?? null,
+      projectPolicyInheritanceMode: (project as any).policy_inheritance_mode,
+    });
+    const gate = effectivePolicy.gate;
+    const gateEnabled = gate.enabled;
     const mode = String(gate.mode || "zero-new");
 
     const byCategoryThresholds: Record<string, number> = {
@@ -847,7 +859,16 @@ export async function POST(req: Request) {
       String(f.severity || "").toUpperCase() === "CRITICAL" &&
       String(f.category || "").toUpperCase() === "SECURITY"
     ).length;
-    const aiAssuranceEnabled = !!(ai_code?.detected && (project as any).ai_assurance_enabled);
+    const aiAssuranceEnabled = !!(
+      ai_code?.detected &&
+      resolveEffectiveAiAssuranceEnabled({
+        organizationAiAssuranceEnabled: Array.isArray(orgRef)
+          ? orgRef?.[0]?.ai_assurance_enabled ?? null
+          : orgRef?.ai_assurance_enabled ?? null,
+        projectAiAssuranceEnabled: (project as any).ai_assurance_enabled,
+        projectPolicyInheritanceMode: (project as any).policy_inheritance_mode,
+      })
+    );
     const aiFiles = new Set(ai_code?.ai_files || []);
     const aiFileFindings = aiAssuranceEnabled
       ? finalFindings.filter(
