@@ -35,7 +35,7 @@ export default function DevPlanToggle({ currentPlan }: { currentPlan: string }) 
       </div>
 
       <p className="text-sm text-gray-700 mb-4">
-        For testing only. This will be changed when we go out of beta
+        For staff testing only. This toggle is not part of the normal workspace settings flow.
       </p>
 
       <form action={handleSubmit} className="flex items-center gap-4">
