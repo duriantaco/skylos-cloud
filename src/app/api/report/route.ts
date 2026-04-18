@@ -61,6 +61,9 @@ const LIMITS = {
   MAX_FILE_PATH_LENGTH: 500,
 };
 
+const UPLOAD_LEASE_TTL_MS = 30 * 60 * 1000;
+const UPLOAD_LEASE_HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
+
 async function batchInsertFindings(
   supabase: SupabaseClient,
   rows: any[]
@@ -74,6 +77,83 @@ async function batchInsertFindings(
     const { error } = await supabase.from('findings').insert(batch);
     if (error) throw new Error(`Batch insert failed: ${error.message}`);
   }
+}
+
+async function renewInlineUploadLease(
+  supabase: SupabaseClient,
+  projectId: string,
+  uploadId: string,
+  uploadLeaseId: string,
+): Promise<void> {
+  const leaseExpiresAt = new Date(
+    Date.now() + UPLOAD_LEASE_TTL_MS
+  ).toISOString();
+  const { data, error } = await supabase
+    .from("report_upload_sessions")
+    .update({
+      updated_at: new Date().toISOString(),
+      lease_expires_at: leaseExpiresAt,
+    })
+    .eq("project_id", projectId)
+    .eq("id", uploadId)
+    .eq("status", "completing")
+    .eq("lease_id", uploadLeaseId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to renew upload lease: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error("Upload lease is no longer active. Retry the upload.");
+  }
+}
+
+function startUploadLeaseHeartbeat(args: {
+  supabase: SupabaseClient;
+  projectId: string;
+  uploadId: string;
+  uploadLeaseId: string;
+}) {
+  let stopped = false;
+  let heartbeatError: Error | null = null;
+
+  const tick = async () => {
+    if (stopped || heartbeatError) {
+      return;
+    }
+    try {
+      await renewInlineUploadLease(
+        args.supabase,
+        args.projectId,
+        args.uploadId,
+        args.uploadLeaseId,
+      );
+    } catch (error) {
+      heartbeatError =
+        error instanceof Error
+          ? error
+          : new Error(String(error || "Upload lease renewal failed."));
+      console.error("Upload lease heartbeat failed:", heartbeatError.message);
+    }
+  };
+
+  const timer = setInterval(() => {
+    void tick();
+  }, UPLOAD_LEASE_HEARTBEAT_INTERVAL_MS);
+  timer.unref?.();
+
+  return {
+    stop() {
+      stopped = true;
+      clearInterval(timer);
+    },
+    assertHealthy() {
+      if (heartbeatError) {
+        throw heartbeatError;
+      }
+    },
+  };
 }
 
 
@@ -391,6 +471,9 @@ export async function POST(req: Request) {
   let chargedCredits:
     | { orgId: string; amount: number; projectId: string; featureKey: string }
     | null = null;
+  let uploadLeaseHeartbeat:
+    | { stop: () => void; assertHealthy: () => void }
+    | null = null;
 
   try {
     const contentLength = req.headers.get('content-length');
@@ -520,6 +603,25 @@ export async function POST(req: Request) {
     const ai_code = body.ai_code || null;
     const provenance = body.provenance || null;
     const definitions = body.definitions || null;
+    const uploadId =
+      typeof body.upload_id === "string" && body.upload_id.trim().length > 0
+        ? body.upload_id.trim()
+        : null;
+    const uploadLeaseId =
+      typeof body.upload_lease_id === "string" &&
+      body.upload_lease_id.trim().length > 0
+        ? body.upload_lease_id.trim()
+        : null;
+    if (uploadId && !uploadLeaseId) {
+      return NextResponse.json({
+        error: "upload_lease_id is required when upload_id is present.",
+      }, { status: 400 })
+    }
+    if (uploadLeaseId && !uploadId) {
+      return NextResponse.json({
+        error: "upload_id is required when upload_lease_id is present.",
+      }, { status: 400 })
+    }
     const requestedBranch =
       typeof body.branch === "string" && body.branch.trim().length > 0
         ? body.branch.trim()
@@ -593,6 +695,15 @@ export async function POST(req: Request) {
           creditsWarning = true;
         }
       }
+    }
+
+    if (uploadId && uploadLeaseId) {
+      uploadLeaseHeartbeat = startUploadLeaseHeartbeat({
+        supabase,
+        projectId: project.id,
+        uploadId,
+        uploadLeaseId,
+      });
     }
 
     if (tool === "sarif" && !caps.sarifEnabled) {
@@ -927,6 +1038,8 @@ export async function POST(req: Request) {
       }
     }
 
+    uploadLeaseHeartbeat?.assertHealthy();
+
     const { data: scan, error: scanError } = await supabase
       .from('scans')
       .insert({
@@ -977,7 +1090,13 @@ export async function POST(req: Request) {
         defense_score: defense_score || null,
         ops_score: ops_score || null,
         owasp_coverage: owasp_coverage || null,
-        result: definitions ? { definitions } : null,
+        result:
+          definitions || uploadId
+            ? {
+                ...(definitions ? { definitions } : {}),
+                ...(uploadId ? { upload_id: uploadId } : {}),
+              }
+            : null,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -987,6 +1106,7 @@ export async function POST(req: Request) {
       throw new Error(scanError.message)
 
     const scanUrl = `${process.env.APP_BASE_URL || getSiteUrl()}/dashboard/scans/${scan.id}${tool === "skylos-defend" ? "/defense" : ""}`;
+    uploadLeaseHeartbeat?.assertHealthy();
 
     const dbRows = finalFindings.map((f: any, idx: number) => ({
       scan_id: scan.id,
@@ -1676,6 +1796,32 @@ export async function POST(req: Request) {
       plan: plan,
     });
 
+    uploadLeaseHeartbeat?.assertHealthy();
+
+    if (uploadId) {
+      let finalizeQuery = supabase
+        .from("report_upload_sessions")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          scan_id: scan.id,
+          complete_response: response,
+          lease_id: null,
+          lease_expires_at: null,
+        })
+        .eq("id", uploadId)
+        .eq("project_id", project.id)
+        .eq("status", "completing");
+      if (uploadLeaseId) {
+        finalizeQuery = finalizeQuery.eq("lease_id", uploadLeaseId);
+      }
+      const { error: uploadSessionErr } = await finalizeQuery;
+      if (uploadSessionErr) {
+        console.error("Failed to finalize upload session:", uploadSessionErr.message);
+      }
+    }
+
     return NextResponse.json(response)
   } catch (e) {
     if (chargedCredits) {
@@ -1697,5 +1843,7 @@ export async function POST(req: Request) {
     }
 
     return serverError(e, "Report API");
+  } finally {
+    uploadLeaseHeartbeat?.stop();
   }
 }
