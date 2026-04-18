@@ -1,44 +1,113 @@
 import { createClient } from "@/utils/supabase/server";
+import { supabaseAdmin } from "@/utils/supabase/admin";
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/api-error";
 import { requirePermission, isAuthError } from "@/lib/permissions";
-import { getEffectivePlan, canUseAdvancedGates } from "@/lib/entitlements";
+import { canUseAdvancedGates, getEffectivePlan } from "@/lib/entitlements";
+import { requirePlan } from "@/lib/require-credits";
+import {
+  readAnalysisPolicyConfig,
+  mergeAnalysisPolicyConfig,
+  normalizeAnalysisPolicyInput,
+} from "@/lib/policy-config";
 
-type GateMode = "zero-new" | "category" | "severity" | "both";
-
-function toNonNegInt(v: any, fallback: number) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(0, Math.floor(n));
-}
-
-function toBool(v: any, fallback: boolean) {
-  if (v === true || v === false)
-    return v;
-  if (v === "true")
-    return true;
-  if (v === "false")
-    return false;
+function toBool(v: unknown, fallback: boolean) {
+  if (v === true || v === false) return v;
+  if (typeof v === "string") {
+    const normalized = v.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
   return fallback;
 }
 
 export async function POST(req: Request) {
   try {
     const supabase = await createClient();
+    const body = await req.json().catch(() => ({} as Record<string, unknown>));
 
-    const body = await req.json().catch(() => ({}));
+    const scope = body.scope === "organization" ? "organization" : "project";
+
+    if (scope === "organization") {
+      const organizationId = String(body.organizationId || "");
+      if (!organizationId) {
+        return NextResponse.json(
+          { error: "Missing organizationId" },
+          { status: 400 }
+        );
+      }
+
+      const auth = await requirePermission(
+        supabase,
+        "manage:settings",
+        organizationId
+      );
+      if (isAuthError(auth)) return auth;
+
+      const { data: org, error: orgError } = await supabase
+        .from("organizations")
+        .select("id, plan, pro_expires_at")
+        .eq("id", organizationId)
+        .single();
+
+      if (orgError) {
+        return serverError(orgError, "Load organization policy");
+      }
+
+      if (!org) {
+        return NextResponse.json(
+          { error: "Organization not found" },
+          { status: 404 }
+        );
+      }
+
+      const effectivePlan = getEffectivePlan({
+        plan: org.plan || "free",
+        pro_expires_at: org.pro_expires_at,
+      });
+      const planCheck = requirePlan(
+        effectivePlan,
+        "pro",
+        "Workspace policy governance"
+      );
+      if (!planCheck.ok) return planCheck.response;
+
+      const policy_config = normalizeAnalysisPolicyInput(body, {
+        canUseAdvancedGates: canUseAdvancedGates(effectivePlan),
+      });
+      const ai_assurance_enabled = toBool(body.ai_assurance_enabled, false);
+
+      const { error } = await supabaseAdmin
+        .from("organizations")
+        .update({ policy_config, ai_assurance_enabled })
+        .eq("id", organizationId);
+
+      if (error) {
+        return serverError(error, "Update organization policy");
+      }
+
+      return NextResponse.json({
+        success: true,
+        scope,
+        policy_config,
+        ai_assurance_enabled,
+      });
+    }
 
     const projectId = String(body.projectId || "");
     if (!projectId) {
       return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
     }
 
-    // FIX: verify org membership via project lookup
-    const { data: project } = await supabase
+    const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id, org_id")
+      .select("id, org_id, policy_config, policy_inheritance_mode")
       .eq("id", projectId)
       .single();
+
+    if (projectError) {
+      return serverError(projectError, "Load project policy");
+    }
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -47,97 +116,66 @@ export async function POST(req: Request) {
     const auth = await requirePermission(supabase, "manage:settings", project.org_id);
     if (isAuthError(auth)) return auth;
 
-    // Resolve effective plan to enforce gate mode restrictions
-    const { data: org } = await supabase
+    const { data: org, error: orgError } = await supabase
       .from("organizations")
-      .select("plan, pro_expires_at")
+      .select("plan, pro_expires_at, policy_config")
       .eq("id", project.org_id)
       .single();
-    const effectivePlan = getEffectivePlan({ plan: org?.plan || "free", pro_expires_at: org?.pro_expires_at });
 
-    const incomingRules = Array.isArray(body.custom_rules) ? body.custom_rules : [];
-    const custom_rules = incomingRules
-      .map((x: any) => String(x ?? "").trim())
-      .filter(Boolean)
-      .slice(0, 50);
-
-    const incomingPaths = Array.isArray(body.exclude_paths) ? body.exclude_paths : [];
-    const exclude_paths = incomingPaths
-      .map((x: any) => String(x ?? "").trim())
-      .filter(Boolean)
-      .slice(0, 100);
-
-    const complexity_enabled = toBool(body.complexity_enabled, true);
-    const complexity_threshold = toNonNegInt(body.complexity_threshold, 10);
-    const nesting_enabled = toBool(body.nesting_enabled, true);
-    const nesting_threshold = toNonNegInt(body.nesting_threshold, 4);
-    const function_length_enabled = toBool(body.function_length_enabled, true);
-    const function_length_threshold = toNonNegInt(body.function_length_threshold, 50);
-    const arg_count_enabled = toBool(body.arg_count_enabled, true);
-    const arg_count_threshold = toNonNegInt(body.arg_count_threshold, 5);
-
-    const security_enabled = toBool(body.security_enabled, true);
-    const secrets_enabled = toBool(body.secrets_enabled, true);
-    const quality_enabled = toBool(body.quality_enabled, true);
-    const dead_code_enabled = toBool(body.dead_code_enabled, true);
-
-    const g = body.gate || {};
-    let requestedMode = (["zero-new", "category", "severity", "both"].includes(String(g.mode))
-      ? String(g.mode)
-      : "zero-new") as GateMode;
-
-    // Free users can only use zero-new gate mode
-    if (!canUseAdvancedGates(effectivePlan) && requestedMode !== "zero-new") {
-      requestedMode = "zero-new";
+    if (orgError) {
+      return serverError(orgError, "Load organization plan");
     }
 
-    const gate = {
-      enabled: toBool(g.enabled, true),
-      mode: requestedMode,
-      by_category: {} as Record<string, number>,
-      by_severity: {} as Record<string, number>,
-    };
+    const effectivePlan = getEffectivePlan({
+      plan: org?.plan || "free",
+      pro_expires_at: org?.pro_expires_at,
+    });
+    const planCheck = requirePlan(
+      effectivePlan,
+      "pro",
+      "Workspace policy governance"
+    );
+    if (!planCheck.ok) return planCheck.response;
 
-    const defaultCats = ["SECURITY", "SECRET", "QUALITY", "DEAD_CODE", "DEPENDENCY"];
-    const defaultSev = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+    const basePolicyConfig =
+      project.policy_inheritance_mode === "inherit"
+        ? mergeAnalysisPolicyConfig(
+            project.policy_config as Record<string, unknown> | null,
+            readAnalysisPolicyConfig(
+              (org?.policy_config as Record<string, unknown> | null) ?? null
+            )
+          )
+        : (project.policy_config as Record<string, unknown> | null);
 
-    const catObj = (g.by_category && typeof g.by_category === "object") ? g.by_category : {};
-    const sevObj = (g.by_severity && typeof g.by_severity === "object") ? g.by_severity : {};
-
-    for (const c of defaultCats) gate.by_category[c] = toNonNegInt(catObj[c], 0);
-    for (const s of defaultSev) gate.by_severity[s] = toNonNegInt(sevObj[s], 0);
-
-    const policy_config = {
-      custom_rules,
-      gate,
-      exclude_paths,
-      complexity_enabled,
-      complexity_threshold,
-      nesting_enabled,
-      nesting_threshold,
-      function_length_enabled,
-      function_length_threshold,
-      arg_count_enabled,
-      arg_count_threshold,
-      security_enabled,
-      secrets_enabled,
-      quality_enabled,
-      dead_code_enabled,
-    };
-
+    const analysisPolicy = normalizeAnalysisPolicyInput(body, {
+      canUseAdvancedGates: canUseAdvancedGates(effectivePlan),
+    });
+    const policy_config = mergeAnalysisPolicyConfig(
+      basePolicyConfig,
+      analysisPolicy
+    );
     const ai_assurance_enabled = toBool(body.ai_assurance_enabled, false);
 
     const { error } = await supabase
       .from("projects")
-      .update({ policy_config, ai_assurance_enabled })
+      .update({
+        policy_config,
+        ai_assurance_enabled,
+        policy_inheritance_mode: "custom",
+      })
       .eq("id", projectId);
 
     if (error) {
       return serverError(error, "Update project policy");
     }
 
-    return NextResponse.json({ success: true, policy_config, exclude_paths });
-  } catch (e: any) {
-    return serverError(e, "Project policy update");
+    return NextResponse.json({
+      success: true,
+      scope,
+      policy_config,
+      ai_assurance_enabled,
+    });
+  } catch (e: unknown) {
+    return serverError(e, "Policy update");
   }
 }
