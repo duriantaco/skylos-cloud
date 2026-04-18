@@ -56,16 +56,24 @@ export default async function ExceptionRequestsPage() {
         <div className="mx-auto max-w-5xl">
           <div className="rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-slate-50 p-12 text-center">
             <Lock className="mx-auto mb-4 h-10 w-10 text-indigo-500" />
-            <h1 className="text-xl font-bold text-slate-900">Exception Governance is a Pro feature</h1>
+            <h1 className="text-xl font-bold text-slate-900">Workspace Governance is required</h1>
             <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600">
-              Route risky exceptions through reviewer approval, keep a decision trail, and prove who allowed what and why.
+              Route risky exceptions through reviewer approval, keep the decision trail in one queue, and export evidence for who allowed what and why.
             </p>
-            <Link
-              href="/dashboard/billing"
-              className="mt-6 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-            >
-              Buy any credit pack to unlock Pro
-            </Link>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              <Link
+                href="/workspace-governance"
+                className="inline-flex rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"
+              >
+                See Workspace Governance
+              </Link>
+              <Link
+                href="/dashboard/billing"
+                className="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                Unlock Workspace Governance
+              </Link>
+            </div>
           </div>
         </div>
       </main>

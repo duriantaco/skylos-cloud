@@ -17,16 +17,24 @@ export default function ProFeatureLock({ feature, description }: Props) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">Workspace Feature</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">Paid Workspace Feature</span>
           </div>
           <p className="text-sm font-medium text-slate-900">{feature}</p>
           <p className="text-xs text-slate-500 mt-0.5">{description}</p>
-          <Link
-            href="/dashboard/billing"
-            className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition"
-          >
-            Buy any credit pack to unlock Workspace access
-          </Link>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Link
+              href="/workspace-governance"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-white text-xs font-semibold text-indigo-700 hover:bg-indigo-50 transition"
+            >
+              See Workspace Governance
+            </Link>
+            <Link
+              href="/dashboard/billing"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition"
+            >
+              Unlock paid workspace
+            </Link>
+          </div>
         </div>
       </div>
     </div>
