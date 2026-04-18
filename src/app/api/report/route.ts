@@ -1105,11 +1105,8 @@ export async function POST(req: Request) {
     if (scanError) 
       throw new Error(scanError.message)
 
-<<<<<<< Updated upstream
     const scanUrl = `${process.env.APP_BASE_URL || getSiteUrl()}/dashboard/scans/${scan.id}${tool === "skylos-defend" ? "/defense" : ""}`;
-=======
     uploadLeaseHeartbeat?.assertHealthy();
->>>>>>> Stashed changes
 
     const dbRows = finalFindings.map((f: any, idx: number) => ({
       scan_id: scan.id,
